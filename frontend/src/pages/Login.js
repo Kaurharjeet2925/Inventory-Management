@@ -116,7 +116,7 @@ export default function Login({ onSwitch }) {
           </button>
 
           {/* Switch to Signup */}
-          <p className="text-center text-sm mt-3">
+          {/* <p className="text-center text-sm mt-3">
             Don't have an account?{' '}
             <button
               type="button"
@@ -125,7 +125,7 @@ export default function Login({ onSwitch }) {
             >
               Sign Up
             </button>
-          </p>
+          </p> */}
         </form>
       </div>
     </div>

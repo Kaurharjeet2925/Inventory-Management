@@ -1,0 +1,217 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Phone, Mail, Eye, Trash2 } from "lucide-react";
+
+const AllAdmins = () => {
+  const [admins, setAdmins] = useState([]);
+  const [failedImages, setFailedImages] = useState({});
+  const [view, setView] = useState("cards"); // cards OR list
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedAdmins = JSON.parse(localStorage.getItem("admins")) || [];
+    setAdmins(storedAdmins);
+  }, []);
+
+  return (
+    <div className="ml-64 mt-12 p-4 bg-gray-100 min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-semibold">All Admins</h1>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => setView("cards")}
+            className={`px-4 py-2 rounded-lg ${
+              view === "cards" ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
+          >
+            Card View
+          </button>
+
+          <button
+            onClick={() => setView("list")}
+            className={`px-4 py-2 rounded-lg ${
+              view === "list" ? "bg-blue-600 text-white" : "bg-gray-200"
+            }`}
+          >
+            List View
+          </button>
+        </div>
+      </div>
+
+      {/* Show NO DATA message */}
+      {admins.length === 0 ? (
+        <div className="text-gray-500 text-lg">
+          No admins found. Add from Add Admin page.
+        </div>
+      ) : (
+        <>
+          {/* CARD VIEW */}
+          {view === "cards" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
+              {admins.map((admin, idx) => {
+                const key = admin.id || admin._id || idx;
+                const failed = !!failedImages[key];
+
+                return (
+                  <div
+                    key={key}
+                    className="relative group bg-white rounded-2xl shadow-lg border p-6 flex flex-col items-center hover:shadow-xl transition-all"
+                  >
+                    {/* Hover overlay with Eye */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex justify-center items-center rounded-2xl transition-all z-20">
+                      <div className="relative">
+                        <button
+                          onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })}
+                          className="w-10 h-10 flex items-center justify-center"
+                          aria-label={`View ${admin.firstName} ${admin.lastName}`}
+                        >
+                          <Eye className="w-8 h-8 text-white" />
+                        </button>
+
+                        {/* <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap">
+                          View Profile
+                        </div> */}
+                      </div>
+                    </div>
+
+                    {/* Profile Image */}
+                    <div className="w-32 h-32 rounded-full overflow-hidden border shadow-sm bg-gray-100 flex items-center justify-center relative z-10">
+                      {admin.image && !failed ? (
+                        <img
+                          src={admin.image}
+                          alt="profile"
+                          className="object-cover w-full h-full"
+                          onError={() =>
+                            setFailedImages((prev) => ({
+                              ...prev,
+                              [key]: true,
+                            }))
+                          }
+                        />
+                      ) : (
+                        (() => {
+                          const f = (admin.firstName || "").trim();
+                          const l = (admin.lastName || "").trim();
+                          const first = f ? f.charAt(0).toUpperCase() : "";
+                          const last = l ? l.charAt(0).toUpperCase() : "";
+                          const initials =
+                            first + last || first || last || "?";
+                          return (
+                            <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white text-2xl font-semibold">
+                              {initials}
+                            </div>
+                          );
+                        })()
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <h2 className="text-xl font-semibold mt-4">
+                      {admin.firstName} {admin.lastName}
+                    </h2>
+
+                    <span className="mt-2 text-sm px-3 py-1 rounded-md bg-gray-100 text-gray-700">
+                      {admin.role || "Admin"}
+                    </span>
+
+                    {/* Email */}
+                    <div className="mt-4 w-full">
+                      <div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center">
+                        <Mail className="w-4 h-4 text-gray-500" />
+                        {admin.email}
+                      </div>
+                    </div>
+
+                    {/* Phone */}
+                    <div className="mt-2 w-full">
+                      <div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center">
+                        <Phone className="w-4 h-4 text-gray-500" />
+                        {admin.phone}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* LIST VIEW */}
+          {view === "list" && (
+            <div className="bg-white p-6 rounded-xl shadow-md">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-200 text-gray-700">
+                    <th className="p-3">Profile</th>
+                    <th className="p-3">Name</th>
+                    <th className="p-3">Email</th>
+                    <th className="p-3">Phone</th>
+                    <th className="p-3">Role</th>
+                    <th className="p-3">Actions</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {admins.map((admin, idx) => {
+                    const key = admin.id || admin._id || idx;
+                    const failed = !!failedImages[key];
+
+                    return (
+                      <tr key={key} className="border-b hover:bg-gray-50">
+                        <td className="p-3">
+                          {admin.image && !failed ? (
+                            <img
+                              src={admin.image}
+                              alt="Profile"
+                              className="w-10 h-10 rounded-full object-cover"
+                              onError={() =>
+                                setFailedImages((prev) => ({
+                                  ...prev,
+                                  [key]: true,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+                              {(admin.firstName?.[0] || "?").toUpperCase()}
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {admin.firstName} {admin.lastName}
+                        </td>
+
+                        <td className="p-3">{admin.email}</td>
+
+                        <td className="p-3">{admin.phone}</td>
+
+                        <td className="p-3">
+                          <span className="px-3 py-1 bg-gray-100 rounded text-gray-700">
+                            {admin.role}
+                          </span>
+                        </td>
+
+                        <td className="p-3 flex gap-2">
+                          <button onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })} className="p-2 rounded-full border-2 border-blue-500 text-blue-500 hover:bg-blue-50">
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          <button className="p-2 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default AllAdmins;

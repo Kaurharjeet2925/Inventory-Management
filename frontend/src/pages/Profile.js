@@ -1,23 +1,18 @@
 import React from 'react';
 import Sidebar from '../components/Sidebar';
-import { Outlet, Link } from "react-router-dom";
+import { Outlet } from "react-router-dom";
+import Header from '../components/Header';
+
 const Profile = () => {
   return (
-	  <div className="flex">
-      <Sidebar/>
-
-      <div className="flex-1 p-4">
-        <h1 className="text-2xl font-bold">Profile</h1>
-        <p>Welcome to Admin Profile</p>
-        <div className="mt-4">
-          <Link to="edit" className="px-4 py-2 bg-blue-600 text-white rounded">Edit Profile</Link>
-        </div>
-        <div className="mt-4">
-          <Outlet />
-        </div>
+    <div className="flex w-full items-start">
+      <Sidebar />
+      <Header/>
+      <div className="flex-1 bg-gray-100 p-6 w-full">
+        <Outlet />
       </div>
     </div>
   );
-}
+};
 
 export default Profile;
