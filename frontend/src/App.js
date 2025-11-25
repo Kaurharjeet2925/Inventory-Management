@@ -10,6 +10,7 @@ import Product from './pages/ManageProduct/Product.js';
 import Brands from './pages/ManageProduct/Brands.js';
 import ManageProducts from './pages/ManageProduct/ManageProducts.js';
 import Categories from './pages/ManageProduct/Category.js';
+import Locations from './pages/ManageProduct/Locations.js';
 function App() {
   return (
     <div>
@@ -25,7 +26,9 @@ function App() {
         <Route path="brands" element={<Brands/>} />
         <Route path="categories" element={<Categories/>} />
         <Route path="products" element={<Product/>} />
+        <Route path='location' element={<Locations/>} />
     </Route>
+    
     </Routes>
     </div>
   );

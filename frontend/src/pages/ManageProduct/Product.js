@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus, Pencil, Trash2 } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
-
+import { FaStar } from "react-icons/fa6";
 const Product = () => {
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
@@ -20,12 +20,15 @@ const Product = () => {
     category: "",
     brand: "",
     quantity: "",
+    unit: "",
+    mrp: "",
+    price: "",
+    description: "",
     location: "",
     thumbnail: null,
     images: [],
   });
 
-  // FETCH CATEGORIES, BRANDS, PRODUCTS
   useEffect(() => {
     fetchData();
   }, []);
@@ -34,26 +37,16 @@ const Product = () => {
     try {
       const catRes = await apiClient.get("/category");
       const brandRes = await apiClient.get("/brands");
-      const prodRes = await apiClient.get("/products");
-      const locRes = await apiClient.get("/locations");
+    
 
       setCategories(catRes.data);
       setBrands(brandRes.data);
-      setProducts(prodRes.data);
-      setLocations(locRes.data);
-
+     
     } catch (err) {
-      console.log("Error fetching data:", err);
+      console.log("Error fetching:", err);
     }
   };
- const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingId(null);
-    setProducts({ name: "", image: null });
-    setImagesPreview("");
-  };
 
-  // OPEN MODAL
   const handleOpenModal = () => {
     setEditingId(null);
     setProductData({
@@ -61,6 +54,10 @@ const Product = () => {
       category: "",
       brand: "",
       quantity: "",
+      unit: "",
+      mrp: "",
+      price: "",
+      description: "",
       location: "",
       thumbnail: null,
       images: [],
@@ -70,67 +67,33 @@ const Product = () => {
     setShowModal(true);
   };
 
-  // EDIT PRODUCT
-  const handleEditProduct = (p) => {
-    setEditingId(p._id);
-    setProductData({
-      name: p.name,
-      category: p.category,
-      brand: p.brand,
-      quantity: p.quantity,
-      location: p.location,
-      thumbnail: null,
-      images: [],
-    });
-
-    setThumbnailPreview(
-      p.thumbnail ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}` : ""
-    );
-
-    setImagesPreview(
-      p.images?.map((img) => `${process.env.REACT_APP_IMAGE_URL}/${img}`)
-    );
-
-    setShowModal(true);
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingId(null);
   };
 
-  // THUMBNAIL
+  // Image handlers
   const handleThumbnail = (e) => {
     const file = e.target.files[0];
-    if (!file) return;
-
     setProductData((prev) => ({ ...prev, thumbnail: file }));
     setThumbnailPreview(URL.createObjectURL(file));
   };
 
-  // MULTI IMAGES
   const handleImages = (e) => {
     const files = Array.from(e.target.files);
-
     setProductData((prev) => ({ ...prev, images: files }));
-    setImagesPreview(files.map((file) => URL.createObjectURL(file)));
+    setImagesPreview(files.map((img) => URL.createObjectURL(img)));
   };
 
-  // SAVE PRODUCT
+  // Save product
   const handleSaveProduct = async () => {
-    if (!productData.name || !productData.category || !productData.brand) {
-      alert("Name, Category, Brand are required!");
-      return;
-    }
-
     const formData = new FormData();
-    formData.append("name", productData.name);
-    formData.append("category", productData.category);
-    formData.append("brand", productData.brand);
-    formData.append("quantity", productData.quantity);
-    formData.append("location", productData.location);
-
-    if (productData.thumbnail) {
-      formData.append("thumbnail", productData.thumbnail);
-    }
-
-    productData.images.forEach((img) => {
-      formData.append("images", img);
+    Object.keys(productData).forEach((key) => {
+      if (key === "images") {
+        productData.images.forEach((img) => formData.append("images", img));
+      } else {
+        formData.append(key, productData[key]);
+      }
     });
 
     try {
@@ -144,27 +107,18 @@ const Product = () => {
         );
       }
 
-      setShowModal(false);
+      handleCloseModal();
     } catch (err) {
-      console.log("Product Save Error:", err);
+      console.log("Save error:", err);
     }
   };
 
-  // DELETE
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this product?")) return;
-    await apiClient.delete(`/product/${id}`);
-    setProducts((prev) => prev.filter((p) => p._id !== id));
-  };
-
-  // FILTER SEARCH
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="ml-64 mt-12 p-6 bg-gray-100 min-h-screen">
-
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Product Management</h1>
@@ -189,153 +143,221 @@ const Product = () => {
         />
       </div>
 
-      {/* PRODUCT GRID */}
+      {/* GRID LIST */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {filteredProducts.map((p) => (
-          <div key={p._id} className="bg-white p-4 rounded-xl shadow-md border hover:shadow-lg transition-all">
-            
-            {/* THUMBNAIL */}
-            <div className="w-full h-40 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-              <img
-                src={
-                  p.thumbnail
-                    ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}`
-                    : "https://via.placeholder.com/150"
-                }
-                alt={p.name}
-                className="object-contain w-full h-full"
-              />
-            </div>
+          <div
+            key={p._id}
+            className="bg-white p-4 rounded-xl shadow border hover:shadow-lg"
+          >
+            <img
+              src={
+                p.thumbnail
+                  ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}`
+                  : "https://via.placeholder.com/150"
+              }
+              className="w-full h-40 object-contain"
+              alt="thumb"
+            />
 
             <h2 className="text-lg font-semibold text-center mt-3">{p.name}</h2>
 
-            <p className="text-sm text-center text-gray-600">
+            <p className="text-center text-gray-600 text-sm">
               {p.brandName} • {p.categoryName}
             </p>
-
-            <p className="text-center text-gray-500">Qty: {p.quantity}</p>
-
-            <div className="mt-3 flex justify-center gap-3">
-              <button onClick={() => handleEditProduct(p)} className="p-2 bg-blue-100 rounded-full">
-                <Pencil className="w-4 h-4 text-blue-600" />
-              </button>
-
-              <button onClick={() => handleDelete(p._id)} className="p-2 bg-red-100 rounded-full">
-                <Trash2 className="w-4 h-4 text-red-600" />
-              </button>
-            </div>
-
           </div>
         ))}
       </div>
 
-      {/* MODAL */}
+     
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white w-[500px] p-6 rounded-xl shadow-lg overflow-y-auto max-h-[95vh]">
+          <div className="bg-white w-[70%] p-8 rounded-xl shadow-lg overflow-y-auto max-h-[95vh]">
 
-            <h2 className="text-xl font-semibold mb-4">
+            <h2 className="text-xl font-bold mb-6">
               {editingId ? "Edit Product" : "Add New Product"}
             </h2>
 
-            {/* NAME */}
-            <label className="font-medium">Product Name</label>
-            <input
-              type="text"
-              className="w-full border p-2 mb-4 rounded"
-              value={productData.name}
-              onChange={(e) =>
-                setProductData((prev) => ({ ...prev, name: e.target.value }))
-              }
-            />
+            {/* TWO COLUMN GRID */}
+            <div className="grid grid-cols-2 gap-8">
 
-            {/* CATEGORY */}
-            <label className="font-medium">Category</label>
-            <select
-              className="w-full border p-2 mb-4 rounded"
-              value={productData.category}
-              onChange={(e) =>
-                setProductData((prev) => ({ ...prev, category: e.target.value }))
-              }
-            >
-              <option value="">Select Category</option>
-              {categories.map((c) => (
-                <option key={c._id} value={c._id}>{c.name}</option>
-              ))}
-            </select>
+              {/* LEFT COLUMN */}
+              <div>
 
-            {/* BRAND */}
-            <label className="font-medium">Brand</label>
-            <select
-              className="w-full border p-2 mb-4 rounded"
-              value={productData.brand}
-              onChange={(e) =>
-                setProductData((prev) => ({ ...prev, brand: e.target.value }))
-              }
-            >
-              <option value="">Select Brand</option>
-              {brands.map((b) => (
-                <option key={b._id} value={b._id}>{b.name}</option>
-              ))}
-            </select>
+                <label className="font-semibold">Product Name</label>
+                <input
+                  type="text"
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.name}
+                  onChange={(e) =>
+                    setProductData({ ...productData, name: e.target.value })
+                  }
+                />
 
-            {/* QUANTITY */}
-            <label className="font-medium">Quantity</label>
-            <input
-              type="number"
-              className="w-full border p-2 mb-4 rounded"
-              value={productData.quantity}
-              onChange={(e) =>
-                setProductData((prev) => ({ ...prev, quantity: e.target.value }))
-              }
-            />
+                <label className="font-semibold">Brand</label>
+                <select
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.brand}
+                  onChange={(e) =>
+                    setProductData({ ...productData, brand: e.target.value })
+                  }
+                >
+                  <option value="">Select Brand</option>
+                  {brands.map((b) => (
+                    <option key={b._id} value={b._id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
 
-            {/* LOCATION */}
-            <label className="font-medium">Inventory Location</label>
-            <select
-              className="w-full border p-2 mb-4 rounded"
-              value={productData.location}
-              onChange={(e) =>
-                setProductData((prev) => ({ ...prev, location: e.target.value }))
-              }
-            >
-              <option value="">Select Location</option>
-              {locations.map((loc) => (
-                <option key={loc._id} value={loc._id}>{loc.name}</option>
-              ))}
-            </select>
+                <label className="font-semibold">Category</label>
+                <select
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.category}
+                  onChange={(e) =>
+                    setProductData({ ...productData, category: e.target.value })
+                  }
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
 
-            {/* THUMBNAIL */}
-            <label className="font-medium">Thumbnail Image</label>
-            <input type="file" className="mb-2" onChange={handleThumbnail} />
-            {thumbnailPreview && (
-              <img src={thumbnailPreview} className="w-32 h-32 object-contain mb-4" alt="preview" />
-            )}
+                <label className="font-semibold">Original Price</label>
+                <input
+                  type="number"
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.mrp}
+                  onChange={(e) =>
+                    setProductData({ ...productData, mrp: e.target.value })
+                  }
+                />
 
-            {/* ADDITIONAL IMAGES */}
-            <label className="font-medium">Additional Images (Max 4)</label>
-            <input type="file" multiple className="mb-2" onChange={handleImages} />
+                <label className="font-semibold">Sales Price</label>
+                <input
+                  type="number"
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.price}
+                  onChange={(e) =>
+                    setProductData({ ...productData, price: e.target.value })
+                  }
+                />
 
-            <div className="flex gap-2 flex-wrap mb-4">
-              {imagesPreview.map((img, i) => (
-                <img key={i} src={img} className="w-24 h-24 object-contain border rounded" alt="preview" />
-              ))}
+                <label className="font-semibold">Thumbnail Image</label>
+                <input type="file" className="mb-3" onChange={handleThumbnail} />
+
+                {thumbnailPreview && (
+                  <img
+                    src={thumbnailPreview}
+					alt="imagep"
+                    className="w-32 h-32 object-contain mb-4 border rounded"
+                  />
+                )}
+
+                
+              </div>
+
+              {/* RIGHT COLUMN */}
+              <div>
+
+                <label className="font-semibold">Quantity</label>
+                <input
+                  type="number"
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.quantity}
+                  onChange={(e) =>
+                    setProductData({ ...productData, quantity: e.target.value })
+                  }
+                />
+
+               
+
+               <label className="font-semibold">Star Rating</label>
+<div className="flex items-center gap-1 mb-4">
+  {[1, 2, 3, 4, 5].map((star) => (
+    <span
+      key={star}
+      className={`text-2xl cursor-pointer ${
+        star <= productData.rating ? "text-yellow-400 color-yellow" : "text-gray-300"
+      }`}
+      onClick={() =>
+        setProductData({ ...productData, rating: star })
+      }
+    >
+      <FaStar/>
+    </span>
+  ))}
+</div>
+
+
+                <label className="font-semibold">Description</label>
+                <textarea
+                  className="w-full border p-2 rounded h-32 mb-4"
+                  value={productData.description}
+                  onChange={(e) =>
+                    setProductData({
+                      ...productData,
+                      description: e.target.value,
+                    })
+                  }
+                />
+
+                <label className="font-semibold">Inventory Location</label>
+                <select
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.location}
+                  onChange={(e) =>
+                    setProductData({ ...productData, location: e.target.value })
+                  }
+                >
+                  <option value="">Select Location</option>
+                  {locations.map((loc) => (
+                    <option key={loc._id} value={loc._id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+                <label className="font-semibold">Product Images (Max 4)</label>
+                <input type="file" multiple onChange={handleImages} />
+
+                <div className="grid grid-cols-4 gap-3 mt-3">
+                  {imagesPreview.map((img, i) => (
+                    <img
+                      key={i}
+                      src={img}
+					  alt="preview"
+                      className="w-28 h-28 border rounded object-contain"
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* BUTTONS */}
-            <div className="flex justify-end gap-3">
-              <button className="px-4 py-2 bg-gray-300 rounded" onClick={handleCloseModal}>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded"
+                onClick={handleCloseModal}
+              >
                 Cancel
               </button>
 
-              <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleSaveProduct}>
-                {editingId ? "Update Product" : "Save Product"}
+              <button
+                className="px-4 py-2 bg-blue-600 text-white rounded"
+                onClick={handleSaveProduct}
+              >
+                {editingId ? "Update" : "Save"}
               </button>
             </div>
 
           </div>
         </div>
       )}
+     
+
     </div>
   );
 };

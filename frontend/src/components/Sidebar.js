@@ -80,25 +80,12 @@ const Sidebar = () => {
               <NavLink to="/manage-products/products" className={linkClass}>
                 Products
               </NavLink>
-            </div>
-          )}
-          <button
-            onClick={() => setSettingsOpen((prev) => !prev)}
-            className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
-              settingOpen ? "bg-gray-800 text-white" : "text-gray-300"
-            }`}
-          >
-            <span>Settings</span>
-            <span>{settingOpen ? "▾" : "▸"}</span>
-          </button>
-
-          {settingOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              <NavLink to="/settings/inventory-locattions" className={linkClass}>
+              <NavLink to="/manage-products/location" className={linkClass}>
                 Locations
               </NavLink>
             </div>
           )}
+         
         </nav>
       </aside>
     </>
