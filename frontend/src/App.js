@@ -8,6 +8,8 @@ import AllAdmin from './pages/AllAdmin.js';
 import ViewProfile from './pages/ViewProfile.js';
 import Product from './pages/ManageProduct/Product.js';
 import Brands from './pages/ManageProduct/Brands.js';
+import ManageProducts from './pages/ManageProduct/ManageProducts.js';
+import Categories from './pages/ManageProduct/Category.js';
 function App() {
   return (
     <div>
@@ -19,10 +21,10 @@ function App() {
         <Route path="alladmin" element={<AllAdmin/>} />
         <Route path="view/:id" element={<ViewProfile/>} />
     </Route>
-   <Route path="/products" element={<Product/>}>
-        <Route path="Add-location" element={<EditProfile />} />
-        <Route path="Brands" element={<Brands/>} />
-        <Route path="AddCategories ==" element={<ViewProfile/>} />
+   <Route path="/manage-products" element={<ManageProducts/>}>
+        <Route path="brands" element={<Brands/>} />
+        <Route path="categories" element={<Categories/>} />
+        <Route path="products" element={<Product/>} />
     </Route>
     </Routes>
     </div>
