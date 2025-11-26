@@ -7,6 +7,7 @@ const connectDB = require("./config/db");
 const Userrouter = require("./routes/user.routes");
 const Brandrouter = require("./routes/brands.routes");
 const Categoryrouter = require("./routes/category.routes");
+const Productrouter = require("./routes/product.routes");
 dotenv.config();
 connectDB();
 
@@ -30,7 +31,8 @@ app.use("/uploads", express.static("uploads"));
 // ROUTES
 app.use("/api", Userrouter);
 app.use("/api", Brandrouter);
-app.use("/api", Categoryrouter)
+app.use("/api", Categoryrouter);
+app.use("/api", Productrouter);
 
 // TEST ROUTE
 app.get("/", (req, res) => {

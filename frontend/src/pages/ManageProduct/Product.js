@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import { FaStar } from "react-icons/fa6";
+
+const WAREHOUSE_LOCATIONS = ["WAREHOUSE-A", "WAREHOUSE-B", "WAREHOUSE-C", "WAREHOUSE-D"];
+
 const Product = () => {
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [locations, setLocations] = useState([]);
 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -37,11 +39,11 @@ const Product = () => {
     try {
       const catRes = await apiClient.get("/category");
       const brandRes = await apiClient.get("/brands");
-    
+      const prodRes = await apiClient.get("/products");
 
       setCategories(catRes.data);
       setBrands(brandRes.data);
-     
+      setProducts(prodRes.data);
     } catch (err) {
       console.log("Error fetching:", err);
     }
@@ -70,6 +72,53 @@ const Product = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingId(null);
+    setProductData({
+      name: "",
+      category: "",
+      brand: "",
+      quantity: "",
+      unit: "",
+      mrp: "",
+      price: "",
+      description: "",
+      location: "",
+      thumbnail: null,
+      images: [],
+    });
+    setThumbnailPreview("");
+    setImagesPreview([]);
+  };
+
+  const handleEditProduct = (product) => {
+    setEditingId(product._id);
+    setProductData({
+      name: product.name,
+      category: product.category,
+      brand: product.brand,
+      quantity: product.quantity,
+      unit: product.unit,
+      mrp: product.mrp,
+      price: product.price,
+      description: product.description,
+      location: product.location,
+      thumbnail: null,
+      images: [],
+    });
+    setThumbnailPreview(product.thumbnail ? `${process.env.REACT_APP_IMAGE_URL}/${product.thumbnail}` : "");
+    setImagesPreview(product.images ? product.images.map(img => `${process.env.REACT_APP_IMAGE_URL}/${img}`) : []);
+    setShowModal(true);
+  };
+
+  const handleDeleteProduct = async (id) => {
+    if (window.confirm("Are you sure you want to delete this product?")) {
+      try {
+        await apiClient.delete(`/product/${id}`);
+        setProducts((prev) => prev.filter((p) => p._id !== id));
+      } catch (err) {
+        console.log("Delete error:", err);
+        alert("Error deleting product");
+      }
+    }
   };
 
   // Image handlers
@@ -91,17 +140,23 @@ const Product = () => {
     Object.keys(productData).forEach((key) => {
       if (key === "images") {
         productData.images.forEach((img) => formData.append("images", img));
+      } else if (key === "thumbnail") {
+        if (productData.thumbnail) formData.append("thumbnail", productData.thumbnail);
       } else {
-        formData.append(key, productData[key]);
+        formData.append(key, productData[key] || "");
       }
     });
 
     try {
       if (!editingId) {
-        const res = await apiClient.post("/add-product", formData);
+        const res = await apiClient.post("/product/add", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
         setProducts((prev) => [res.data.product, ...prev]);
       } else {
-        const res = await apiClient.put(`/product/${editingId}`, formData);
+        const res = await apiClient.put(`/product/${editingId}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
         setProducts((prev) =>
           prev.map((p) => (p._id === editingId ? res.data.product : p))
         );
@@ -110,6 +165,7 @@ const Product = () => {
       handleCloseModal();
     } catch (err) {
       console.log("Save error:", err);
+      alert("Error saving product");
     }
   };
 
@@ -144,30 +200,82 @@ const Product = () => {
       </div>
 
       {/* GRID LIST */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {filteredProducts.map((p) => (
-          <div
-            key={p._id}
-            className="bg-white p-4 rounded-xl shadow border hover:shadow-lg"
-          >
+      {/* PRODUCT TABLE LIST VIEW */}
+<div className="bg-white rounded-xl shadow p-4">
+  <table className="w-full border-collapse">
+    <thead>
+      <tr className="bg-gray-100 text-left">
+        <th className="p-3 border">Image</th>
+        <th className="p-3 border">Product Name</th>
+        <th className="p-3 border">Brand</th>
+        <th className="p-3 border">Category</th>
+        <th className="p-3 border">Qty</th>
+        <th className="p-3 border">Price</th>
+        <th className="p-3 border">Location</th>
+        <th className="p-3 border">Actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {filteredProducts.length === 0 && (
+        <tr>
+          <td colSpan="8" className="text-center p-4 text-gray-500">
+            No products found
+          </td>
+        </tr>
+      )}
+
+      {filteredProducts.map((p) => (
+        <tr key={p._id} className="hover:bg-gray-50">
+          
+          {/* Thumbnail */}
+          <td className="p-3">
             <img
               src={
                 p.thumbnail
                   ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}`
-                  : "https://via.placeholder.com/150"
+                  : "https://via.placeholder.com/60"
               }
-              className="w-full h-40 object-contain"
               alt="thumb"
+              className="w-16 h-16 object-contain rounded"
             />
+          </td>
 
-            <h2 className="text-lg font-semibold text-center mt-3">{p.name}</h2>
+          <td className="pl-3 font-medium">{p.name}</td>
 
-            <p className="text-center text-gray-600 text-sm">
-              {p.brandName} • {p.categoryName}
-            </p>
-          </div>
-        ))}
-      </div>
+          <td className="p-3 ">{p.brand?.name}</td>
+
+          <td className="p-3 ">{p.category?.name}</td>
+
+          <td className="p-3 text-center">{p.quantity}</td>
+
+          <td className="p-3 text-center">₹{p.price}</td>
+
+          <td className="p-3 ">{p.location}</td>
+
+          <td className="pl-3">
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleEditProduct(p)}
+                className="p-2 rounded-full border-2 border-blue-500 text-blue-500 hover:bg-blue-50"
+              >
+                <Pencil className="w-4 h-4 "/>
+              </button>
+
+              <button
+                onClick={() => handleDeleteProduct(p._id)}
+                className="p-2 rounded-full border-2 border-red-500 text-red-500 hover:bg-blue-50"
+              >
+                <Trash2 className="w-4 h-4 "/>
+              </button>
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
 
      
       {showModal && (
@@ -305,7 +413,7 @@ const Product = () => {
                   }
                 />
 
-                <label className="font-semibold">Inventory Location</label>
+                <label className="font-semibold">Warehouse Location</label>
                 <select
                   className="w-full border p-2 rounded mb-4"
                   value={productData.location}
@@ -314,9 +422,9 @@ const Product = () => {
                   }
                 >
                   <option value="">Select Location</option>
-                  {locations.map((loc) => (
-                    <option key={loc._id} value={loc._id}>
-                      {loc.name}
+                  {WAREHOUSE_LOCATIONS.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
                     </option>
                   ))}
                 </select>

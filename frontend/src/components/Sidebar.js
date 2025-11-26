@@ -5,7 +5,6 @@ import { NavLink, useLocation } from "react-router-dom";
 const Sidebar = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
-  const [settingOpen, setSettingsOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -14,9 +13,6 @@ const Sidebar = () => {
 
   useEffect(() => {
     setProfileOpen(location.pathname.startsWith("/manage-products"));
-  }, [location.pathname]);
-  useEffect(() => {
-    setProfileOpen(location.pathname.startsWith("/settings"));
   }, [location.pathname]);
   const linkClass = ({ isActive }) =>
     `block px-4 py-2 rounded hover:bg-gray-700 ${
@@ -80,9 +76,9 @@ const Sidebar = () => {
               <NavLink to="/manage-products/products" className={linkClass}>
                 Products
               </NavLink>
-              <NavLink to="/manage-products/location" className={linkClass}>
+              {/* <NavLink to="/manage-products/location" className={linkClass}>
                 Locations
-              </NavLink>
+              </NavLink> */}
             </div>
           )}
          

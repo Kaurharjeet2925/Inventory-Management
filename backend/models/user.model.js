@@ -6,7 +6,21 @@ const userSchema = new Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+
+  // ⭐ Add role here ⭐
+  role: {
+    type: String,
+    enum: ["superadmin", "admin", "delivery-boy"],
+    default: "admin",
+  },
+
+  phone: String,
+  image: String,
+  gender: String,
+  address: String,
+  dateofbirth: String,
 });
+
 
 // Hash password before save
 userSchema.pre("save", async function (next) {

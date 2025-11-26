@@ -46,8 +46,7 @@ const Brands = () => {
     setNewBrand({ name: brand.name, image: null });
      setImagePreview(
           brand.image
-          ? `${process.env.REACT_APP_IMAGE_URL}/uploads/${brand.image}`
-
+          ? `${process.env.REACT_APP_IMAGE_URL}/${brand.image}`
            : ""
           );
        setShowModal(true);
@@ -171,8 +170,7 @@ const Brands = () => {
               <img
                 src={
                   brand.image
-                    ? `${process.env.REACT_APP_IMAGE_URL}/uploads/${brand.image}`
-
+                    ? `${process.env.REACT_APP_IMAGE_URL}/${brand.image}`
                     : "https://via.placeholder.com/150"
                 }
                 alt={brand.name}
