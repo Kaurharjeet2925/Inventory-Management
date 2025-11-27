@@ -5,6 +5,8 @@ import { NavLink, useLocation } from "react-router-dom";
 const Sidebar = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const [clientsOpen, setClientsOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -12,12 +14,42 @@ const Sidebar = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    setProfileOpen(location.pathname.startsWith("/manage-products"));
+    setProductOpen(location.pathname.startsWith("/manage-products"));
+  }, [location.pathname]);
+   useEffect(() => {
+    setOrdersOpen(location.pathname.startsWith("/orders"));
+  }, [location.pathname]);
+  useEffect(() => {
+    setClientsOpen(location.pathname.startsWith("/manage-client"));
   }, [location.pathname]);
   const linkClass = ({ isActive }) =>
     `block px-4 py-2 rounded hover:bg-gray-700 ${
       isActive ? "bg-gray-800 text-white" : "text-gray-300"
     }`;
+
+  const handleMenuToggle = (menu) => {
+    if (menu === 'profile') {
+      setProfileOpen(!profileOpen);
+      setProductOpen(false);
+      setOrdersOpen(false);
+      setClientsOpen(false);
+    } else if (menu === 'product') {
+      setProductOpen(!productOpen);
+      setProfileOpen(false);
+      setOrdersOpen(false);
+      setClientsOpen(false);
+    } else if (menu === 'orders') {
+      setOrdersOpen(!ordersOpen);
+      setProfileOpen(false);
+      setProductOpen(false);
+      setClientsOpen(false);
+    } else if (menu === 'clients') {
+      setClientsOpen(!clientsOpen);
+      setProfileOpen(false);
+      setProductOpen(false);
+      setOrdersOpen(false);
+    }
+  };
 
   return (
     <>
@@ -33,7 +65,7 @@ const Sidebar = () => {
           </NavLink>
 
           <button
-            onClick={() => setProfileOpen((prev) => !prev)}
+            onClick={() => handleMenuToggle('profile')}
             className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
               profileOpen ? "bg-gray-800 text-white" : "text-gray-300"
             }`}
@@ -54,7 +86,7 @@ const Sidebar = () => {
             </div>
           )}
             <button
-            onClick={() => setProductOpen((prev) => !prev)}
+            onClick={() => handleMenuToggle('product')}
             className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
               productOpen ? "bg-gray-800 text-white" : "text-gray-300"
             }`}
@@ -81,7 +113,52 @@ const Sidebar = () => {
               </NavLink> */}
             </div>
           )}
-         
+           <button
+            onClick={() => handleMenuToggle('orders')}
+            className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
+              ordersOpen ? "bg-gray-800 text-white" : "text-gray-300"
+            }`}
+          >
+            <span>Manage Orders</span>
+            <span>{ordersOpen ? "▾" : "▸"}</span>
+          </button>
+
+           {ordersOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              
+
+              <NavLink to="/orders/generate-order" className={linkClass}>
+               Generate Order
+              </NavLink>
+              <NavLink to="/orders/view-order" className={linkClass}>
+                View Orders
+              </NavLink>
+             
+             
+            </div>
+          )}
+           <button
+            onClick={() => handleMenuToggle('clients')}
+            className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
+              clientsOpen ? "bg-gray-800 text-white" : "text-gray-300"
+            }`}
+          >
+            <span>Manage Clients</span>
+            <span>{clientsOpen ? "▾" : "▸"}</span>
+          </button>
+
+           {clientsOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              
+
+              <NavLink to="/manage-client/client" className={linkClass}>
+               Clients
+              </NavLink>
+              
+             
+             
+            </div>
+          )}
         </nav>
       </aside>
     </>

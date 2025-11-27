@@ -9,6 +9,7 @@ exports.addProduct = async (req, res) => {
       brand,
       quantity,
       unit,
+      unitOptions,
       mrp,
       price,
       description,
@@ -31,12 +32,20 @@ exports.addProduct = async (req, res) => {
       return res.status(400).json({ message: "Name, brand, category required" });
     }
 
+    // parse unitOptions (accept string or array). If string, split by commas
+    let parsedUnits = [];
+    if (unitOptions) {
+      if (Array.isArray(unitOptions)) parsedUnits = unitOptions;
+      else if (typeof unitOptions === 'string') parsedUnits = unitOptions.split(',').map(u => u.trim()).filter(Boolean);
+    }
+
     const product = await Product.create({
       name,
       category,
       brand,
       quantity,
       unit,
+      unitOptions: parsedUnits,
       mrp,
       price,
       description,
@@ -81,6 +90,15 @@ exports.updateProduct = async (req, res) => {
     const id = req.params.id;
 
     let updateData = { ...req.body };
+
+    // parse unitOptions on update if provided
+    if (updateData.unitOptions) {
+      if (Array.isArray(updateData.unitOptions)) {
+        // keep as is
+      } else if (typeof updateData.unitOptions === 'string') {
+        updateData.unitOptions = updateData.unitOptions.split(',').map(u => u.trim()).filter(Boolean);
+      }
+    }
 
     // Update thumbnail only if new is uploaded
     if (req.files?.thumbnail) {

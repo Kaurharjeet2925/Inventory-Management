@@ -10,7 +10,12 @@ import Product from './pages/ManageProduct/Product.js';
 import Brands from './pages/ManageProduct/Brands.js';
 import ManageProducts from './pages/ManageProduct/ManageProducts.js';
 import Categories from './pages/ManageProduct/Category.js';
-//import Locations from './pages/ManageProduct/Locations.js';
+import ManageOrders from './pages/ManageOrders/ManageOrders.js';
+import CreateOrders from './pages/ManageOrders/CreateOrders.js';
+import ViewOrders from './pages/ManageOrders/ViewOrders.js';
+import ManageClients from './pages/ManageClient/ManageClients.js';
+import Client from './pages/ManageClient/Client.js';
+
 function App() {
   return (
     <div>
@@ -26,9 +31,16 @@ function App() {
         <Route path="brands" element={<Brands/>} />
         <Route path="categories" element={<Categories/>} />
         <Route path="products" element={<Product/>} />
-        {/* <Route path='location' element={<Locations/>} /> */}
     </Route>
-    
+     <Route path="/manage-client" element={<ManageClients/>}>
+        <Route path="client" element={<Client/>} />
+        
+    </Route>
+    <Route path="/orders" element={<ManageOrders/>}>
+        <Route path="generate-order" element={<CreateOrders/>} />
+        <Route path="view-order" element={<ViewOrders/>} />
+    </Route>
+   
     </Routes>
     </div>
   );

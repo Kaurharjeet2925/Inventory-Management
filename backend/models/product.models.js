@@ -8,6 +8,7 @@ const productSchema = new mongoose.Schema(
 
     quantity: { type: Number, default: 0 },
     unit: { type: String },
+    unitOptions: [{ type: String }],
     mrp: { type: Number },
     price: { type: Number },
 

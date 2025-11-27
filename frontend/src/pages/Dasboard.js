@@ -1,7 +1,7 @@
 import React from 'react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Package, AlertTriangle, ShoppingCart, Clock } from 'lucide-react';
+import { Package,  ShoppingCart, Clock } from 'lucide-react';
 function DashboardCard({ icon, title, value }) {
   return (
     <div className="bg-white shadow rounded-xl p-6 flex flex-col items-center text-center border border-gray-100">
@@ -38,22 +38,22 @@ const Dashboard = () => {
 
               {/* Low Stock */}
               <DashboardCard
-                icon={<AlertTriangle size={40} className="text-yellow-500" />}
-                title="Low Stock Alerts"
+                icon={<ShoppingCart size={40} className="text-yellow-500" />}
+                title="Toal Orders"
                 value="8"
               />
 
               {/* Today's Orders */}
               <DashboardCard
-                icon={<ShoppingCart size={40} className="text-green-500" />}
-                title="Today's Orders"
+                icon={<Clock size={40} className="text-green-500" />}
+                title="Pending Orders"
                 value="15"
               />
 
               {/* Pending Orders */}
               <DashboardCard
                 icon={<Clock size={40} className="text-red-500" />}
-                title="Pending Orders"
+                title="Delieverd Orders"
                 value="5"
               />
             </div>

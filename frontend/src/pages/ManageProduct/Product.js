@@ -23,6 +23,7 @@ const Product = () => {
     brand: "",
     quantity: "",
     unit: "",
+    unitOptions: "", 
     mrp: "",
     price: "",
     description: "",
@@ -57,6 +58,7 @@ const Product = () => {
       brand: "",
       quantity: "",
       unit: "",
+      unitOptions: "",
       mrp: "",
       price: "",
       description: "",
@@ -78,6 +80,7 @@ const Product = () => {
       brand: "",
       quantity: "",
       unit: "",
+      unitOptions: "",
       mrp: "",
       price: "",
       description: "",
@@ -97,6 +100,7 @@ const Product = () => {
       brand: product.brand,
       quantity: product.quantity,
       unit: product.unit,
+      unitOptions: Array.isArray(product.unitOptions) ? product.unitOptions.join(',') : (product.unitOptions || ''),
       mrp: product.mrp,
       price: product.price,
       description: product.description,
@@ -135,39 +139,59 @@ const Product = () => {
   };
 
   // Save product
-  const handleSaveProduct = async () => {
-    const formData = new FormData();
-    Object.keys(productData).forEach((key) => {
-      if (key === "images") {
-        productData.images.forEach((img) => formData.append("images", img));
-      } else if (key === "thumbnail") {
-        if (productData.thumbnail) formData.append("thumbnail", productData.thumbnail);
-      } else {
-        formData.append(key, productData[key] || "");
-      }
-    });
+ const handleSaveProduct = async () => {
+  const formData = new FormData();
 
-    try {
-      if (!editingId) {
-        const res = await apiClient.post("/product/add", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        setProducts((prev) => [res.data.product, ...prev]);
-      } else {
-        const res = await apiClient.put(`/product/${editingId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        setProducts((prev) =>
-          prev.map((p) => (p._id === editingId ? res.data.product : p))
-        );
-      }
-
-      handleCloseModal();
-    } catch (err) {
-      console.log("Save error:", err);
-      alert("Error saving product");
+  Object.keys(productData).forEach((key) => {
+    if (key === "images") {
+      productData.images.forEach((img) => formData.append("images", img));
+    } else if (key === "thumbnail") {
+      if (productData.thumbnail)
+        formData.append("thumbnail", productData.thumbnail);
+    } else {
+      formData.append(key, productData[key] || "");
     }
-  };
+  });
+
+  try {
+    if (!editingId) {
+      const res = await apiClient.post("/product/add", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // ⭐ FIX: Map brand & category objects
+      const newProduct = {
+        ...res.data.product,
+        brand: brands.find((b) => b._id === res.data.product.brand),
+        category: categories.find((c) => c._id === res.data.product.category),
+      };
+
+      setProducts((prev) => [newProduct, ...prev]);
+
+    } else {
+      const res = await apiClient.put(`/product/${editingId}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // ⭐ FIX: Map brand & category objects on update
+      const updatedProduct = {
+        ...res.data.product,
+        brand: brands.find((b) => b._id === res.data.product.brand),
+        category: categories.find((c) => c._id === res.data.product.category),
+      };
+
+      setProducts((prev) =>
+        prev.map((p) => (p._id === editingId ? updatedProduct : p))
+      );
+    }
+
+    handleCloseModal();
+  } catch (err) {
+    console.log("Save error:", err);
+    alert("Error saving product");
+  }
+};
+
 
   const filteredProducts = products.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
@@ -204,13 +228,14 @@ const Product = () => {
 <div className="bg-white rounded-xl shadow p-4">
   <table className="w-full border-collapse">
     <thead>
-      <tr className="bg-gray-100 text-left">
+        <tr className="bg-gray-100 text-left">
         <th className="p-3 border">Image</th>
         <th className="p-3 border">Product Name</th>
         <th className="p-3 border">Brand</th>
         <th className="p-3 border">Category</th>
         <th className="p-3 border">Qty</th>
-        <th className="p-3 border">Price</th>
+          <th className="p-3 border">Price</th>
+          <th className="p-3 border">Units</th>
         <th className="p-3 border">Location</th>
         <th className="p-3 border">Actions</th>
       </tr>
@@ -219,7 +244,7 @@ const Product = () => {
     <tbody>
       {filteredProducts.length === 0 && (
         <tr>
-          <td colSpan="8" className="text-center p-4 text-gray-500">
+          <td colSpan="9" className="text-center p-4 text-gray-500">
             No products found
           </td>
         </tr>
@@ -250,6 +275,12 @@ const Product = () => {
           <td className="p-3 text-center">{p.quantity}</td>
 
           <td className="p-3 text-center">₹{p.price}</td>
+
+          <td className="p-3 ">
+            {p.unitOptions && Array.isArray(p.unitOptions)
+              ? p.unitOptions.join(", ")
+              : p.unit || (p.unitOptions ? p.unitOptions : "-")}
+          </td>
 
           <td className="p-3 ">{p.location}</td>
 
@@ -352,6 +383,17 @@ const Product = () => {
                   onChange={(e) =>
                     setProductData({ ...productData, price: e.target.value })
                   }
+                />
+
+                <label className="font-semibold">Units (comma separated)</label>
+                <input
+                  type="text"
+                  className="w-full border p-2 rounded mb-4"
+                  value={productData.unitOptions}
+                  onChange={(e) =>
+                    setProductData({ ...productData, unitOptions: e.target.value })
+                  }
+                  placeholder="e.g. piece,packet,kg"
                 />
 
                 <label className="font-semibold">Thumbnail Image</label>

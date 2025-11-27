@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { apiClient } from '../apiclient/apiclient';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,70 @@ export default function Login({ onSwitch }) {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const logoutTimerRef = useRef(null);
+
+  // Decode JWT payload to extract expiry
+  const parseJwt = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Clear auth and logout
+  const clearAuth = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    if (logoutTimerRef.current) {
+      clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = null;
+    }
+  };
+
+  // Schedule automatic logout when token expires
+  const scheduleAutoLogout = useCallback((expiryMs) => {
+    if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    const ms = expiryMs - Date.now();
+    if (ms <= 0) {
+      clearAuth();
+      return;
+    }
+    logoutTimerRef.current = setTimeout(() => {
+      clearAuth();
+      toast.info('Your session has expired. Please log in again.');
+      navigate('/login');
+    }, ms);
+  }, [navigate]);
+
+  // Check for existing token on mount and schedule logout if present
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const decoded = parseJwt(token);
+      if (decoded?.exp) {
+        const expiryMs = decoded.exp * 1000;
+        if (expiryMs > Date.now()) {
+          // Schedule logout at expiry time
+          scheduleAutoLogout(expiryMs);
+        } else {
+          // Token already expired, clear it
+          clearAuth();
+        }
+      }
+    }
+    return () => {
+      if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
+    };
+  }, [navigate, scheduleAutoLogout]);
 
   const validateEmail = (value) => {
     if (!value) return 'Email is required';
@@ -45,6 +109,14 @@ export default function Login({ onSwitch }) {
       if (data?.token) {
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        
+        // Schedule auto-logout when token expires
+        const decoded = parseJwt(data.token);
+        if (decoded?.exp) {
+          const expiryMs = decoded.exp * 1000;
+          scheduleAutoLogout(expiryMs);
+        }
+        
         toast.success(`Login successful! Welcome ${data.user.name}`);
         setEmail("");
         setPassword("");
