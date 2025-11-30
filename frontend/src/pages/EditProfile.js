@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
-//import { apiClient } from '../apiclient/apiclient';
+import { apiClient } from '../apiclient/apiclient';
+import { toast } from 'react-toastify';
+
 const EditProfile = () => {
 const [form, setForm] = useState({
   firstName: "",
@@ -30,26 +32,36 @@ const [form, setForm] = useState({
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // Get existing admins from localStorage
-  const existingAdmins = JSON.parse(localStorage.getItem("admins")) || [];
+  try {
+    // Create FormData to handle file upload
+    const formData = new FormData();
+    formData.append("firstName", form.firstName);
+    formData.append("lastName", form.lastName);
+    formData.append("email", form.email);
+    formData.append("password", form.password);
+    formData.append("phone", form.phone);
+    formData.append("gender", form.gender);
+    formData.append("address", form.address);
+    formData.append("dateofbirth", form.dateofbirth);
+    formData.append("role", form.role);
+    if (form.image instanceof File) {
+      formData.append("image", form.image);
+    }
 
-  // New admin data
-  const newAdmin = {
-    ...form,
-    id: Date.now(), // unique id
-    image: imagePreview, // store preview base URL (temporary)
-  };
+    // Call the API
+    await apiClient.post("/superadmin/create-user", formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
 
-  // Save updated list
-  localStorage.setItem("admins", JSON.stringify([...existingAdmins, newAdmin]));
-
-  alert("Admin added successfully!");
-
- 
-  handleCancel();
+    toast.success(`${form.role} created successfully!`);
+    handleCancel();
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Failed to create user");
+    console.error(error);
+  }
 };
 
 const handleCancel = () => {

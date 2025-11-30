@@ -3,17 +3,22 @@ const Brand = require("../models/brands.model");
 // ADD BRAND
 exports.addBrand = async (req, res) => {
   try {
+    console.log("[addBrand] Request body:", req.body);
+    console.log("[addBrand] File:", req.file);
+    
     const { name } = req.body;
-    const image = req.files?.uploadImage
-      ? req.files.uploadImage[0].filename
-      : "";
+    const image = req.file ? req.file.filename : "";
 
-    if (!name)
+    if (!name) {
+      console.log("[addBrand] Brand name is missing");
       return res.status(400).json({ message: "Brand name is required" });
+    }
 
     const exists = await Brand.findOne({ name });
-    if (exists)
+    if (exists) {
+      console.log("[addBrand] Brand already exists:", name);
       return res.status(400).json({ message: "Brand already exists" });
+    }
 
     const brand = await Brand.create({ name, image });
 
@@ -22,6 +27,7 @@ exports.addBrand = async (req, res) => {
       brand
     });
   } catch (error) {
+    console.error("[addBrand] Error:", error);
     res.status(500).json({ message: "Error adding brand", error: error.message });
   }
 };
@@ -30,9 +36,12 @@ exports.addBrand = async (req, res) => {
 // GET ALL BRANDS
 exports.getBrands = async (req, res) => {
   try {
+    console.log("[getBrands] Fetching all brands...");
     const brands = await Brand.find().sort({ createdAt: -1 });
+    console.log("[getBrands] Found", brands.length, "brands");
     res.json(brands);
   } catch (error) {
+    console.error("[getBrands] Error:", error);
     res.status(500).json({ message: "Error fetching brands", error: error.message });
   }
 };
@@ -56,9 +65,7 @@ exports.updateBrand = async (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
 
-    let image = req.files?.uploadImage
-      ? req.files.uploadImage[0].filename
-      : undefined;
+    let image = req.file ? req.file.filename : undefined;
 
     const updateData = { name };
     if (image) updateData.image = image;

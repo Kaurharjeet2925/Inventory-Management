@@ -6,19 +6,12 @@ const storage = multer.diskStorage({
     cb(null, "uploads/");
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix =
-      Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const extension = path.extname(file.originalname);
-    cb(null, `${file.fieldname}-${uniqueSuffix}${extension}`);
-  },
+    const ext = path.extname(file.originalname);
+    const unique = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + unique + ext);
+  }
 });
 
-
-// 🔥 For Product: Thumbnail + up to 4 images
-const upload = multer({ storage }).fields([
-  { name: "uploadImage", maxCount: 1 }, 
-  { name: "thumbnail", maxCount: 1 },
-  { name: "images", maxCount: 4 },
-]);
+const upload = multer({ storage }); 
 
 module.exports = upload;

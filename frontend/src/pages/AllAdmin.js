@@ -1,17 +1,49 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, Mail, Eye, Trash2 } from "lucide-react";
+import { apiClient } from "../apiclient/apiclient";
+import { toast } from "react-toastify";
 
 const AllAdmins = () => {
   const [admins, setAdmins] = useState([]);
   const [failedImages, setFailedImages] = useState({});
   const [view, setView] = useState("cards"); // cards OR list
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // Fetch all users from backend
   useEffect(() => {
-    const storedAdmins = JSON.parse(localStorage.getItem("admins")) || [];
-    setAdmins(storedAdmins);
+    fetchAdmins();
   }, []);
+
+  const fetchAdmins = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get("/all");
+      setAdmins(response.data.users || []);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to fetch users");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete user
+  const handleDelete = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) {
+      return;
+    }
+
+    try {
+      await apiClient.delete(`/${userId}`);
+      toast.success("User deleted successfully");
+      setAdmins(admins.filter(admin => admin._id !== userId));
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to delete user");
+      console.error(error);
+    }
+  };
 
   return (
     <div className="ml-64 mt-12 p-4 bg-gray-100 min-h-screen">
@@ -42,7 +74,7 @@ const AllAdmins = () => {
       {/* Show NO DATA message */}
       {admins.length === 0 ? (
         <div className="text-gray-500 text-lg">
-          No admins found. Add from Add Admin page.
+          {loading ? "Loading..." : "No admins found. Add from Add Admin page."}
         </div>
       ) : (
         <>
@@ -50,7 +82,7 @@ const AllAdmins = () => {
           {view === "cards" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
               {admins.map((admin, idx) => {
-                const key = admin.id || admin._id || idx;
+                const key = admin._id || idx;
                 const failed = !!failedImages[key];
 
                 return (
@@ -64,14 +96,10 @@ const AllAdmins = () => {
                         <button
                           onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })}
                           className="w-10 h-10 flex items-center justify-center"
-                          aria-label={`View ${admin.firstName} ${admin.lastName}`}
+                          aria-label={`View ${admin.name}`}
                         >
                           <Eye className="w-8 h-8 text-white" />
                         </button>
-
-                        {/* <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black text-white text-xs px-3 py-1 rounded opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap">
-                          View Profile
-                        </div> */}
                       </div>
                     </div>
 
@@ -79,7 +107,7 @@ const AllAdmins = () => {
                     <div className="w-32 h-32 rounded-full overflow-hidden border shadow-sm bg-gray-100 flex items-center justify-center relative z-10">
                       {admin.image && !failed ? (
                         <img
-                          src={admin.image}
+                          src={`http://localhost:5000${admin.image}`}
                           alt="profile"
                           className="object-cover w-full h-full"
                           onError={() =>
@@ -91,12 +119,10 @@ const AllAdmins = () => {
                         />
                       ) : (
                         (() => {
-                          const f = (admin.firstName || "").trim();
-                          const l = (admin.lastName || "").trim();
-                          const first = f ? f.charAt(0).toUpperCase() : "";
-                          const last = l ? l.charAt(0).toUpperCase() : "";
-                          const initials =
-                            first + last || first || last || "?";
+                          const nameparts = (admin.name || "").trim().split(" ");
+                          const first = nameparts[0] ? nameparts[0].charAt(0).toUpperCase() : "";
+                          const last = nameparts[1] ? nameparts[1].charAt(0).toUpperCase() : "";
+                          const initials = first + last || first || "?";
                           return (
                             <div className="w-full h-full flex items-center justify-center bg-blue-600 text-white text-2xl font-semibold">
                               {initials}
@@ -108,7 +134,7 @@ const AllAdmins = () => {
 
                     {/* Name */}
                     <h2 className="text-xl font-semibold mt-4">
-                      {admin.firstName} {admin.lastName}
+                      {admin.name}
                     </h2>
 
                     <span className="mt-2 text-sm px-3 py-1 rounded-md bg-gray-100 text-gray-700">
@@ -127,7 +153,7 @@ const AllAdmins = () => {
                     <div className="mt-2 w-full">
                       <div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center">
                         <Phone className="w-4 h-4 text-gray-500" />
-                        {admin.phone}
+                        {admin.phone || "N/A"}
                       </div>
                     </div>
                   </div>
@@ -153,7 +179,7 @@ const AllAdmins = () => {
 
                 <tbody>
                   {admins.map((admin, idx) => {
-                    const key = admin.id || admin._id || idx;
+                    const key = admin._id || idx;
                     const failed = !!failedImages[key];
 
                     return (
@@ -161,7 +187,7 @@ const AllAdmins = () => {
                         <td className="p-3">
                           {admin.image && !failed ? (
                             <img
-                              src={admin.image}
+                              src={`http://localhost:5000${admin.image}`}
                               alt="Profile"
                               className="w-10 h-10 rounded-full object-cover"
                               onError={() =>
@@ -173,18 +199,18 @@ const AllAdmins = () => {
                             />
                           ) : (
                             <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
-                              {(admin.firstName?.[0] || "?").toUpperCase()}
+                              {(admin.name?.[0] || "?").toUpperCase()}
                             </div>
                           )}
                         </td>
 
                         <td className="p-3">
-                          {admin.firstName} {admin.lastName}
+                          {admin.name}
                         </td>
 
                         <td className="p-3">{admin.email}</td>
 
-                        <td className="p-3">{admin.phone}</td>
+                        <td className="p-3">{admin.phone || "N/A"}</td>
 
                         <td className="p-3">
                           <span className="px-3 py-1 bg-gray-100 rounded text-gray-700">
@@ -197,7 +223,7 @@ const AllAdmins = () => {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          <button className="p-2 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50">
+                          <button onClick={() => handleDelete(admin._id)} className="p-2 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </td>

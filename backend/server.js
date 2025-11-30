@@ -10,6 +10,7 @@ const Brandrouter = require("./routes/brands.routes");
 const Categoryrouter = require("./routes/category.routes");
 const Productrouter = require("./routes/product.routes");
 const Clientrouter = require("./routes/client.routes");
+const Ordersrouter = require("./routes/orders.routes");
 dotenv.config();
 connectDB();
 
@@ -46,12 +47,13 @@ app.use((req, res, next) => {
 app.use("/uploads", express.static("uploads"));
 
 
-// ROUTES
-app.use("/api", Userrouter);
+// ROUTES - Mount specific routes FIRST (before catch-all patterns)
 app.use("/api", Brandrouter);
 app.use("/api", Categoryrouter);
 app.use("/api", Productrouter);
+app.use("/api", Ordersrouter);
 app.use("/api/clients", Clientrouter);
+app.use("/api", Userrouter);  // User router LAST because it has /:id catch-all
 
 // TEST ROUTE
 app.get("/", (req, res) => {

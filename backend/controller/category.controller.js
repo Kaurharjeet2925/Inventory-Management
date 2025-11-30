@@ -4,9 +4,7 @@ const Category = require("../models/category.model");
 exports.addCategory = async (req, res) => {
   try {
 	const { name } = req.body;
-	const image = req.files?.uploadImage
-	  ? req.files.uploadImage[0].filename
-	  : "";
+	const image = req.file ? req.file.filename : "";
 
 	if (!name)
 	  return res.status(400).json({ message: "Category name is required" });
@@ -30,10 +28,13 @@ exports.addCategory = async (req, res) => {
 // GET ALL Category
 exports.getCategory = async (req, res) => {
   try {
-	const categories = await Category.find().sort({ createdAt: -1 });
-	res.json(categories);
+    console.log("[getCategory] Fetching all categories...");
+    const categories = await Category.find().sort({ createdAt: -1 });
+    console.log("[getCategory] Found", categories.length, "categories");
+    res.json(categories);
   } catch (error) {
-	res.status(500).json({ message: "Error fetching categories", error: error.message });
+    console.error("[getCategory] Error:", error);
+    res.status(500).json({ message: "Error fetching categories", error: error.message });
   }
 };
 
@@ -56,9 +57,7 @@ exports.updateCategory = async (req, res) => {
 	const { id } = req.params;
 	const { name } = req.body;
 
-	let image = req.files?.uploadImage
-	  ? req.files.uploadImage[0].filename
-	  : undefined;
+	let image = req.file ? req.file.filename : undefined;
 
 	const updateData = { name };
 	if (image) updateData.image = image;

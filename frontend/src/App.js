@@ -15,6 +15,7 @@ import CreateOrders from './pages/ManageOrders/CreateOrders.js';
 import ViewOrders from './pages/ManageOrders/ViewOrders.js';
 import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
+import Locations from './pages/ManageProduct/Locations.js';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="brands" element={<Brands/>} />
         <Route path="categories" element={<Categories/>} />
         <Route path="products" element={<Product/>} />
+        <Route path="location" element={<Locations/>} />
     </Route>
      <Route path="/manage-client" element={<ManageClients/>}>
         <Route path="client" element={<Client/>} />

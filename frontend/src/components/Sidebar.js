@@ -108,9 +108,9 @@ const Sidebar = () => {
               <NavLink to="/manage-products/products" className={linkClass}>
                 Products
               </NavLink>
-              {/* <NavLink to="/manage-products/location" className={linkClass}>
-                Locations
-              </NavLink> */}
+              <NavLink to="/manage-products/location" className={linkClass}>
+                Warehouse Locations
+              </NavLink>
             </div>
           )}
            <button

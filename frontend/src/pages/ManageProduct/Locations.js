@@ -7,6 +7,28 @@ const Locations = () => {
 
   const [showModal, setShowModal] = useState(false);
   const [locationName, setLocationName] = useState("");
+  const [address, setAddress] = useState("");
+  const [coords, setCoords] = useState({ lat: null, lng: null });
+
+  const geocodeAddress = async () => {
+  const apiKey = "YOUR_GOOGLE_MAPS_API_KEY";
+
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+    address
+  )}&key=${apiKey}`;
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (data.results.length > 0) {
+    const location = data.results[0].geometry.location;
+    setCoords({ lat: location.lat, lng: location.lng });
+    return location;
+  }
+
+  alert("Could not find location on map");
+  return null;
+};
 
   // Fetch all locations
   const fetchLocations = async () => {
@@ -29,21 +51,31 @@ const Locations = () => {
   }, []);
 
   // Add Location
-  const handleAddLocation = async () => {
-    if (!locationName.trim()) return;
+ const handleAddLocation = async () => {
+  if (!locationName.trim() || !address.trim()) return;
 
-    try {
-      const res = await apiClient.post("/add-location", {
-        name: locationName,
-      });
+  // Convert address → Lat/Lng
+  const geo = await geocodeAddress();
+  if (!geo) return;
 
-      setLocations((prev) => [...prev, res.data.location]);
-      setLocationName("");
-      setShowModal(false);
-    } catch (err) {
-      console.log("Add error:", err);
-    }
-  };
+  try {
+    const res = await apiClient.post("/add-location", {
+      name: locationName,
+      address,
+      latitude: geo.lat,
+      longitude: geo.lng,
+    });
+
+    setLocations(prev => [...prev, res.data.location]);
+    setLocationName("");
+    setAddress("");
+    setCoords({ lat: null, lng: null });
+    setShowModal(false);
+
+  } catch (err) {
+    console.log("Add error:", err);
+  }
+};
 
   // Delete location
   const handleDelete = async (id) => {
@@ -123,13 +155,30 @@ const Locations = () => {
           <div className="bg-white w-[400px] p-6 rounded-lg shadow">
             <h2 className="text-xl font-bold mb-4">Add Location</h2>
 
-            <label className="font-semibold mb-2 block">Location Name</label>
-            <input
-              type="text"
-              className="w-full border p-2 rounded mb-4"
-              value={locationName}
-              onChange={(e) => setLocationName(e.target.value)}
-            />
+           <label className="font-semibold mb-2 block">Location Name</label>
+<input
+  type="text"
+  className="w-full border p-2 rounded mb-4"
+  value={locationName}
+  onChange={(e) => setLocationName(e.target.value)}
+/>
+
+<label className="font-semibold mb-2 block">Address</label>
+<input
+  type="text"
+  className="w-full border p-2 rounded mb-4"
+  value={address}
+  onChange={(e) => setAddress(e.target.value)}
+/>
+
+{/* GOOGLE MAP PREVIEW */}
+{coords.lat && coords.lng && (
+  <iframe
+    className="w-full h-52 rounded mb-4 border"
+    src={`https://www.google.com/maps?q=${coords.lat},${coords.lng}&z=15&output=embed`}
+  ></iframe>
+)}
+
 
             <div className="flex justify-end gap-2">
               <button
