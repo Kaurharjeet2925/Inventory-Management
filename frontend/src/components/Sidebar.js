@@ -7,6 +7,7 @@ const Sidebar = () => {
   const [productOpen, setProductOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -22,6 +23,9 @@ const Sidebar = () => {
   useEffect(() => {
     setClientsOpen(location.pathname.startsWith("/manage-client"));
   }, [location.pathname]);
+  useEffect(() => {
+    setDeliveryOpen(location.pathname.startsWith("/delivery-boys"));
+  }, [location.pathname]);
   const linkClass = ({ isActive }) =>
     `block px-4 py-2 rounded hover:bg-gray-700 ${
       isActive ? "bg-gray-800 text-white" : "text-gray-300"
@@ -33,21 +37,31 @@ const Sidebar = () => {
       setProductOpen(false);
       setOrdersOpen(false);
       setClientsOpen(false);
+      setDeliveryOpen(false);
     } else if (menu === 'product') {
       setProductOpen(!productOpen);
       setProfileOpen(false);
       setOrdersOpen(false);
       setClientsOpen(false);
+      setDeliveryOpen(false);
     } else if (menu === 'orders') {
       setOrdersOpen(!ordersOpen);
       setProfileOpen(false);
       setProductOpen(false);
       setClientsOpen(false);
+      setDeliveryOpen(false);
     } else if (menu === 'clients') {
       setClientsOpen(!clientsOpen);
       setProfileOpen(false);
       setProductOpen(false);
       setOrdersOpen(false);
+      setDeliveryOpen(false);
+    } else if (menu === 'delivery') {
+      setDeliveryOpen(!deliveryOpen);
+      setProfileOpen(false);
+      setProductOpen(false);
+      setOrdersOpen(false);
+      setClientsOpen(false);
     }
   };
 
@@ -157,6 +171,23 @@ const Sidebar = () => {
               
              
              
+            </div>
+          )}
+          <button
+            onClick={() => handleMenuToggle('delivery')}
+            className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
+              deliveryOpen ? "bg-gray-800 text-white" : "text-gray-300"
+            }`}
+          >
+            <span>Delivery Management</span>
+            <span>{deliveryOpen ? "▾" : "▸"}</span>
+          </button>
+
+          {deliveryOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              <NavLink to="/delivery-boys/deliveries" className={linkClass}>
+                Deliveries
+              </NavLink>
             </div>
           )}
         </nav>

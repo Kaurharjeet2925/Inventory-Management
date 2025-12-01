@@ -2,12 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
+import { Package, AlertTriangle, XCircle, BarChart3 } from "lucide-react";
+
 import AddProducts from "./components/AddProducts";
 const DEFAULT_UNITS = ["piece", "packet", "kg", "ltr", "gm"];
 
 const Product = () => {
   const [search, setSearch] = useState("");
   const [products, setProducts] = useState([]);
+  
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [units, setUnits] = useState(DEFAULT_UNITS);
@@ -33,6 +36,19 @@ const Product = () => {
     thumbnail: null,
     images: [],
   });
+
+const [filterStock, setFilterStock] = useState("");
+const [sortBy, setSortBy] = useState("");
+
+const totalProducts = products.length;
+
+const lowStock = products.filter(p => p.totalQuantity <= 10 && p.totalQuantity > 0).length;
+
+const outOfStock = products.filter(p => p.totalQuantity === 0).length;
+
+const mostStockProduct = products.length
+  ? Math.max(...products.map(p => p.totalQuantity))
+  : 0;
 
   // FETCH DATA
   useEffect(() => {
@@ -189,16 +205,98 @@ const Product = () => {
       </div>
 
       {/* SEARCH */}
-      <div className="flex items-center bg-white p-3 rounded shadow max-w-md mb-6">
-        <Search className="w-5 h-5 text-gray-500 mr-2" />
-        <input
-          className="outline-none w-full"
-          placeholder="Search product…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+     
 
+{/* STATS CARDS */}
+<div className="bg-white p-5 rounded-xl shadow mb-6">
+  <div className="grid grid-cols-4 gap-6 ">
+
+    {/* Total Products (Orange) */}
+    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-orange-100 rounded-xl shadow-sm text-center">
+      <div className="p-3 bg-orange-200 text-orange-700 rounded-full">
+        <Package className="w-6 h-6" />
+      </div>
+      <p className="text-sm text-gray-700">Total Products</p>
+      <p className="text-2xl font-bold text-gray-900">{totalProducts}</p>
+    </div>
+
+    {/* Low Stock (Yellow) */}
+    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-yellow-100 rounded-xl shadow-sm text-center">
+      <div className="p-3 bg-yellow-200 text-yellow-700 rounded-full">
+        <AlertTriangle className="w-6 h-6" />
+      </div>
+      <p className="text-sm text-gray-700">Low Stock Products</p>
+      <p className="text-2xl font-bold text-gray-900">{lowStock}</p>
+    </div>
+
+    {/* Out of Stock (Red) */}
+    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-red-100 rounded-xl shadow-sm text-center">
+      <div className="p-3 bg-red-200 text-red-700 rounded-full">
+        <XCircle className="w-6 h-6" />
+      </div>
+      <p className="text-sm text-gray-700">Out of Stock</p>
+      <p className="text-2xl font-bold text-gray-900">{outOfStock}</p>
+    </div>
+
+    {/* Most Stock Product (Green) */}
+    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-green-100 rounded-xl shadow-sm text-center">
+      <div className="p-3 bg-green-200 text-green-700 rounded-full">
+        <BarChart3 className="w-6 h-6" />
+      </div>
+      <p className="text-sm text-gray-700">Most Stock Product</p>
+      <p className="text-2xl font-bold text-gray-900">{mostStockProduct}</p>
+    </div>
+
+  </div>
+</div>
+ {/* FILTER BAR */}
+<div className="bg-white p-4 rounded-xl shadow mb-6">
+  <div className="flex items-center justify-between gap-4">
+
+    {/* LEFT: Search Bar */}
+    <div className="flex items-center border rounded-lg bg-gray-50 px-3 py-2 w-1/3">
+      <Search className="w-5 h-5 text-gray-500 mr-2" />
+      <input
+        type="text"
+        placeholder="Search product…"
+        className="outline-none w-full text-sm bg-gray-50"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+    </div>
+
+    {/* RIGHT SIDE FILTERS */}
+    <div className="flex items-center gap-3">
+
+      {/* Stock Filter */}
+      <select
+        className="border rounded-lg px-3 py-2 text-sm bg-gray-50"
+        value={filterStock}
+        onChange={(e) => setFilterStock(e.target.value)}
+      >
+        <option value="">All Stock</option>
+        <option value="low">Low Stock</option>
+        <option value="out">Out of Stock</option>
+        <option value="most">Most Stock Product</option>
+      </select>
+
+      {/* Sort by Quantity */}
+      <select
+        className="border rounded-lg px-3 py-2 text-sm bg-gray-50"
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value)}
+      >
+        <option value="">Sort Qty</option>
+        <option value="qty-low">Qty: Low → High</option>
+        <option value="qty-high">Qty: High → Low</option>
+      </select>
+
+    </div>
+
+  </div>
+</div>
+
+      {/* PRODUCT TABLE */}
 <div className="bg-white shadow-md rounded-xl overflow-hidden mt-6">
   <table className="min-w-full text-sm">
     <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
@@ -216,9 +314,22 @@ const Product = () => {
 
     <tbody>
       {products
-        .filter((p) =>
-          p.name.toLowerCase().includes(search.toLowerCase())
-        )
+  .filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase())
+  )
+  .filter((p) => {
+    if (filterStock === "low") return p.totalQuantity <= 10 && p.totalQuantity > 0;
+    if (filterStock === "out") return p.totalQuantity === 0;
+    if (filterStock === "most") return p.totalQuantity === mostStockProduct;
+    return true;
+  })
+  .sort((a, b) => {
+    if (sortBy === "qty-low") return a.totalQuantity - b.totalQuantity;
+    if (sortBy === "qty-high") return b.totalQuantity - a.totalQuantity;
+    return 0;
+  })
+
+
         .map((p) => (
           <tr
             key={p._id}

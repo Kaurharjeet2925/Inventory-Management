@@ -16,6 +16,8 @@ import ViewOrders from './pages/ManageOrders/ViewOrders.js';
 import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
 import Locations from './pages/ManageProduct/Locations.js';
+import DeliveryBoys from './pages/DeliveryBoys/DeliveryBoys.js';
+import Deliveries from './pages/DeliveryBoys/Deliveries.js';
 
 function App() {
   return (
@@ -41,6 +43,9 @@ function App() {
     <Route path="/orders" element={<ManageOrders/>}>
         <Route path="generate-order" element={<CreateOrders/>} />
         <Route path="view-order" element={<ViewOrders/>} />
+    </Route>
+    <Route path="/delivery-boys" element={<DeliveryBoys/>}>
+        <Route path="deliveries" element={<Deliveries/>} />
     </Route>
    
     </Routes>

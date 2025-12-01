@@ -160,3 +160,22 @@ exports.updateOrderStatus = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Delete order
+exports.deleteOrder = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const order = await Order.findByIdAndDelete(id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    
+    // Restore stock for all items in deleted order
+    for (let item of order.items) {
+      await Product.findByIdAndUpdate(item.productId, { $inc: { totalQuantity: item.quantity } });
+    }
+    
+    res.json({ message: "Order deleted successfully" });
+  } catch (error) {
+    console.error("deleteOrder Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
