@@ -1,6 +1,8 @@
 import './App.css';
 import Login from './pages/Login.js';
 import { Routes, Route } from "react-router-dom";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Dashboard from './pages/Dasboard.js';
 import Profile from './pages/Profile.js';
 import EditProfile from './pages/EditProfile.js';
@@ -16,12 +18,23 @@ import ViewOrders from './pages/ManageOrders/ViewOrders.js';
 import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
 import Locations from './pages/ManageProduct/Locations.js';
-import DeliveryBoys from './pages/DeliveryBoys/DeliveryBoys.js';
-import Deliveries from './pages/DeliveryBoys/Deliveries.js';
+import Agent from './pages/Delievery/Agent.js';
+import AgentDashboard from './pages/Delievery/AgentDashboard.js';
 
 function App() {
   return (
     <div>
+      <ToastContainer 
+        position="top-right" 
+        autoClose={3000} 
+        hideProgressBar={false} 
+        newestOnTop 
+        closeOnClick 
+        rtl={false} 
+        pauseOnFocusLoss 
+        draggable 
+        pauseOnHover 
+      />
      <Routes>
       <Route path="/" element={<Login />} />
       <Route path='/dashboard' element= {<Dashboard/>} />
@@ -44,8 +57,8 @@ function App() {
         <Route path="generate-order" element={<CreateOrders/>} />
         <Route path="view-order" element={<ViewOrders/>} />
     </Route>
-    <Route path="/delivery-boys" element={<DeliveryBoys/>}>
-        <Route path="deliveries" element={<Deliveries/>} />
+    <Route path="/agent" element={<Agent/>}>
+        <Route path="agent-dashboard" element={<AgentDashboard/>} />
     </Route>
    
     </Routes>

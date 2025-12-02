@@ -35,6 +35,12 @@ const [form, setForm] = useState({
   const handleSubmit = async (e) => {
   e.preventDefault();
 
+  // Validate required fields
+  if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.password.trim() || !form.role) {
+    toast.error("Please fill in all required fields");
+    return;
+  }
+
   try {
     // Create FormData to handle file upload
     const formData = new FormData();
@@ -52,14 +58,15 @@ const [form, setForm] = useState({
     }
 
     // Call the API
-    await apiClient.post("/superadmin/create-user", formData, {
+    const response = await apiClient.post("/superadmin/create-user", formData, {
       headers: { "Content-Type": "multipart/form-data" }
     });
 
-    toast.success(`${form.role} created successfully!`);
+    toast.success(response.data?.message || `${form.role} created successfully!`);
     handleCancel();
   } catch (error) {
-    toast.error(error.response?.data?.message || "Failed to create user");
+    const errorMessage = error.response?.data?.message || error.message || "Failed to create user";
+    toast.error(errorMessage);
     console.error(error);
   }
 };

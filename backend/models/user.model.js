@@ -15,7 +15,7 @@ const userSchema = new Schema({
   },
 
   phone: String,
-  image: String,
+  uploadImage: String,
   gender: String,
   address: String,
   dateofbirth: String,

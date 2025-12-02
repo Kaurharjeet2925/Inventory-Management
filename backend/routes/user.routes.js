@@ -30,7 +30,7 @@ router.post(
   "/superadmin/create-user",
   auth,                   
   onlySuperAdmin,         
-  upload.single("profileImage"),
+  upload.single("image"),
   createUserBySuperAdmin  
 );
 

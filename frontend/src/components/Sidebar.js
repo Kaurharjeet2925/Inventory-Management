@@ -24,7 +24,7 @@ const Sidebar = () => {
     setClientsOpen(location.pathname.startsWith("/manage-client"));
   }, [location.pathname]);
   useEffect(() => {
-    setDeliveryOpen(location.pathname.startsWith("/delivery-boys"));
+    setDeliveryOpen(location.pathname.startsWith("/agent"));
   }, [location.pathname]);
   const linkClass = ({ isActive }) =>
     `block px-4 py-2 rounded hover:bg-gray-700 ${
@@ -56,7 +56,7 @@ const Sidebar = () => {
       setProductOpen(false);
       setOrdersOpen(false);
       setDeliveryOpen(false);
-    } else if (menu === 'delivery') {
+    } else if (menu === 'agent') {
       setDeliveryOpen(!deliveryOpen);
       setProfileOpen(false);
       setProductOpen(false);
@@ -68,7 +68,7 @@ const Sidebar = () => {
   return (
     <>
       {/* FIX: Sidebar is now FIXED and FULL HEIGHT */}
-      <aside className="w-64 bg-gray-900 text-gray-300 fixed top-0 left-0 h-screen overflow-y-auto">
+      <aside className="hidden md:block md:w-64 md:bg-gray-900 md:text-gray-300 md:fixed md:top-0 md:left-0 md:h-screen md:overflow-y-auto">
         <div className="text-white text-xl font-bold p-4 border-b border-gray-700">
           Admin Panel
         </div>
@@ -172,24 +172,11 @@ const Sidebar = () => {
              
              
             </div>
-          )}
-          <button
-            onClick={() => handleMenuToggle('delivery')}
-            className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
-              deliveryOpen ? "bg-gray-800 text-white" : "text-gray-300"
-            }`}
-          >
-            <span>Delivery Management</span>
-            <span>{deliveryOpen ? "▾" : "▸"}</span>
-          </button>
-
-          {deliveryOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              <NavLink to="/delivery-boys/deliveries" className={linkClass}>
-                Deliveries
-              </NavLink>
-            </div>
-          )}
+           )}
+         
+          <NavLink to="/agent/agent-dashboard" className={linkClass}>
+            Agent Dashboard
+          </NavLink>
         </nav>
       </aside>
     </>
