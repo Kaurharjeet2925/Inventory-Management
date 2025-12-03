@@ -152,7 +152,7 @@ const handleCancel = () => {
          >
     <option value="">Select role </option>
     <option value="admin">Admin</option>
-    <option value="delievery-boy">Delievery Boy</option>
+    <option value="delivery-boy">Delivery Boy</option>
     
   </select>
 </div>

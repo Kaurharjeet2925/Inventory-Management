@@ -25,7 +25,7 @@ const generateOrderId = async () => {
 exports.createOrder = async (req, res) => {
   try {
     const { clientId, clientName, items, notes, status = "pending" } = req.body;
-
+    console.log("Create Order Request:", req.body);
     if (!clientId) {
       return res.status(400).json({ message: "Client is required" });
     }
@@ -64,16 +64,26 @@ exports.createOrder = async (req, res) => {
       await Product.findByIdAndUpdate(item.productId, { $inc: { totalQuantity: -item.quantity } });
     }
 
-    // 3️⃣ Generate orderId and create the order
-    const orderId = await generateOrderId();
-    const newOrder = await Order.create({
-      orderId,
-      clientId,
-      clientName,
-      items,
-      notes,
-      status
-    });
+    
+const orderId = await generateOrderId();
+
+const formattedItems = items.map(item => ({
+  productId: item.productId,
+  productName: item.productName,
+  quantityValue: item.quantityValue,
+  unitType: item.unitType,
+  quantity: Number(item.quantity) // ⭐ MUST INCLUDE
+}));
+
+const newOrder = await Order.create({
+  orderId,
+  clientId,
+  clientName,
+  items: formattedItems,
+  notes,
+  status
+});
+
 
     res.status(201).json({
       message: "Order created successfully",
@@ -90,47 +100,26 @@ exports.createOrder = async (req, res) => {
 // Get all orders
 exports.getOrders = async (req, res) => {
   try {
-    const orders = await Order.find().populate("clientId", "name").sort({ createdAt: -1 });
-    
-    // Auto-assign orderId to orders that don't have one
-    let counter = 1;
-    for (let order of orders) {
-      if (!order.orderId) {
-        order.orderId = `STN${String(counter).padStart(5, '0')}`;
-        await order.save();
-        counter++;
-      } else {
-        const match = order.orderId.match(/\d+$/);
-        if (match) {
-          const num = parseInt(match[0]);
-          if (num >= counter) {
-            counter = num + 1;
-          }
-        }
-      }
-      
-      // Extract clientName from populated clientId if missing
-      if (!order.clientName && order.clientId && order.clientId.name) {
-        order.clientName = order.clientId.name;
-        await order.save();
-      }
+    const user = req.user;
+
+    let filter = {};
+
+    // Delivery boy should only get their own orders
+    if (user.role === "delivery-boy") {
+      filter.deliveryPersonId = user._id;
     }
-    
-    // Re-fetch and transform response to include clientName as string
-    const updatedOrders = await Order.find().populate("clientId", "name").sort({ createdAt: -1 });
-    
-    // Transform: extract clientName from clientId object
-    const transformedOrders = updatedOrders.map(order => ({
-      ...order.toObject(),
-      clientName: order.clientName || (order.clientId?.name || "Unknown")
-    }));
-    
-    res.json({ orders: transformedOrders });
+
+    const orders = await Order.find(filter)
+      .populate("clientId", "name phone")
+      .populate("deliveryPersonId", "name phone")
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
   } catch (error) {
-    console.error("getOrders Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: "Failed to retrieve orders", error: error.message });
   }
 };
+
 
 // Get order by id
 exports.getOrderById = async (req, res) => {
@@ -165,15 +154,28 @@ exports.updateOrderStatus = async (req, res) => {
 exports.deleteOrder = async (req, res) => {
   try {
     const id = req.params.id;
-    const order = await Order.findByIdAndDelete(id);
+
+    // STEP 1: Find order first
+    const order = await Order.findById(id);
     if (!order) return res.status(404).json({ message: "Order not found" });
-    
-    // Restore stock for all items in deleted order
+
+    // STEP 2: Restore stock
     for (let item of order.items) {
-      await Product.findByIdAndUpdate(item.productId, { $inc: { totalQuantity: item.quantity } });
+      const restoreQty = Number(item.quantity) || 0;
+
+      if (restoreQty > 0) {
+        await Product.findByIdAndUpdate(
+          item.productId,
+          { $inc: { totalQuantity: restoreQty } }
+        );
+      }
     }
-    
-    res.json({ message: "Order deleted successfully" });
+
+    // STEP 3: Delete the order after stock is restored
+    await Order.findByIdAndDelete(id);
+
+    return res.json({ message: "Order deleted successfully" });
+
   } catch (error) {
     console.error("deleteOrder Error:", error);
     res.status(500).json({ error: error.message });

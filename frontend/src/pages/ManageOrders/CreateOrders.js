@@ -5,20 +5,35 @@ import AddClient from '../ManageClient/AddClient';
 
 const CreateOrders = () => {
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState("");
+
+  const [deliveryPersons, setDeliveryPersons] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
+
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [qtyError, setQtyError] = useState("");
 
+  const [rawProducts, setRawProducts] = useState([]);
+  const [warehouseOptions, setWarehouseOptions] = useState([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+
+  const [amountData, setAmountData] = useState({
+    totalAmount: "",
+    paidAmount: "",
+    balanceAmount: "",
+    paymentStatus: "unpaid",
+  });
+
   const [itemForm, setItemForm] = useState({
-    productId: '',
-    productName: '',
-    quantity: '',
-    unitType: '',
+    productId: "",
+    productName: "",
+    quantity: "",
+    unitType: "",
   });
 
   const [formData, setFormData] = useState({
-    paymentMethod: 'credit-card',
-    notes: '',
+    paymentMethod: "credit-card",
+    notes: "",
     gstPercentage: 18,
   });
 
@@ -31,13 +46,28 @@ const CreateOrders = () => {
   useEffect(() => {
     const loadClients = async () => {
       try {
-        const res = await apiClient.get('/clients');
+        const res = await apiClient.get("/clients");
         setClients(res.data?.clients || []);
       } catch (err) {
-        console.error('Failed to load clients', err);
+        console.error("Failed to load clients", err);
       }
     };
     loadClients();
+  }, []);
+
+  /* -------------------------------------------------------
+     LOAD DELIVERY PERSONS
+  -------------------------------------------------------- */
+  useEffect(() => {
+    const loadDeliveryPersons = async () => {
+      try {
+        const res = await apiClient.get("/delivery-persons");
+        setDeliveryPersons(res.data || []);
+      } catch (err) {
+        console.error("Failed to load delivery persons", err);
+      }
+    };
+    loadDeliveryPersons();
   }, []);
 
   /* -------------------------------------------------------
@@ -46,42 +76,52 @@ const CreateOrders = () => {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const res = await apiClient.get('/products');
+        const res = await apiClient.get("/products");
 
-        const mergedProducts = res.data.map((p) => ({
+        setRawProducts(res.data);
+
+        const merged = res.data.map((p) => ({
           ...p,
-          displayName: `${p.name} – ${ p.quantityValue || 0} ${p.quantityUnit || ''}`,
+          displayName: `${p.name} – ${p.quantityValue || 0} ${p.quantityUnit || ""}`,
         }));
 
-        setProducts(mergedProducts);
+        const map = new Map();
+        merged.forEach((p) => {
+          const key = `${p.name}-${p.quantityValue}-${p.quantityUnit}`;
+          if (!map.has(key)) map.set(key, p);
+        });
+
+        setProducts(Array.from(map.values()));
       } catch (err) {
-        console.error('Failed to load products', err);
+        console.error("Failed to load products", err);
       }
     };
     loadProducts();
   }, []);
 
+  /* -------------------------------------------------------
+      SEARCHABLE DROPDOWN COMPONENT
+  -------------------------------------------------------- */
   const SearchableSelect = ({ options = [], value, onChange, placeholder }) => {
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
 
     useEffect(() => {
-      const handleClick = (e) => {
+      const handleClickOutside = (e) => {
         if (ref.current && !ref.current.contains(e.target)) setOpen(false);
       };
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
     }, []);
 
-    // Show selected item in input
     useEffect(() => {
-      const sel = options.find((o) => o._id === value);
-      setQuery(sel ? sel.displayName : '');
+      const selectedOption = options.find((o) => o._id === value);
+      setQuery(selectedOption ? selectedOption.displayName : "");
     }, [value, options]);
 
-    const filtered = options.filter((o) =>
-      (o.displayName || '').toLowerCase().includes(query.toLowerCase())
+    const filteredOptions = options.filter((o) =>
+      o.displayName.toLowerCase().includes(query.toLowerCase())
     );
 
     return (
@@ -93,18 +133,18 @@ const CreateOrders = () => {
             setQuery(e.target.value);
             setOpen(true);
           }}
-          onFocus={() => setOpen(true)}
           placeholder={placeholder}
           className="w-full border p-2 rounded"
+          onFocus={() => setOpen(true)}
         />
 
         {open && (
-          <ul className="absolute z-40 w-full bg-white border rounded mt-1 max-h-48 overflow-auto shadow">
-            {filtered.length === 0 && (
+          <ul className="absolute w-full bg-white border rounded mt-1 max-h-48 overflow-auto shadow z-50">
+            {filteredOptions.length === 0 && (
               <li className="p-2 text-sm text-gray-500">No results</li>
             )}
 
-            {filtered.map((o) => (
+            {filteredOptions.map((o) => (
               <li
                 key={o._id}
                 className="p-2 hover:bg-gray-100 cursor-pointer"
@@ -123,7 +163,10 @@ const CreateOrders = () => {
     );
   };
 
-  const selectedClient = clients.find((c) => String(c._id) === String(selectedClientId));
+  /* -------------------------------------------------------
+      CLIENT DETAILS
+  -------------------------------------------------------- */
+  const selectedClient = clients.find((c) => c._id === selectedClientId);
 
   const handleAddNewClient = (newClient) => {
     setClients([...clients, newClient]);
@@ -131,33 +174,36 @@ const CreateOrders = () => {
   };
 
   /* -------------------------------------------------------
-     ITEM CHANGE
+      ITEM QUANTITY CHANGE
   -------------------------------------------------------- */
   const handleItemChange = (e) => {
     const { name, value } = e.target;
 
     if (name === "quantity") {
-      const product = products.find((p) => p._id === itemForm.productId);
-      const dbStock = product?.totalQuantity || product?.quantityValue || 0;
-      // Deduct quantities already added in orderItems for this product
-      const alreadyOrdered = orderItems
-        .filter((it) => String(it.productId) === String(itemForm.productId))
-        .reduce((sum, it) => sum + it.quantity, 0);
-      const availableQty = dbStock - alreadyOrdered;
       const qty = Number(value);
-
       if (!qty || qty <= 0) {
         setItemForm({ ...itemForm, quantity: "" });
         return;
       }
 
-      if (qty > availableQty) {
-        setQtyError(`Cannot select more than ${availableQty} in stock`);
+      const selectedWh = warehouseOptions.find((w) => w.id === selectedWarehouseId);
+      const availableQty = selectedWh?.stock || 0;
+
+      const alreadyOrdered = orderItems
+        .filter(
+          (it) =>
+            it.productId === itemForm.productId && it.warehouseId === selectedWarehouseId
+        )
+        .reduce((sum, it) => sum + it.quantity, 0);
+
+      const remaining = availableQty - alreadyOrdered;
+
+      if (qty > remaining) {
+        setQtyError(`Only ${remaining} available in this warehouse`);
         return;
-      } else {
-        setQtyError("");
       }
 
+      setQtyError("");
       setItemForm({ ...itemForm, quantity: qty });
       return;
     }
@@ -166,31 +212,20 @@ const CreateOrders = () => {
   };
 
   /* -------------------------------------------------------
-     ADD ITEM
+      ADD ITEM
   -------------------------------------------------------- */
   const addItem = () => {
-    const product = products.find((p) => p._id === itemForm.productId);
-    const dbStock = product?.totalQuantity || product?.quantityValue || 0;
-    // Deduct quantities already added in orderItems for this product
-    const alreadyOrdered = orderItems
-      .filter((it) => String(it.productId) === String(itemForm.productId))
-      .reduce((sum, it) => sum + it.quantity, 0);
-    const availableQty = dbStock - alreadyOrdered;
-
-    if (!itemForm.productId) return alert("Select a product first");
-    if (!itemForm.quantity || itemForm.quantity <= 0) return alert("Enter valid quantity");
-
-    if (itemForm.quantity > availableQty) {
-      return alert(`You cannot add more than ${availableQty}`);
-    }
+    if (!itemForm.productId) return alert("Select a product");
+    if (!selectedWarehouseId) return alert("Select a warehouse");
+    if (!itemForm.quantity) return alert("Enter quantity");
 
     const itemToAdd = {
       id: Date.now(),
       productId: itemForm.productId,
-      productName: product?.name,
-      quantityValue: product?.quantityValue || null,
-      unitType: itemForm.unitType,
+      warehouseId: selectedWarehouseId,
+      productName: itemForm.productName,
       quantity: Number(itemForm.quantity),
+      unitType: itemForm.unitType,
     };
 
     setOrderItems([...orderItems, itemToAdd]);
@@ -201,58 +236,86 @@ const CreateOrders = () => {
       quantity: "",
       unitType: "",
     });
+    setSelectedWarehouseId("");
   };
 
   const removeItem = (id) => {
     setOrderItems(orderItems.filter((item) => item.id !== id));
   };
 
-  
- 
   /* -------------------------------------------------------
-     SUBMIT ORDER
+      BALANCE CALCULATION
   -------------------------------------------------------- */
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    const total = Number(amountData.totalAmount || 0);
+    const paid = Number(amountData.paidAmount || 0);
+    const balance = total - paid;
+
+    setAmountData((prev) => ({
+      ...prev,
+      balanceAmount: balance >= 0 ? balance : 0,
+      paymentStatus:
+        paid === 0
+          ? "unpaid"
+          : paid >= total
+          ? "paid"
+          : "partial",
+    }));
+  }, [amountData.totalAmount, amountData.paidAmount]);
+
+  /* -------------------------------------------------------
+      SUBMIT ORDER
+  -------------------------------------------------------- */
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!selectedClientId || orderItems.length === 0) {
-      alert("Select a client and add at least one item.");
-      return;
-    }
+    if (!selectedClientId) return alert("Select a client");
+    if (orderItems.length === 0) return alert("Add at least one item");
+    if (!selectedDeliveryPersonId) return alert("Select a delivery person");
 
-    // Build payload expected by backend: client + items + optional notes/status
+    if (!amountData.totalAmount) return alert("Total amount required");
+
     const payload = {
       clientId: selectedClientId,
-      clientName: selectedClient?.name || "",
-      items: orderItems.map((it) => ({
-        productId: it.productId,
-        productName: it.productName,
-        quantity: Number(it.quantity),
-        quantityValue: Number(it.quantityValue),
-        unitType: it.unitType || "",
-      })),
-      notes: formData.notes || "",
+      deliveryPersonId: selectedDeliveryPersonId,
+
+      paymentDetails: amountData,
+      items: orderItems,
+
+      notes: formData.notes,
       status: "pending",
     };
 
-    (async () => {
-      try {
-        const res = await apiClient.post('/orders', payload);
-        if (res?.data?.order) {
-          alert('Order created successfully');
-          setSelectedClientId(null);
-          setOrderItems([]);
-          setFormData({ paymentMethod: 'credit-card', notes: '', gstPercentage: 18 });
-        } else {
-          alert('Order created (no order object returned)');
-        }
-      } catch (err) {
-        console.error('Failed to create order', err);
-        const msg = err?.response?.data?.message || err.message || 'Failed to create order';
-        alert(msg);
-      }
-    })();
+    try {
+      await apiClient.post("/orders", payload);
+      alert("Order created successfully!");
+
+      // Reset all fields
+      setSelectedClientId("");
+      setSelectedDeliveryPersonId("");
+      setOrderItems([]);
+      setItemForm({
+        productId: "",
+        productName: "",
+        quantity: "",
+        unitType: "",
+      });
+
+      setAmountData({
+        totalAmount: "",
+        paidAmount: "",
+        balanceAmount: "",
+        paymentStatus: "unpaid",
+      });
+
+      setSelectedWarehouseId("");
+      setWarehouseOptions([]);
+
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to create order");
+    }
   };
+
 
   return (
     <div className="ml-64 mt-12 p-6">
@@ -303,16 +366,32 @@ const CreateOrders = () => {
           )}
         </div>
 
+        <div className="bg-gray-50 p-6 rounded-lg mb-6">
+          <h2 className="text-xl font-bold mb-4">Delivery Person</h2>
+
+          <select
+  value={selectedDeliveryPersonId}
+  onChange={(e) => setSelectedDeliveryPersonId(e.target.value)}
+  className="w-full border p-3 rounded"
+>
+  <option value="">Select Delivery Person</option>
+
+  {deliveryPersons.map((d) => (
+    <option key={d._id} value={d._id}>
+      {d.name} ({d.phone})
+    </option>
+  ))}
+</select>
+
+        </div>
+
         {/* ORDER ITEMS */}
-       {/* -----------------------------
-    ORDER ITEMS (FINAL SIMPLE VERSION)
-    Product | Stock | Add Button
------------------------------- */}
+      
 <div className="bg-gray-50 p-6 rounded-lg mb-6">
   <h2 className="text-xl font-bold mb-4">Order Items</h2>
 
   {/* 3-column layout: Product – Stock – Add */}
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 items-end">
+  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4 items-end">
 
     {/* PRODUCT SELECT */}
     <div className="sm:col-span-1">
@@ -322,21 +401,64 @@ const CreateOrders = () => {
         options={products}
         value={itemForm.productId}
         onChange={(id) => {
-          const selectedProduct = products.find((p) => p._id === id);
+          const p = products.find((prod) => prod._id === id);
 
-          // auto-set quantity to 1 and fill unitType from product
           setItemForm({
             productId: id,
-            productName: selectedProduct?.name || "",
+            productName: p.name,
             quantity: 1,
-            unitType: selectedProduct?.quantityUnit || "",
+            unitType: p.quantityUnit,
           });
 
+          const warehouses = rawProducts
+            .filter(prod =>
+              prod.name === p.name &&
+              prod.quantityValue === p.quantityValue &&
+              prod.quantityUnit === p.quantityUnit
+            )
+            .map(prod => ({
+              id: prod._id,
+              warehouseName: prod.location?.name || "Unknown",
+              stock: prod.totalQuantity || 0,
+            }));
+
+          setWarehouseOptions(warehouses);
+          setSelectedWarehouseId("");
           setQtyError("");
         }}
         placeholder="Search product..."
       />
     </div>
+    <div>
+  <label className="font-semibold">Warehouse</label>
+  <select
+    value={selectedWarehouseId}
+    onChange={(e) => setSelectedWarehouseId(e.target.value)}
+    className="border p-2 rounded w-full"
+  >
+    <option value="">Select Warehouse</option>
+
+    {warehouseOptions.map((wh) => {
+      // calculate already ordered FROM THIS warehouse only
+      const alreadyOrdered = orderItems
+        .filter(
+          (it) =>
+            it.productId === itemForm.productId &&
+            it.warehouseId === wh.id
+        )
+        .reduce((sum, it) => sum + it.quantity, 0);
+
+      const remainingStock = wh.stock - alreadyOrdered;
+
+      return (
+        <option key={wh.id} value={wh.id}>
+          {wh.warehouseName} (Stock: {remainingStock})
+        </option>
+      );
+    })}
+  </select>
+</div>
+
 
     {/* STOCK (order quantity) */}
     <div className="relative sm:col-span-1">
@@ -352,21 +474,28 @@ const CreateOrders = () => {
       />
 
       {/* AVAILABLE STOCK */}
-      {itemForm.productId && (
-        <span className="absolute -bottom-5 left-0 text-xs text-gray-600">
-          Available:{" "}
-          {(() => {
-            const prod = products.find((p) => p._id === itemForm.productId);
-            const dbStock = prod?.totalQuantity ?? prod?.quantityValue ?? 0;
-            // Deduct quantities already added in orderItems
-            const alreadyOrdered = orderItems
-              .filter((it) => String(it.productId) === String(itemForm.productId))
-              .reduce((sum, it) => sum + it.quantity, 0);
-            const remaining = dbStock - alreadyOrdered;
-            return remaining;
-          })()}
-        </span>
-      )}
+      {itemForm.productId && selectedWarehouseId && (
+  <span className="absolute -bottom-5 left-0 text-xs text-gray-600">
+    Available:{" "}
+    {(() => {
+      const wh = warehouseOptions.find(
+        (w) => w.id === selectedWarehouseId
+      );
+
+      // deduct already ordered 
+      const alreadyOrdered = orderItems
+        .filter(
+          (it) =>
+            it.productId === itemForm.productId &&
+            it.warehouseId === selectedWarehouseId
+        )
+        .reduce((sum, it) => sum + it.quantity, 0);
+
+      return (wh?.stock || 0) - alreadyOrdered;
+    })()}
+  </span>
+)}
+
 
       {qtyError && (
         <p className="text-red-500 text-xs absolute -bottom-10 left-0">
@@ -422,6 +551,55 @@ const CreateOrders = () => {
   )}
 </div>
 
+<div className="bg-gray-50 p-6 rounded-lg mb-6">
+          <h2 className="text-xl font-bold mb-4">Payment Details</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label>Total Amount</label>
+              <input
+                type="number"
+                value={amountData.totalAmount}
+                onChange={(e) =>
+                  setAmountData({ ...amountData, totalAmount: e.target.value })
+                }
+                className="border p-2 rounded w-full"
+              />
+            </div>
+
+            <div>
+              <label>Paid Amount</label>
+              <input
+                type="number"
+                value={amountData.paidAmount}
+                onChange={(e) =>
+                  setAmountData({ ...amountData, paidAmount: e.target.value })
+                }
+                className="border p-2 rounded w-full"
+              />
+            </div>
+
+            <div>
+              <label>Balance</label>
+              <input
+                type="number"
+                value={amountData.balanceAmount}
+                readOnly
+                className="border bg-gray-100 p-2 rounded w-full"
+              />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label>Payment Status</label>
+            <input
+              type="text"
+              value={amountData.paymentStatus}
+              readOnly
+              className="border bg-gray-100 p-2 rounded w-full"
+            />
+          </div>
+        </div>
 
         {/* SUBMIT */}
         <div className="flex gap-3 justify-end">

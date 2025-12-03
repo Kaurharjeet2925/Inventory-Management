@@ -11,6 +11,7 @@ const Categoryrouter = require("./routes/category.routes");
 const Productrouter = require("./routes/product.routes");
 const Clientrouter = require("./routes/client.routes");
 const Ordersrouter = require("./routes/orders.routes");
+const locationRouter = require("./routes/location.routes");
 dotenv.config();
 connectDB();
 
@@ -53,7 +54,9 @@ app.use("/api", Categoryrouter);
 app.use("/api", Productrouter);
 app.use("/api", Ordersrouter);
 app.use("/api/clients", Clientrouter);
+app.use("/api", locationRouter);
 app.use("/api", Userrouter);  // User router LAST because it has /:id catch-all
+
 
 // TEST ROUTE
 app.get("/", (req, res) => {

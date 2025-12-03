@@ -7,7 +7,7 @@ const AgentBottomNav = () => {
   const location = useLocation();
 
   const tabs = [
-    { name: "Home", icon: Home, path: "/agent/dashboard" },
+    { name: "Home", icon: Home, path: "/agent/agent-dashboard" },
     { name: "Deliveries", icon: Truck, path: "/agent/deliveries" },
     { name: "History", icon: History, path: "/agent/history" },
     { name: "Profile", icon: User, path: "/agent/profile" },

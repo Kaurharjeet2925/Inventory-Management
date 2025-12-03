@@ -9,6 +9,8 @@ const AddProducts = ({
   units,
   setUnits,
   thumbnailPreview,
+  locations,
+  setShowLocationModal,   // <-- coming from Product.jsx
   imagesPreview,
   handleThumbnail,
   handleImages,
@@ -18,6 +20,7 @@ const AddProducts = ({
 
       {/* LEFT FORM */}
       <div>
+        {/* Product Name */}
         <label className="font-semibold">Product Name</label>
         <input
           type="text"
@@ -27,8 +30,10 @@ const AddProducts = ({
             setProductData({ ...productData, name: e.target.value })
           }
         />
-        
+
+        {/* Brand + Category */}
         <div className="grid grid-cols-2 gap-4 mb-4">
+          {/* Brand */}
           <div>
             <label className="font-semibold">Brand</label>
             <select
@@ -47,6 +52,7 @@ const AddProducts = ({
             </select>
           </div>
 
+          {/* Category */}
           <div>
             <label className="font-semibold">Category</label>
             <select
@@ -66,52 +72,44 @@ const AddProducts = ({
           </div>
         </div>
 
+        {/* Inventory Location */}
         <label className="font-semibold">Inventory Location</label>
-        {(() => {
-          const locations = ["WAREHOUSE-A", "WAREHOUSE-B", "WAREHOUSE-C", "WAREHOUSE-D"];
-          const selectedOption = locations.includes(productData.location)
-            ? productData.location
-            : (productData.location ? 'Other' : '');
 
-          return (
-            <>
-              <select
-                className="w-full border p-2 rounded mb-2"
-                value={selectedOption}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === 'Other') {
-                    setProductData({ ...productData, location: '' });
-                  } else {
-                    setProductData({ ...productData, location: val });
-                  }
-                }}
-              >
-                <option value="">Select location</option>
-                {locations.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {loc}
-                  </option>
-                ))}
-                <option value="Other">Other (custom)</option>
-              </select>
+<select
+  className="w-full border p-2 rounded mb-4"
+  value={productData.location}
+  onChange={(e) => {
+    const value = e.target.value;
 
-              {selectedOption === 'Other' && (
-                <input
-                  type="text"
-                  className="w-full border p-2 rounded mb-4"
-                  placeholder="Enter custom location"
-                  value={productData.location || ''}
-                  onChange={(e) =>
-                    setProductData({ ...productData, location: e.target.value })
-                  }
-                />
-              )}
-            </>
-          );
-        })()}
+    if (value === "__add_new__") {
+      // Open modal
+      setShowLocationModal(true);
 
-        <label className="font-semibold">Original Price (MRP)</label>
+      // Reset selection to previous chosen value
+      setProductData({ ...productData, location: "" });
+      return;
+    }
+
+    setProductData({ ...productData, location: value });
+  }}
+>
+  <option value="">Select Location</option>
+
+  {locations.map((loc) => (
+    <option key={loc._id} value={loc._id}>
+      {loc.name}
+    </option>
+  ))}
+
+  {/* ADD NEW LOCATION OPTION */}
+  <option value="__add_new__" className="text-blue-600 font-semibold">
+    ➕ Add New Location
+  </option>
+</select>
+    
+
+        {/* MRP */}
+        <label className="font-semibold">Original Price</label>
         <input
           type="number"
           className="w-full border p-2 rounded mb-4"
@@ -121,6 +119,7 @@ const AddProducts = ({
           }
         />
 
+        {/* Sales Price */}
         <label className="font-semibold">Sales Price</label>
         <input
           type="number"
@@ -131,6 +130,7 @@ const AddProducts = ({
           }
         />
 
+        {/* Thumbnail */}
         <label className="font-semibold">Thumbnail Image</label>
         <input type="file" className="mb-3" onChange={handleThumbnail} />
 
@@ -145,6 +145,7 @@ const AddProducts = ({
 
       {/* RIGHT FORM */}
       <div>
+        {/* Quantity */}
         <label className="font-semibold">Quantity (Value + Unit)</label>
         <div className="flex gap-3 mb-4">
           <input
@@ -157,6 +158,7 @@ const AddProducts = ({
             }
           />
 
+          {/* Unit */}
           <input
             list="unitsList"
             className="w-1/2 border p-2 rounded"
@@ -164,11 +166,7 @@ const AddProducts = ({
             value={productData.quantityUnit}
             onChange={(e) => {
               const value = e.target.value;
-
-              if (value && !units.includes(value)) {
-                setUnits([...units, value]);
-              }
-
+              if (value && !units.includes(value)) setUnits([...units, value]);
               setProductData({ ...productData, quantityUnit: value });
             }}
           />
@@ -180,6 +178,7 @@ const AddProducts = ({
           </datalist>
         </div>
 
+        {/* Stock */}
         <label className="font-semibold">Stock Quantity</label>
         <input
           type="number"
@@ -190,6 +189,7 @@ const AddProducts = ({
           }
         />
 
+        {/* Rating */}
         <label className="font-semibold">Rating</label>
         <div className="flex items-center gap-1 mb-4">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -207,6 +207,7 @@ const AddProducts = ({
           ))}
         </div>
 
+        {/* Description */}
         <label className="font-semibold">Description</label>
         <textarea
           className="w-full border p-2 rounded h-32 mb-4"
@@ -216,6 +217,7 @@ const AddProducts = ({
           }
         />
 
+        {/* Product Images */}
         <label className="font-semibold">Product Images</label>
         <input type="file" multiple onChange={handleImages} />
 

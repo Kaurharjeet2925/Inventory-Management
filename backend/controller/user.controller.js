@@ -196,3 +196,15 @@ exports.deleteUser = async (req, res) => {
     res.status(500).json({ message: "Error deleting user", error: error.message });
   }
 };
+
+// GET ALL DELIVERY PERSONS
+exports.getDeliveryPersons = async (req, res) => {
+  try {
+    const deliveryPersons = await User.find({ role: "delivery-boy" })
+      .select("_id name phone email");
+
+    res.json(deliveryPersons);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching delivery persons", error: error.message });
+  }
+};

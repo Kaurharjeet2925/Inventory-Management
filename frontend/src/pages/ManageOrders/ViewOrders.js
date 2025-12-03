@@ -92,7 +92,8 @@ const ViewOrders = () => {
             <tr>
               <th className="p-3 text-left">Order ID</th>
               <th className="p-3 text-left">Client Name</th>
-              <th className="p-3 text-left">Items</th>
+              <th className="p-3 text-left">Products</th>
+              <th className="p-3 text-left">Stocks</th>
               <th className="p-3 text-left">Status</th>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-center">Actions</th>
@@ -111,10 +112,18 @@ const ViewOrders = () => {
                   <td className="p-3 text-sm">
                     {order.items && order.items.map((item, idx) => (
                       <div key={idx} className="text-gray-700">
-                        {item.productName} - {item.quantity} {item.unitType || ''}
+                        {item.productName} - {item.quantityValue} {item.unitType || ''}
                       </div>
                     ))}
                   </td>
+                 <td className="p-3 text-sm">
+                             {order.items?.map((item, idx) => (
+                         <div key={idx} className="text-gray-700">
+                            {item.quantity ?? "N/A"}
+                         </div>
+                         ))}
+                 </td>
+
                   <td className="p-3">
                     <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusBadge(order.status)}`}>
                       {order.status || 'pending'}

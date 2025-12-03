@@ -3,7 +3,7 @@ import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
 import { Package, AlertTriangle, XCircle, BarChart3 } from "lucide-react";
-
+import AddLocationModal from "./components/AddLocation";
 import AddProducts from "./components/AddProducts";
 const DEFAULT_UNITS = ["piece", "packet", "kg", "ltr", "gm"];
 
@@ -14,13 +14,16 @@ const Product = () => {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [units, setUnits] = useState(DEFAULT_UNITS);
-
+ const [locations, setLocations] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
   const [thumbnailPreview, setThumbnailPreview] = useState("");
   const [imagesPreview, setImagesPreview] = useState([]);
-
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [newLocationName, setNewLocationName] = useState("");
+  const [newAddress, setNewAddress] = useState("");
+  
   const [productData, setProductData] = useState({
     name: "",
     brand: "",
@@ -55,17 +58,56 @@ const mostStockProduct = products.length
     fetchAll();
   }, []);
 
-  const fetchAll = async () => {
-    const [cat, brand, prod] = await Promise.all([
+ const fetchAll = async () => {
+  try {
+    const [cat, brand, prod, loc] = await Promise.all([
       apiClient.get("/category"),
       apiClient.get("/brands"),
       apiClient.get("/products"),
+      apiClient.get("/locations"),
     ]);
 
     setCategories(cat.data);
     setBrands(brand.data);
     setProducts(prod.data);
-  };
+    setLocations(loc.data.locations || loc.data);
+
+  } catch (error) {
+    console.log("Fetch error:", error);
+  }
+};
+
+const handleAddLocationFromProduct = async () => {
+  if (!newLocationName.trim() || !newAddress.trim()) {
+    toast.error("Please fill all fields");
+    return;
+  }
+
+  try {
+    const res = await apiClient.post("/locations/create", {
+      name: newLocationName,
+      address: newAddress,
+    });
+
+    const newLoc = res.data.location;
+
+    // update list
+    setLocations((prev) => [...prev, newLoc]);
+
+    // auto-select new location in product form
+    setProductData((prev) => ({
+      ...prev,
+      location: newLoc._id
+    }));
+
+    setShowLocationModal(false);
+    setNewLocationName("");
+    setNewAddress("");
+    toast.success("Location added!");
+  } catch (err) {
+    toast.error("Failed to add location");
+  }
+};
 
   const openAdd = () => {
     setEditingId(null);
@@ -95,13 +137,13 @@ const mostStockProduct = products.length
       name: p.name,
       brand: p.brand?._id,
       category: p.category?._id,
+      location: p.location?._id,
       quantityValue: p.quantityValue,
       quantityUnit: p.quantityUnit,
       totalQuantity: p.totalQuantity,
       mrp: p.mrp,
       price: p.price,
       description: p.description,
-      location: p.location,
       rating: p.rating || 0,
       thumbnail: null,
       images: [],
@@ -369,7 +411,8 @@ const mostStockProduct = products.length
             {/* LOCATION */}
             <td className="p-4 text-center">
               <span className="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">
-                {p.location}
+                {p.location?.name}
+
               </span>
             </td>
 
@@ -430,11 +473,30 @@ const mostStockProduct = products.length
               categories={categories}
               units={units}
               setUnits={setUnits}
+              locations={locations}                  // ✅ FIX
+              setShowLocationModal={setShowLocationModal}
               thumbnailPreview={thumbnailPreview}
               imagesPreview={imagesPreview}
               handleThumbnail={handleThumbnail}
               handleImages={handleImages}
             />
+           {showLocationModal && (
+  <AddLocationModal
+    show={showLocationModal}
+    onClose={() => {
+      setShowLocationModal(false);
+      setNewLocationName("");
+      setNewAddress("");
+    }}
+    locationName={newLocationName}
+    address={newAddress}
+    setLocationName={setNewLocationName}
+    setAddress={setNewAddress}
+    onSave={handleAddLocationFromProduct}
+  />
+)}
+
+
 
             <div className="flex justify-end mt-6 gap-3">
               <button

@@ -6,7 +6,8 @@ const {
   getAllUsers,
   getUserById,
   updateUser,
-  deleteUser
+  deleteUser,
+  getDeliveryPersons
 } = require("../controller/user.controller");
 const upload = require("../middleware/multer");
 const { 
@@ -16,7 +17,7 @@ const {
 
 const auth = require("../middleware/auth");
 const onlySuperAdmin = require("../middleware/onlySuperAdmin");
-
+const allowAdminAndSuperAdmin = require("../middleware/allowAdminAndSuperAdmin");
 
 const { getProductsDashboard } = require("../controller/dashboard.controller");
 
@@ -25,7 +26,7 @@ router.post("/register", registerValidation, registerUser);
 router.post("/login", loginValidation, loginUser);
 router.get("/dashboard", auth, getProductsDashboard);
 router.get("/all", auth, onlySuperAdmin, getAllUsers);
-
+router.get("/delivery-persons", auth, allowAdminAndSuperAdmin, getDeliveryPersons);
 router.post(
   "/superadmin/create-user",
   auth,                   
@@ -36,6 +37,7 @@ router.post(
 
 // Generic ID routes LAST (after specific routes)
 router.get("/:id", auth, getUserById);
+
 
 router.put(
   "/:id",

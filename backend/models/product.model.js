@@ -12,12 +12,13 @@ const productSchema = new mongoose.Schema(
     price: { type: Number },
     description: { type: String },
     rating: { type: Number, default: 0 },
-    location: {
-  type: String,
-  enum: ["WAREHOUSE-A", "WAREHOUSE-B", "WAREHOUSE-C", "WAREHOUSE-D"],
-  default: "WAREHOUSE-A"
-}
-,
+//     location: {
+//   type: String,
+//   enum: ["WAREHOUSE-A", "WAREHOUSE-B", "WAREHOUSE-C", "WAREHOUSE-D"],
+//   default: "WAREHOUSE-A"
+// }
+location: { type: mongoose.Schema.Types.ObjectId, ref: "Location" },
+
 
     thumbnail: { type: String }, 
     images: [String],            

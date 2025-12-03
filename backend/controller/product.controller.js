@@ -102,6 +102,7 @@ exports.getProducts = async (req, res) => {
     const products = await Product.find()
       .populate("brand", "name")
       .populate("category", "name")
+      .populate("location", "name address")
       .sort({ createdAt: -1 });
     console.log("[getProducts] Found", products.length, "products");
     res.json(products);
