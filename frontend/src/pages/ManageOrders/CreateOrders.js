@@ -218,27 +218,34 @@ const CreateOrders = () => {
     if (!itemForm.productId) return alert("Select a product");
     if (!selectedWarehouseId) return alert("Select a warehouse");
     if (!itemForm.quantity) return alert("Enter quantity");
-
+  
+    const selectedProduct = products.find(p => p._id === itemForm.productId);
+    const selectedWarehouse = warehouseOptions.find(w => w.id === selectedWarehouseId);
+  
     const itemToAdd = {
       id: Date.now(),
       productId: itemForm.productId,
       warehouseId: selectedWarehouseId,
-      productName: itemForm.productName,
+      warehouseName: selectedWarehouse?.warehouseName || "Unknown",   // ✅ FIX 1
+      productName: selectedProduct.name,
       quantity: Number(itemForm.quantity),
-      unitType: itemForm.unitType,
+      quantityValue: selectedProduct.quantityValue,   // ✅ FIX 2
+      quantityUnit: selectedProduct.quantityUnit,     // ✅ FIX 3
     };
-
+  
     setOrderItems([...orderItems, itemToAdd]);
-
+  
     setItemForm({
       productId: "",
       productName: "",
       quantity: "",
       unitType: "",
     });
+  
     setSelectedWarehouseId("");
   };
-
+  
+   
   const removeItem = (id) => {
     setOrderItems(orderItems.filter((item) => item.id !== id));
   };
@@ -406,7 +413,7 @@ const CreateOrders = () => {
           setItemForm({
             productId: id,
             productName: p.name,
-            quantity: 1,
+            quantity: "",
             unitType: p.quantityUnit,
           });
 
@@ -468,6 +475,10 @@ const CreateOrders = () => {
         type="number"
         name="quantity"
         value={itemForm.quantity}
+        disabled={
+          selectedWarehouseId &&
+          warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
+        }
         onChange={handleItemChange}
         className={`w-full border rounded p-2 ${qtyError ? "border-red-500" : ""}`}
         min="1"
@@ -509,6 +520,11 @@ const CreateOrders = () => {
       <button
         type="button"
         onClick={addItem}
+        disabled={
+          !itemForm.productId ||
+          !selectedWarehouseId ||
+          warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
+        }
         className="w-full bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center justify-center gap-2"
       >
         <Plus size={18} /> Add
@@ -522,22 +538,24 @@ const CreateOrders = () => {
     <div>
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-gray-200">
-            <th className="p-2 text-left">Product</th>
-            <th className="p-2 text-center">Qty</th>
-            <th className="p-2 text-center">Action</th>
+          <tr className="bg-gray-200 ">
+            <th className="p-4 text-left">Product</th>
+            <th className="p-4 text-left">Warehouse</th>
+            <th className="p-4 text-left">Quantity</th>
+            <th className="p-4 text-left">Action</th>
           </tr>
         </thead>
 
         <tbody>
           {orderItems.map((item) => (
             <tr key={item.id} className="border-b hover:bg-gray-100">
-              <td className="p-2">{item.productName}</td>
-              <td className="p-2 text-center">{item.quantity}</td>
-              <td className="p-2 text-center">
+              <td className="p-4 text-left">{item.productName}-{item.quantityValue}{item.quantityUnit}</td>
+              <td className='p-4 text-left'>{item.warehouseName}</td>
+              <td className="p-4 text-left">{item.quantity}</td>
+              <td className="p-4 text-left">
                 <button
                   type="button"
-                  onClick={() => removeItem(item.id)}
+                  onClick={() => removeItem(item.id)} 
                   className="text-red-500 hover:text-red-700"
                 >
                   <Trash2 size={18} />

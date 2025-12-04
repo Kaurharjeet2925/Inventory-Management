@@ -88,75 +88,142 @@ const ViewOrders = () => {
 
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-100 border-b">
-            <tr>
-              <th className="p-3 text-left">Order ID</th>
-              <th className="p-3 text-left">Client Name</th>
-              <th className="p-3 text-left">Products</th>
-              <th className="p-3 text-left">Stocks</th>
-              <th className="p-3 text-left">Status</th>
-              <th className="p-3 text-left">Date</th>
-              <th className="p-3 text-center">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="p-3 text-center text-gray-500">No orders found</td>
-              </tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order._id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 font-semibold text-blue-600">{order.orderId || 'N/A'}</td>
-                  <td className="p-3">{order.clientName}</td>
-                  <td className="p-3 text-sm">
-                    {order.items && order.items.map((item, idx) => (
-                      <div key={idx} className="text-gray-700">
-                        {item.productName} - {item.quantityValue} {item.unitType || ''}
-                      </div>
-                    ))}
-                  </td>
-                 <td className="p-3 text-sm">
-                             {order.items?.map((item, idx) => (
-                         <div key={idx} className="text-gray-700">
-                            {item.quantity ?? "N/A"}
-                         </div>
-                         ))}
-                 </td>
+        <thead className="bg-gray-100 border-b text-sm font-semibold text-gray-700">
+  <tr>
+    <th className="p-4 text-left">Order ID</th>
+    <th className="p-4 text-left">Client Name</th>
+    <th className="p-4 text-left">Products</th>
+    <th className="p-4 text-left">Stocks</th>
+    <th className="p-4 text-left">Warehouse</th>
+    <th className="p-4 text-left">Date</th>
+    <th className="p-4 text-left">Status</th>
+    {/* <th className="p-4 text-left">Collected</th> */}
+    <th className="p-4 text-center">Actions</th>
+  </tr>
+</thead>
 
-                  <td className="p-3">
-                    <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusBadge(order.status)}`}>
-                      {order.status || 'pending'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-sm">{new Date(order.createdAt).toLocaleDateString()}</td>
-                  <td className="p-3 flex justify-center gap-2">
-                    <button 
-                      onClick={() => handleViewOrder(order)}
-                      className="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-2 rounded" 
-                      title="View Details"
-                    >
-                      <Eye size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleEditOrder(order)}
-                      className="text-green-500 hover:text-green-700 hover:bg-green-50 p-2 rounded" 
-                      title="Edit Status"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteOrder(order)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded" 
-                      title="Delete Order"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
+<tbody>
+  {orders.length === 0 ? (
+    <tr>
+      <td colSpan="9" className="p-4 text-center text-gray-500">
+        No orders found
+      </td>
+    </tr>
+  ) : (
+    orders.map((order) => (
+      <tr key={order._id} className="border-b hover:bg-gray-50">
+
+        {/* ORDER ID */}
+        <td className="p-4 font-semibold text-blue-600 whitespace-nowrap">
+          {order.orderId}
+        </td>
+
+        {/* CLIENT NAME */}
+        <td className="p-4 whitespace-nowrap">
+          {order.clientId?.name || "N/A"}
+        </td>
+
+        {/* PRODUCTS */}
+        <td className="p-4 text-sm leading-6">
+  {order.items?.map((item, idx) => (
+    <div key={idx} className="mb-1 flex items-center gap-2">
+      <span>{item.productName} ({item.quantityValue}{item.unitType})</span>
+
+      {item.collected ? (
+        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+          Collected
+        </span>
+      ) : (
+        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">
+          Not Collected
+        </span>
+      )}
+    </div>
+  ))}
+</td>
+
+
+        {/* STOCKS */}
+        <td className="p-4 text-sm leading-5">
+          {order.items?.map((item, idx) => (
+            <div key={idx} className="text-gray-800">
+              {item.quantity}
+            </div>
+          ))}
+        </td>
+
+        {/* WAREHOUSE NAME + ADDRESS */}
+        <td className="p-4 text-sm leading-5">
+          {order.items?.map((item, idx) => (
+            <div key={idx} className="mb-1">
+              <span className="font-medium">{item.warehouseName || "N/A"}</span>
+              {/* <div className="text-xs text-gray-500">
+                {item.warehouseAddress || ""}
+              </div> */}
+            </div>
+          ))}
+        </td>
+
+        {/* DATE */}
+        <td className="p-4 text-sm whitespace-nowrap">
+          {new Date(order.createdAt).toLocaleDateString()}
+        </td>
+
+        {/* STATUS */}
+        <td className="p-4 whitespace-nowrap">
+          <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(order.status)}`}>
+            {order.status}
+          </span>
+        </td>
+
+        {/* COLLECTED */}
+        {/* <td className="p-4 whitespace-nowrap">
+          {order.collected ? (
+            <span className="px-3 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+              Yes
+            </span>
+          ) : (
+            <span className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+              No
+            </span>
+          )}
+        </td> */}
+
+        {/* ACTIONS */}
+        <td className="p-4 whitespace-nowrap flex items-center gap-3">
+
+          {/* View */}
+          <button
+            onClick={() => handleViewOrder(order)}
+            className="text-blue-600 hover:text-blue-800"
+          >
+            <Eye size={18} />
+          </button>
+
+          {/* Edit */}
+          <button
+            onClick={() => handleEditOrder(order)}
+            className="text-green-600 hover:text-green-800"
+          >
+            <Edit2 size={18} />
+          </button>
+
+          {/* Delete */}
+          <button
+            onClick={() => handleDeleteOrder(order)}
+            className="text-red-600 hover:text-red-800"
+          >
+            <Trash2 size={18} />
+          </button>
+
+        </td>
+
+      </tr>
+    ))
+  )}
+</tbody>
+
+
         </table>
       </div>
 

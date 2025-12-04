@@ -1,0 +1,27 @@
+import React, { useEffect, useState } from "react";
+import { apiClient } from "../../../apiclient/apiclient";
+import OrderCard from "./OrderCard";
+
+const PendingOrders = () => {
+  const [orders, setOrders] = useState([]);
+
+  const loadOrders = async () => {
+    const res = await apiClient.get("/orders");
+    setOrders(res.data.orders.filter(o => o.status === "pending"));
+  };
+
+  useEffect(() => { loadOrders(); }, []);
+
+  return (
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Pending Orders</h1>
+      {orders.length === 0 && <p>No pending orders</p>}
+      {orders.map(order => (
+        <OrderCard order={order} reload={loadOrders} />
+
+      ))}
+    </div>
+  );
+};
+
+export default PendingOrders;

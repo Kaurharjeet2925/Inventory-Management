@@ -18,10 +18,17 @@ import ViewOrders from './pages/ManageOrders/ViewOrders.js';
 import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
 import Locations from './pages/ManageProduct/Locations.js';
-import Agent from './pages/Delievery/Agent.js';
-import AgentDashboard from './pages/Delievery/AgentDashboard.js';
+import Agent from './pages/Delivery/Agent.js';
+import History from './pages/Delivery/History.js';
+import CompletedOrders from './pages/Delivery/Deliveries/CompletedOrders.js';
+import AgentDashboard from './pages/Delivery/Deliveries/AgentDashboard.js';
+import PendingOrders from './pages/Delivery/Deliveries/PendingOrders.js';
+import ShippedOrders from './pages/Delivery/Deliveries/ShippedOrders.js';
+import DeliveredOrders from './pages/Delivery/Deliveries/DeliveredOrders.js';
 
-function App() {
+
+
+function App() {  
   return (
     <div>
       <ToastContainer 
@@ -57,9 +64,22 @@ function App() {
         <Route path="generate-order" element={<CreateOrders/>} />
         <Route path="view-order" element={<ViewOrders/>} />
     </Route>
-    <Route path="/agent" element={<Agent/>}>
-        <Route path="agent-dashboard" element={<AgentDashboard/>} />
-    </Route>
+    <Route path="/agent" element={<Agent />}>
+
+  {/* Dashboard Home */}
+  <Route path="agent-dashboard" element={<AgentDashboard />} />
+
+  {/* Deliveries Section */}
+  <Route path="deliveries">
+    <Route index element={<AgentDashboard />} /> 
+    <Route path="pending" element={<PendingOrders />} />
+    <Route path="shipped" element={<ShippedOrders />} />
+    <Route path="delivered" element={<DeliveredOrders />} />
+    <Route path="completed" element={<CompletedOrders />} />
+  </Route>
+
+</Route>
+
    
     </Routes>
     </div>

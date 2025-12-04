@@ -5,17 +5,17 @@ import { Outlet } from "react-router-dom";
 
 const Agent = () => {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 flex flex-col">
 
-      {/* TOP NAVBAR */}
+      {/* FIXED TOP NAVBAR */}
       <AgentNavbar />
 
-      {/* MAIN CONTENT WRAPPER */}
-      <div className="pt-20 pb-20 px-3 md:px-6">
+      {/* MAIN CONTENT — NOW SCROLLABLE */}
+      <div className="flex-1 overflow-y-auto pt-20 pb-20 px-3 md:px-6">
         <Outlet />
       </div>
 
-      {/* BOTTOM NAVBAR (MOBILE ONLY) */}
+      {/* FIXED BOTTOM NAVBAR */}
       <AgentBottomNav />
     </div>
   );

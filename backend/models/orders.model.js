@@ -17,11 +17,14 @@ const orderSchema = new mongoose.Schema(
         totalQuantity: Number,           // how many units ordered
         quantityValue: Number,       // size of each unit (e.g., 20 pieces per packet)
         unitType: String,           // unit type (packet, piece, etc.)
-        quantity: { type: Number, required: true } // ⭐ ordered quantity
+        quantity: { type: Number, required: true }, // ⭐ ordered quantity
+        warehouseName: String,
+        warehouseAddress: String,
+        collected: { type: Boolean, default: false }  
       }
 
     ],
-
+    collected: { type: Boolean, default: false },
     notes: String,
     status: { type: String, default: "pending" }, 
   },
