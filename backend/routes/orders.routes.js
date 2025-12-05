@@ -7,7 +7,8 @@ const {
   getOrderById, 
   updateOrderStatus, 
   deleteOrder ,
-    collectOrder
+    collectOrder,
+    updateOrder
 } = require("../controller/orders.controller");
 
 // Create order
@@ -16,7 +17,7 @@ router.post("/orders", auth, createOrder);
 // List orders
 router.get("/orders", auth, getOrders);
 router.put("/orders/:id/collect-item/:itemId", auth, collectOrder);
-
+router.put("/orders/:id", auth, updateOrder);
 // Get single order
 router.get("/orders/:id", auth, getOrderById);
 

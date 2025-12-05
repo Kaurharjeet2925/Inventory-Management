@@ -1,0 +1,340 @@
+import React, { useState, useEffect } from "react";
+import { X, Pencil, Trash2 } from "lucide-react";
+import SearchableSelect from "../../components/SearchableSelect";
+import { apiClient } from "../../apiclient/apiclient";
+
+const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
+  const [form, setForm] = useState(null);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [originalItems, setOriginalItems] = useState([]);
+  const [rawProducts, setRawProducts] = useState([]);
+
+  /* LOAD RAW PRODUCTS */
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const res = await apiClient.get("/products");
+        setRawProducts(res.data || []);
+      } catch (err) {
+        console.error("Failed to load products", err);
+      }
+    };
+    loadProducts();
+  }, []);
+
+  /* PRODUCT DROPDOWN OPTIONS */
+  const seen = new Set();
+  const productOptions = rawProducts
+    .filter((p) => {
+      const key = `${p.name}-${p.quantityValue}-${p.quantityUnit}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((p) => ({
+      _id: p._id,
+      name: p.name,
+      displayName: `${p.name} – ${p.quantityValue}${p.quantityUnit}`,
+      unitType: p.quantityUnit,
+      size: p.quantityValue,
+      price: p.price,
+    }));
+
+  /* GET WAREHOUSES FOR PRODUCT LIKE CREATE ORDER */
+  const getWarehouses = (name, size, unit) => {
+    return rawProducts
+      .filter(
+        (p) =>
+          p.name === name &&
+          p.quantityValue === size &&
+          p.quantityUnit === unit
+      )
+      .map((p) => ({
+        id: p._id,
+        warehouseName: p.location?.name || "Unknown",
+        warehouseAddress: p.location?.address || "NA",
+        stock: p.totalQuantity || 0,
+      }));
+  };
+
+  /* INITIALIZE FORM */
+  useEffect(() => {
+    if (!order || rawProducts.length === 0) return;
+
+    const rebuilt = order.items.map((it) => {
+      const whList = getWarehouses(it.productName, it.quantityValue, it.unitType);
+
+      return {
+        ...it,
+        warehouseOptions: whList,
+        warehouseId: it.warehouseId || whList[0]?.id || "",
+      };
+    });
+
+    setForm({
+      ...order,
+      newStatus: order.status,
+      items: rebuilt,
+    });
+
+    setOriginalItems(JSON.parse(JSON.stringify(rebuilt)));
+  }, [order, rawProducts]);
+
+  if (!form) return null;
+
+  /* UPDATE FIELD */
+  const updateField = (index, field, value) => {
+    if (viewOnly) return; // prevent editing
+    const updated = [...form.items];
+    updated[index][field] = value;
+    setForm({ ...form, items: updated });
+  };
+
+  /* DELETE ITEM */
+  const deleteItem = (index) => {
+    if (viewOnly) return;
+    const updated = form.items.filter((_, i) => i !== index);
+    setForm({ ...form, items: updated });
+    setOriginalItems(updated);
+  };
+
+  /* CANCEL EDIT */
+  const cancelInlineEdit = (index) => {
+    const updated = [...form.items];
+    updated[index] = originalItems[index];
+    setForm({ ...form, items: updated });
+    setEditingIndex(null);
+  };
+
+  /* SAVE ORDER (Backend calculates totals) */
+  const saveOrder = () => {
+    const updatedItems = form.items.map((item) => {
+      const price = Number(item.price || 0);
+      const qty = Number(item.quantity || 0);
+
+      return {
+        productId: item.productId,
+        productName: item.productName,
+        quantity: qty,
+        quantityValue: item.quantityValue,
+        unitType: item.unitType,
+        price: price,
+        totalPrice: price * qty,
+        warehouseId: item.warehouseId,
+        warehouseName: item.warehouseName,
+        warehouseAddress: item.warehouseAddress,
+      };
+    });
+
+    onSave({
+      _id: form._id,
+      status: form.newStatus,
+      items: updatedItems,
+      paymentDetails: {
+        ...form.paymentDetails,
+        paidAmount: form.paymentDetails?.paidAmount || 0,
+      },
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+
+        {/* HEADER */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-bold">
+            {viewOnly ? "View Order" : "Edit Order"}
+          </h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={26} />
+          </button>
+        </div>
+
+        {/* ORDER DETAILS */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          <div>
+            <p className="text-gray-600 text-sm">Order ID</p>
+            <p className="font-semibold text-lg">{form.orderId}</p>
+          </div>
+
+          <div>
+            <p className="text-gray-600 text-sm">Client Name</p>
+            <p className="font-semibold text-lg">{form.clientId?.name}</p>
+          </div>
+
+          <div>
+            <p className="text-gray-600 text-sm">Status</p>
+            <select
+              disabled={viewOnly}
+              value={form.newStatus}
+              onChange={(e) => setForm({ ...form, newStatus: e.target.value })}
+              className="border rounded p-2 w-full disabled:bg-gray-100 disabled:text-gray-500"
+            >
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <p className="text-gray-600 text-sm">Date</p>
+            <p className="font-semibold text-lg">
+              {new Date(form.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+
+        {/* ITEMS LIST */}
+        <h3 className="text-lg font-semibold mb-3">Items</h3>
+
+        <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+          {form.items.map((item, idx) => {
+            const whSelected =
+              item.warehouseOptions?.find((w) => w.id === item.warehouseId) || {};
+
+            return (
+              <div key={idx} className="border-b pb-4 last:border-b-0">
+
+                {/* EDIT MODE */}
+                {editingIndex === idx && !viewOnly ? (
+                  <div className="grid grid-cols-6 gap-3 items-center">
+
+                    {/* PRODUCT */}
+                    <div className="col-span-2">
+                      <SearchableSelect
+                        options={productOptions}
+                        value={item.productId}
+                        placeholder="Product"
+                        onChange={(selectedId) => {
+                          const p = productOptions.find((q) => q._id === selectedId);
+
+                          updateField(idx, "productId", selectedId);
+                          updateField(idx, "productName", p.name);
+                          updateField(idx, "unitType", p.unitType);
+                          updateField(idx, "quantityValue", p.size);
+                          updateField(idx, "price", p.price);
+
+                          const wh = getWarehouses(p.name, p.size, p.unitType);
+                          updateField(idx, "warehouseOptions", wh);
+                          updateField(idx, "warehouseId", wh[0]?.id || "");
+                          updateField(idx, "warehouseName", wh[0]?.warehouseName);
+                          updateField(idx, "warehouseAddress", wh[0]?.warehouseAddress);
+                        }}
+                      />
+                    </div>
+
+                    {/* PRICE */}
+                    <input
+                      type="number"
+                      className="border rounded-lg px-3 py-2.5 bg-gray-100"
+                      value={item.price}
+                      readOnly
+                    />
+
+                    {/* WAREHOUSE */}
+                    <select
+                      className="border rounded-lg px-3 py-2.5"
+                      value={item.warehouseId}
+                      onChange={(e) => {
+                        const wid = e.target.value;
+                        const wh = item.warehouseOptions.find((w) => w.id === wid);
+
+                        updateField(idx, "warehouseId", wid);
+                        updateField(idx, "warehouseName", wh?.warehouseName);
+                        updateField(idx, "warehouseAddress", wh?.warehouseAddress);
+                      }}
+                    >
+                      <option value="">Select</option>
+                      {item.warehouseOptions?.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.warehouseName} (Stock {w.stock})
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* QTY */}
+                    <input
+                      type="number"
+                      className="border rounded-lg px-3 py-2.5"
+                      value={item.quantity}
+                      onChange={(e) => updateField(idx, "quantity", e.target.value)}
+                    />
+
+                    {/* EDIT BUTTONS */}
+                    {!viewOnly && (
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          className="bg-green-600 text-white w-9 h-9 rounded-full"
+                          onClick={() => setEditingIndex(null)}
+                        >
+                          ✔
+                        </button>
+                        <button
+                          className="bg-red-500 text-white w-9 h-9 rounded-full"
+                          onClick={() => cancelInlineEdit(idx)}
+                        >
+                          ✖
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* VIEW MODE */
+                  <div>
+                    <div className="flex justify-between">
+                      <p className="font-semibold">
+                        {item.productName} — Qty {item.quantity}
+                      </p>
+
+                      {/* HIDE EDIT BUTTONS IN VIEW MODE */}
+                      {!viewOnly && (
+                        <div className="flex gap-3">
+                          <Pencil
+                            size={18}
+                            onClick={() => setEditingIndex(idx)}
+                            className="cursor-pointer text-blue-600"
+                          />
+                          <Trash2
+                            size={18}
+                            onClick={() => deleteItem(idx)}
+                            className="cursor-pointer text-red-600"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-sm text-gray-600">Warehouse: {item.warehouseName}</p>
+                    <p className="text-sm text-gray-600">Price: ₹{item.price}</p>
+                    <p className="text-sm text-gray-600">
+                      Total: ₹{item.price * item.quantity}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* FOOTER */}
+        <div className="mt-6 flex gap-3">
+          <button className="flex-1 bg-gray-300 py-3 rounded" onClick={onClose}>
+            {viewOnly ? "Close" : "Cancel"}
+          </button>
+
+          {!viewOnly && (
+            <button
+              className="flex-1 bg-green-600 text-white py-3 rounded"
+              onClick={saveOrder}
+            >
+              Save Order
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EditOrderModal;

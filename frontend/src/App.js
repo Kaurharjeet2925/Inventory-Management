@@ -25,10 +25,22 @@ import AgentDashboard from './pages/Delivery/Deliveries/AgentDashboard.js';
 import PendingOrders from './pages/Delivery/Deliveries/PendingOrders.js';
 import ShippedOrders from './pages/Delivery/Deliveries/ShippedOrders.js';
 import DeliveredOrders from './pages/Delivery/Deliveries/DeliveredOrders.js';
-
-
+import socket from "../src/socket/socketClient.js"; 
+import { useEffect } from 'react';
 
 function App() {  
+useEffect(() => {
+  socket.on("connect", () => {
+    console.log("Connected to socket:", socket.id);
+    console.log("Socket connected with token:", localStorage.getItem("token"));
+    console.log("Socket auth user:", socket.user);
+
+  });
+  
+  return () => {
+    socket.off("connect");
+  };
+}, []);
   return (
     <div>
       <ToastContainer 

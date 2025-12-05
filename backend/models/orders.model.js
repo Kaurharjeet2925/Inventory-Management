@@ -20,7 +20,10 @@ const orderSchema = new mongoose.Schema(
         quantity: { type: Number, required: true }, // ⭐ ordered quantity
         warehouseName: String,
         warehouseAddress: String,
-        collected: { type: Boolean, default: false }  
+        collected: { type: Boolean, default: false },
+        price: { type: Number, default: 0 },
+        totalPrice: { type: Number, default: 0 },
+
       }
 
     ],

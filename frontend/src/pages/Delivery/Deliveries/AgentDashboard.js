@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../../apiclient/apiclient";
-
+import socket from "../../../socket/socketClient"; 
 import { Clock, Truck, PackageCheck, CheckCircle } from "lucide-react";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
+  const user = JSON.parse(localStorage.getItem("user"));
 
-  // LOAD ORDERS
+  // 1️⃣ Load orders for this delivery boy
   const loadOrders = async () => {
     try {
-      const res = await apiClient.get("/orders");
+      const res = await apiClient.get(`/orders?deliveryPersonId=${user._id}`);
       setOrders(res.data.orders || []);
     } catch (err) {
       console.error("Failed to load orders");
@@ -19,7 +20,29 @@ const AgentDashboard = () => {
   };
 
   useEffect(() => {
-    loadOrders();
+    loadOrders(); // Initial load
+
+    // 2️⃣ Real-time: When admin creates order
+    socket.on("order_created", (newOrder) => {
+      if (newOrder.deliveryPersonId === user._id) {
+        setOrders((prev) => [newOrder, ...prev]);
+      }
+    });
+
+    // 3️⃣ Real-time: When order status updates
+    socket.on("order_status_updated", (updatedOrder) => {
+      if (updatedOrder.deliveryPersonId !== user._id) return;
+
+      setOrders((prev) => {
+        const others = prev.filter((o) => o._id !== updatedOrder._id);
+        return [updatedOrder, ...others];
+      });
+    });
+
+    return () => {
+      socket.off("order_created");
+      socket.off("order_status_updated");
+    };
   }, []);
 
   // COUNT ORDERS BY STATUS
@@ -69,7 +92,6 @@ const AgentDashboard = () => {
     <div className="p-4 mt-14">
       <h1 className="text-2xl font-bold mb-4">Delivery Dashboard</h1>
 
-      {/* ONE CARD PER ROW */}
       <div className="grid grid-cols-1 gap-4">
         {tabs.map((tab) => (
           <div
@@ -81,8 +103,6 @@ const AgentDashboard = () => {
               {tab.icon}
               <div>
                 <p className="font-semibold">{tab.label}</p>
-
-                {/* 🔥 SHOW ORDER COUNT INSTEAD OF 'Tap to open' */}
                 <p className="text-md font-bold text-gray-700">
                   {tab.count} Orders
                 </p>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../../apiclient/apiclient';
 import { Plus, Trash2 } from 'lucide-react';
 import AddClient from '../ManageClient/AddClient';
+import socket from "../../socket/socketClient";
 
 const CreateOrders = () => {
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -29,6 +30,7 @@ const CreateOrders = () => {
     productName: "",
     quantity: "",
     unitType: "",
+    price: "",
   });
 
   const [formData, setFormData] = useState({
@@ -40,6 +42,16 @@ const CreateOrders = () => {
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
 
+  useEffect(() => {
+    socket.on("order_created", (order) => {
+      console.log("📦 New order created:", order);
+    });
+  
+    return () => {
+      socket.off("order_created");
+    };
+  }, []);
+  
   /* -------------------------------------------------------
      LOAD CLIENTS
   -------------------------------------------------------- */
@@ -226,29 +238,40 @@ const CreateOrders = () => {
       id: Date.now(),
       productId: itemForm.productId,
       warehouseId: selectedWarehouseId,
-      warehouseName: selectedWarehouse?.warehouseName || "Unknown",   // ✅ FIX 1
+      warehouseName: selectedWarehouse?.warehouseName || "Unknown",
       productName: selectedProduct.name,
       quantity: Number(itemForm.quantity),
-      quantityValue: selectedProduct.quantityValue,   // ✅ FIX 2
-      quantityUnit: selectedProduct.quantityUnit,     // ✅ FIX 3
+      quantityValue: selectedProduct.quantityValue,
+      quantityUnit: selectedProduct.quantityUnit,
+      price: Number(itemForm.price),
+      total: Number(itemForm.quantity) * Number(itemForm.price),
     };
   
     setOrderItems([...orderItems, itemToAdd]);
   
+    // Do NOT reset productId, do NOT reset warehouses
     setItemForm({
-      productId: "",
+      productId: itemForm.productId,
       productName: "",
       quantity: "",
-      unitType: "",
+      unitType: itemForm.unitType,
+      price: itemForm.price,
     });
   
     setSelectedWarehouseId("");
+    setQtyError("");
   };
+  
   
    
   const removeItem = (id) => {
     setOrderItems(orderItems.filter((item) => item.id !== id));
   };
+  useEffect(() => {
+    const total = orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    setAmountData((prev) => ({ ...prev, totalAmount: total }));
+  }, [orderItems]);
+  
 
   /* -------------------------------------------------------
       BALANCE CALCULATION
@@ -415,6 +438,7 @@ const CreateOrders = () => {
             productName: p.name,
             quantity: "",
             unitType: p.quantityUnit,
+            price: p.price || 0,
           });
 
           const warehouses = rawProducts
@@ -465,8 +489,17 @@ const CreateOrders = () => {
     })}
   </select>
 </div>
+<div className="relative sm:col-span-1">
+<label className="block text-sm font-semibold mb-1">Price per product</label>
+<input
+  type="number"
+  className="border rounded p-2 w-full"
+  value={itemForm.price}
+  onChange={(e) => setItemForm({ ...itemForm, price: Number(e.target.value) })}
+  placeholder="Enter price"
+/>
 
-
+</div>
     {/* STOCK (order quantity) */}
     <div className="relative sm:col-span-1">
       <label className="block text-sm font-semibold mb-1">Quantity</label>
@@ -541,27 +574,41 @@ const CreateOrders = () => {
           <tr className="bg-gray-200 ">
             <th className="p-4 text-left">Product</th>
             <th className="p-4 text-left">Warehouse</th>
-            <th className="p-4 text-left">Quantity</th>
+            <th className='p-4 text-left'>Price Per Product</th>
+            <th className="p-4 text-left">Quantity</th>           
+            <th className="p-4 text-left">Total Price</th>
             <th className="p-4 text-left">Action</th>
           </tr>
         </thead>
 
         <tbody>
           {orderItems.map((item) => (
-            <tr key={item.id} className="border-b hover:bg-gray-100">
-              <td className="p-4 text-left">{item.productName}-{item.quantityValue}{item.quantityUnit}</td>
-              <td className='p-4 text-left'>{item.warehouseName}</td>
-              <td className="p-4 text-left">{item.quantity}</td>
-              <td className="p-4 text-left">
-                <button
-                  type="button"
-                  onClick={() => removeItem(item.id)} 
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </td>
-            </tr>
+           <tr key={item.id} className="border-b hover:bg-gray-100">
+           <td className="p-4 text-left">
+             {item.productName}-{item.quantityValue}{item.quantityUnit}
+           </td>
+         
+           <td className="p-4 text-left">{item.warehouseName}</td>
+           <td className="p-4 text-left"> ₹{item.price}</td>
+           <td className="p-4 text-left">{item.quantity}</td>
+         
+           {/* TOTAL PRICE */}
+           <td className="p-4 text-left">
+             ₹{Number(item.quantity) * Number(item.price || 0)}
+           </td>
+         
+           <td className="p-4 text-left">
+             <button
+               type="button"
+               onClick={() => removeItem(item.id)}
+               className="text-red-500 hover:text-red-700"
+             >
+               <Trash2 size={18} />
+             </button>
+           </td>
+         </tr>
+         
+          
           ))}
         </tbody>
       </table>

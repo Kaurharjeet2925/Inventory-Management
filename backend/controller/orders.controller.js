@@ -26,8 +26,7 @@ exports.createOrder = async (req, res) => {
   try {
     const { 
       clientId, 
-      clientName, 
-      deliveryPersonId,     // ✅ required field 
+      deliveryPersonId,
       paymentDetails,
       items, 
       notes, 
@@ -41,68 +40,122 @@ exports.createOrder = async (req, res) => {
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Order must contain at least 1 item" });
 
-    // validate stock...
+    // -----------------------------------------------------
+    // ⭐ Validate Warehouse-level Stock
+    // -----------------------------------------------------
     for (let item of items) {
-      const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
+      const warehouseProduct = await Product.findById(item.warehouseId).populate("location");
 
-      item.quantity = Number(item.quantity);
-      if (item.quantity <= 0) return res.status(400).json({ message: `Invalid quantity for ${product.name}` });
+      if (!warehouseProduct) {
+        return res.status(404).json({
+          message: `Warehouse stock not found for product: ${item.productName}`
+        });
+      }
 
-      if (!item.productName) item.productName = product.name;
-      if (!item.unitType) item.unitType = product.quantityUnit;
-      if (!item.quantityValue) item.quantityValue = product.quantityValue;
+      const available = warehouseProduct.totalQuantity || 0;
+      const qty = Number(item.quantity);
 
-      const available = product.totalQuantity || 0;
-      if (item.quantity > available)
-        return res.status(400).json({ message: `Not enough stock for ${product.name}. Available: ${available}` });
+      if (qty > available) {
+        return res.status(400).json({
+          message: `Not enough stock in ${warehouseProduct.location?.name}. Available: ${available}`
+        });
+      }
     }
 
-    // deduct stock...
+    // -----------------------------------------------------
+    // ⭐ Deduct Warehouse Stock
+    // -----------------------------------------------------
     for (let item of items) {
-      await Product.findByIdAndUpdate(item.productId, { $inc: { totalQuantity: -item.quantity } });
+      await Product.findByIdAndUpdate(item.warehouseId, {
+        $inc: { totalQuantity: -Number(item.quantity) }
+      });
     }
 
+    // Generate Order ID
     const orderId = await generateOrderId();
 
+    let totalAmount = 0;
     const formattedItems = [];
 
-for (let item of items) {
-  const product = await Product.findById(item.productId).populate("location");
+    // -----------------------------------------------------
+    // ⭐ Prepare items for the order
+    // -----------------------------------------------------
+    for (let item of items) {
+      const warehouseProduct = await Product.findById(item.warehouseId).populate("location");
 
-  formattedItems.push({
-    productId: item.productId,
-    productName: product.name,
-    quantityValue: product.quantityValue,
-    unitType: product.quantityUnit,
-    quantity: Number(item.quantity),
-    warehouseName: product.location?.name || "Not Assigned",
-    warehouseAddress: product.location?.address || "Not Available"
-  });
-}
+      const price = Number(item.price || 0);
+      const qty = Number(item.quantity || 0);
+      const totalPrice = qty * price;
 
+      totalAmount += totalPrice;
 
+      formattedItems.push({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: qty,
+        quantityValue: item.quantityValue,
+        unitType: item.unitType,
+
+        price: price,
+        totalPrice: totalPrice,
+
+        warehouseId: item.warehouseId,
+        warehouseName: warehouseProduct?.location?.name || "Unknown",
+        warehouseAddress: warehouseProduct?.location?.address || "Unknown",
+      });
+    }
+
+    // -----------------------------------------------------
+    // ⭐ Payment Calculations
+    // -----------------------------------------------------
+    const paid = Number(paymentDetails?.paidAmount || 0);
+    const balance = totalAmount - paid;
+
+    const finalPaymentDetails = {
+      totalAmount,
+      paidAmount: paid,
+      balanceAmount: balance < 0 ? 0 : balance,
+      paymentStatus:
+        paid === 0 ? "unpaid" :
+        paid >= totalAmount ? "paid" : "partial"
+    };
+
+    // -----------------------------------------------------
+    // ⭐ Save Order
+    // -----------------------------------------------------
     const newOrder = await Order.create({
       orderId,
       clientId,
-      clientName,
-      deliveryPersonId,    //  ✅ FIXED
-      paymentDetails,      //  optional but recommended
+      deliveryPersonId,
+      paymentDetails: finalPaymentDetails,
       items: formattedItems,
       notes,
       status
     });
 
-    res.status(201).json({
+    // -----------------------------------------------------
+    // ⭐ SOCKET EVENTS
+    // -----------------------------------------------------
+    const io = req.app.get("io");
+
+    if (deliveryPersonId) {
+      io.to(deliveryPersonId.toString()).emit("order_created", newOrder);
+    }
+
+    io.to("admins").emit("order_created", newOrder);
+    io.emit("order_created_global", newOrder);
+
+    return res.status(201).json({
       message: "Order created successfully",
       order: newOrder
     });
 
   } catch (error) {
     console.error("Create Order Error:", error);
-    res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error });
   }
 };
+
 
 
 
@@ -133,6 +186,111 @@ exports.getOrders = async (req, res) => {
     res.status(500).json({ message: "Failed to retrieve orders", error: error.message });
   }
 };
+exports.updateOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { items, status, paymentDetails } = req.body;
+
+    const existingOrder = await Order.findById(orderId);
+    if (!existingOrder)
+      return res.status(404).json({ message: "Order not found" });
+
+    // ---------------------------------------------
+    // ⭐ STOCK UPDATE ONLY IF ORDER IS STILL PENDING
+    // ---------------------------------------------
+    if (existingOrder.status === "pending") {
+      // Restore old quantities (undo old items)
+      for (let oldItem of existingOrder.items) {
+        await Product.findByIdAndUpdate(
+          oldItem.productId,
+          { $inc: { totalQuantity: oldItem.quantity } }
+        );
+      }
+
+      // Deduct new quantities
+      for (let newItem of items) {
+        await Product.findByIdAndUpdate(
+          newItem.productId,
+          { $inc: { totalQuantity: -Number(newItem.quantity) } }
+        );
+      }
+    }
+
+    // ----------------------------------------------------
+    // ⭐ Build updated items + recalc totalAmount
+    // ----------------------------------------------------
+    let totalAmount = 0;
+
+    const updatedItems = items.map((item) => {
+      const price = Number(item.price || 0);
+      const qty = Number(item.quantity || 0);
+      const totalPrice = qty * price;
+
+      totalAmount += totalPrice;
+
+      return {
+        productId: item.productId,
+        productName: item.productName || "",
+        quantity: qty,
+        quantityValue: item.quantityValue,
+        unitType: item.unitType,
+        price,
+        totalPrice,
+        warehouseName: item.warehouseName || "",
+        warehouseAddress: item.warehouseAddress || "",
+        warehouseId: item.warehouseId || "",
+      };
+    });
+
+    // ----------------------------------------------------
+    // ⭐ Recalculate payment
+    // ----------------------------------------------------
+    const paid = Number(paymentDetails?.paidAmount || 0);
+    const balance = totalAmount - paid;
+
+    const updatedPaymentDetails = {
+      totalAmount,
+      paidAmount: paid,
+      balanceAmount: balance < 0 ? 0 : balance,
+      paymentStatus:
+        paid === 0 ? "unpaid" :
+        paid >= totalAmount ? "paid" : "partial",
+    };
+
+    // ----------------------------------------------------
+    // ⭐ Update Order
+    // ----------------------------------------------------
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId,
+      {
+        status,
+        items: updatedItems,
+        paymentDetails: updatedPaymentDetails,
+      },
+      { new: true }
+    );
+
+    const io = req.app.get("io");
+
+    // notify admins
+    io.to("admins").emit("order_updated", updatedOrder);
+
+    // notify assigned delivery boy
+    io.to(updatedOrder.deliveryPersonId.toString())
+      .emit("order_updated", updatedOrder);
+
+    return res.json({
+      message: "Order updated successfully",
+      order: updatedOrder,
+    });
+
+  } catch (error) {
+    console.error("Update Order Error:", error);
+    return res.status(500).json({ message: "Server error", error });
+  }
+};
+
+
 
 exports.collectOrder = async (req, res) => {
   try {
@@ -149,11 +307,13 @@ exports.collectOrder = async (req, res) => {
     item.collected = true;
 
     await order.save();
-
+    const io = req.app.get("io");
+    io.emit("order_collected", order);
     res.json({
       message: "Item collected successfully",
       order,
     });
+   
   } catch (error) {
     res.status(500).json({ message: "Failed to collect item", error });
   }
@@ -213,17 +373,33 @@ exports.updateOrderStatus = async (req, res) => {
       { status },
       { new: true }
     );
-
+ 
     if (!updatedOrder) {
       return res.status(404).json({
         message: "Order not found or unauthorized",
       });
     }
+    const io = req.app.get("io");
+
+    // Notify admin panel
+    io.to("admins").emit("order_status_updated", updatedOrder);
+
+    // Notify delivery boy assigned to this order
+    io.to(updatedOrder.deliveryPersonId.toString())
+      .emit("order_status_updated", updatedOrder);
+
+    // Optional global event
+    io.emit("order_status_updated_global", updatedOrder);
+
 
     return res.json({
       message: "Status updated successfully",
       order: updatedOrder,
     });
+    
+    // 🔥 Real-time event
+ 
+    
 
   } catch (error) {
     console.error("updateOrderStatus Error:", error);
@@ -258,8 +434,10 @@ exports.deleteOrder = async (req, res) => {
 
     // STEP 3: Delete the order after stock is restored
     await Order.findByIdAndDelete(id);
-
+    const io = req.app.get("io");
+    io.emit("order_deleted", { orderId: id });
     return res.json({ message: "Order deleted successfully" });
+
 
   } catch (error) {
     console.error("deleteOrder Error:", error);

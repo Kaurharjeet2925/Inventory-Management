@@ -116,8 +116,8 @@ const OrderCard = ({ order, reload }) => {
       <div className="clear-both"></div>
 
       {/* AFTER COLLECTION → SHOW STATUS UPDATE BUTTONS */}
-      {order.collected && order.status === "pending" && (
-        <div className="mt-3 flex gap-2">
+   {order.items?.every(item => item.collected) && order.status === "pending" && (
+  <div className="mt-3 flex gap-2">
           <button
             onClick={() => updateStatus(order._id, "shipped")}
             className="flex-1 bg-blue-500 text-white py-2 rounded"

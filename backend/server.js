@@ -1,68 +1,126 @@
+// server.js
 const express = require("express");
+const { verify } = require("jsonwebtoken");
+const User = require("./models/user.model");
+
+const http = require("http");
+const { Server } = require("socket.io");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const cookieParser = require('cookie-parser');
+const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
 
-// ROUTES
-const Userrouter = require("./routes/user.routes");
-const Brandrouter = require("./routes/brands.routes");
-const Categoryrouter = require("./routes/category.routes");
-const Productrouter = require("./routes/product.routes");
-const Clientrouter = require("./routes/client.routes");
-const Ordersrouter = require("./routes/orders.routes");
-const locationRouter = require("./routes/location.routes");
+// Load environment & DB
 dotenv.config();
 connectDB();
 
 const app = express();
 
-// CORS
-app.use(
-  cors({
-    origin: "http://localhost:3000",
-    credentials: true,
-  })
-);
+// ------------------------
+// Middleware
+// ------------------------
+app.use(cors({ 
+  origin: "http://localhost:3000",
+  credentials: true 
+}));
 
-// JSON PARSER
 app.use(express.json());
 app.use(cookieParser());
+app.use("/uploads", express.static("uploads"));
 
-// Request logging middleware - logs every API call
+// Logging
 app.use((req, res, next) => {
-  const startTime = Date.now();
-  const { method, originalUrl, ip } = req;
-  
-  res.on('finish', () => {
-    const duration = Date.now() - startTime;
-    const { statusCode } = res;
-    const statusEmoji = statusCode >= 400 ? '❌' : '✅';
-    console.log(`${statusEmoji} [${method}] ${originalUrl} - Status: ${statusCode} (${duration}ms)`);
+  const start = Date.now();
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    console.log(
+      `🔹 [${req.method}] ${req.originalUrl} - Status: ${res.statusCode} (${duration}ms)`
+    );
   });
-  
   next();
 });
 
-// 🔥 Serve uploaded images (VERY IMPORTANT)
-app.use("/uploads", express.static("uploads"));
+// ------------------------
+// ROUTES
+// ------------------------
+app.use("/api", require("./routes/brands.routes"));
+app.use("/api", require("./routes/category.routes"));
+app.use("/api", require("./routes/product.routes"));
+app.use("/api", require("./routes/orders.routes"));
+app.use("/api/clients", require("./routes/client.routes"));
+app.use("/api", require("./routes/location.routes"));
+app.use("/api", require("./routes/user.routes"));
 
+// ------------------------
+// SOCKET.IO SETUP
+// ------------------------
+const server = http.createServer(app);
 
-// ROUTES - Mount specific routes FIRST (before catch-all patterns)
-app.use("/api", Brandrouter);
-app.use("/api", Categoryrouter);
-app.use("/api", Productrouter);
-app.use("/api", Ordersrouter);
-app.use("/api/clients", Clientrouter);
-app.use("/api", locationRouter);
-app.use("/api", Userrouter);  // User router LAST because it has /:id catch-all
-
-
-// TEST ROUTE
-app.get("/", (req, res) => {
-  res.send("✅ API is running...");
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
+  }
 });
 
-// SERVER
+// Make io available in controllers
+app.set("io", io);
+
+// ------------------------
+// SOCKET AUTH (JWT)
+// ------------------------
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+
+    if (!token) {
+      console.log("❌ Socket failed: No token");
+      return next(new Error("No token"));
+    }
+
+    const decoded = verify(token, process.env.JWT_SECRET);
+
+    // Fetch user
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      console.log("❌ Socket failed: User not found");
+      return next(new Error("Invalid token user"));
+    }
+
+    socket.user = user;
+    next();
+  } catch (err) {
+    console.log("❌ Socket auth error:", err.message);
+    next(new Error("Unauthorized socket"));
+  }
+});
+
+// ------------------------
+// SOCKET CONNECTION
+// ------------------------
+io.on("connection", (socket) => {
+  console.log("⚡ Socket connected:", socket.id, "User:", socket.user?.name);
+
+  // Auto join room by user id (delivery boy)
+  socket.join(socket.user._id.toString());
+  console.log(`➡️ Joined room: ${socket.user._id}`);
+
+  // Admin rooms
+  if (socket.user.role === "admin" || socket.user.role === "superAdmin") {
+    socket.join("admins");
+    console.log(`👑 Joined admins room`);
+  }
+
+  socket.on("disconnect", () => {
+    console.log("🔌 Socket disconnected:", socket.id);
+  });
+});
+
+// ------------------------
+// START SERVER
+// ------------------------
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+server.listen(PORT, () =>
+  console.log(`🚀 Server running on port ${PORT}`)
+);
