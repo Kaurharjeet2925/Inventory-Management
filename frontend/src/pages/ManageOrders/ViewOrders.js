@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Edit2, Trash2, X, Shield } from 'lucide-react';
+import { Eye, Edit2, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../apiclient/apiclient';
 import EditOrderModal from './EditOrderModel';
 import socket from "../../socket/socketClient";
@@ -15,38 +15,29 @@ const ViewOrders = () => {
   useEffect(() => {
     loadOrders();
   }, []);
+
   useEffect(() => {
+    // socket listeners
     socket.on("order_collected", (updatedOrder) => {
-      console.log("🔄 Item collected:", updatedOrder);
-      setOrders(prev =>
-        prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o))
-      );
+      setOrders(prev => prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o)));
     });
-  
+
     socket.on("order_status_updated", (updatedOrder) => {
-      console.log("🔄 Status updated:", updatedOrder);
-      setOrders(prev =>
-        prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o))
-      );
+      setOrders(prev => prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o)));
     });
-  
+
     socket.on("order_updated", (updatedOrder) => {
-      console.log("🔄 Order edited:", updatedOrder);
-      setOrders(prev =>
-        prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o))
-      );
+      setOrders(prev => prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o)));
     });
-  
+
     socket.on("order_deleted", ({ orderId }) => {
-      console.log("❌ Order deleted:", orderId);
       setOrders(prev => prev.filter(o => o._id !== orderId));
     });
-  
+
     socket.on("order_created", (newOrder) => {
-      console.log("🆕 New Order Created:", newOrder);
       setOrders(prev => [newOrder, ...prev]);
     });
-  
+
     return () => {
       socket.off("order_collected");
       socket.off("order_status_updated");
@@ -55,7 +46,7 @@ const ViewOrders = () => {
       socket.off("order_created");
     };
   }, []);
-  
+
   const loadOrders = async () => {
     try {
       const res = await apiClient.get('/orders');
@@ -71,20 +62,17 @@ const ViewOrders = () => {
     const loadProducts = async () => {
       try {
         const res = await apiClient.get("/products");
-
         const formatted = res.data.map((p) => ({
           _id: p._id,
           productName: `${p.name} – ${p.quantityValue}${p.quantityUnit}`,
           unitType: p.quantityUnit,
           quantityValue: p.quantityValue,
         }));
-
         setProducts(formatted);
       } catch (err) {
         console.error("Failed to load products", err);
       }
     };
-
     loadProducts();
   }, []);
 
@@ -99,15 +87,12 @@ const ViewOrders = () => {
     return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-700';
   };
 
-  const handleViewOrder = (order) => setViewModal(order);
-  const handleEditOrder = (order) => setEditModal({ ...order, newStatus: order.status });
-  const handleDeleteOrder = (order) => setDeleteModal(order);
-
   const handleConfirmDelete = async () => {
     try {
       await apiClient.delete(`/orders/${deleteModal._id}`);
       alert('Order deleted successfully');
       setDeleteModal(null);
+      // server emits order_deleted — but also reload to be safe
       loadOrders();
     } catch (err) {
       alert('Failed to delete order');
@@ -149,89 +134,52 @@ const ViewOrders = () => {
               </tr>
             ) : (
               orders.map((order) => {
-                // ⭐ Calculate total amount fallback
                 const calculatedTotal = order.items.reduce((sum, item) => {
                   const price = Number(item.price || 0);
                   const qty = Number(item.quantity || 0);
                   return sum + price * qty;
                 }, 0);
-
                 const totalAmount = order.paymentDetails?.totalAmount ?? calculatedTotal;
 
                 return (
                   <tr key={order._id} className="border-b hover:bg-gray-50">
-                    <td className="p-4 font-semibold text-blue-600 whitespace-nowrap">
-                      {order.orderId}
-                    </td>
-
-                    <td className="p-4 whitespace-nowrap">
-                      {order.clientId?.name || "N/A"}
-                    </td>
-
+                    <td className="p-4 font-semibold text-blue-600 whitespace-nowrap">{order.orderId}</td>
+                    <td className="p-4 whitespace-nowrap">{order.clientId?.name || "N/A"}</td>
                     <td className="p-4 text-sm leading-6">
-  {order.items?.map((item, idx) => (
-    <div key={idx} className="mb-1 flex items-center gap-2">
-      <span>{item.productName} ({item.quantityValue}{item.unitType})</span>
-
-      <span
-        className={`px-2 py-0.5 rounded text-xs font-semibold 
-          ${item.collected ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-      >
-        {item.collected ? "Collected" : "Not Collected"}
-      </span>
-    </div>
-  ))}
-</td>
-
-
-                    <td className="p-4 text-sm leading-5">
                       {order.items?.map((item, idx) => (
-                        <div key={idx}>{item.quantity}</div>
+                        <div key={idx} className="mb-1 flex items-center gap-2">
+                          <span>{item.productName} ({item.quantityValue}{item.unitType})</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.collected ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {item.collected ? "Collected" : "Not Collected"}
+                          </span>
+                        </div>
                       ))}
                     </td>
-
                     <td className="p-4 text-sm leading-5">
-                      {order.items?.map((item, idx) => (
-                        <div key={idx}>{item.warehouseName}</div>
-                      ))}
+                      {order.items?.map((item, idx) => (<div key={idx}>{item.quantity}</div>))}
                     </td>
-
-                    <td className="p-4 text-sm whitespace-nowrap">
-                      {new Date(order.createdAt).toLocaleDateString()}
+                    <td className="p-4 text-sm leading-5">
+                      {order.items?.map((item, idx) => (<div key={idx}>{item.warehouseName}</div>))}
                     </td>
-
+                    <td className="p-4 text-sm whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
                     <td className="p-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(order.status)}`}>
-                        {order.status}
-                      </span>
+                      <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(order.status)}`}>{order.status}</span>
                     </td>
-
-                    {/* ⭐ UPDATED TOTAL AMOUNT COLUMN */}
-                    <td className="p-4 font-semibold text-green-700">
-                      ₹{totalAmount}
-                    </td>
-
+                    <td className="p-4 font-semibold text-green-700">₹{totalAmount}</td>
                     <td className="p-4 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-4">
-                   
-<button
-  onClick={() => setViewModal({ ...order, viewOnly: true })}
-  className="text-blue-600 hover:text-blue-800"
->
-  <Eye size={18} />
-</button>
+                        <button onClick={() => setViewModal({ ...order, viewOnly: true })} className="text-blue-600 hover:text-blue-800"><Eye size={18} /></button>
 
-
+                        {/* Edit button: allowed to open modal always, but modal enforces item-edit only when pending */}
                         <button onClick={() => setEditModal(order)} className="text-green-600 hover:text-green-800">
                           <Edit2 size={18} />
                         </button>
 
-                        <button onClick={() => handleDeleteOrder(order)} className="text-red-600 hover:text-red-800">
+                        <button onClick={() => setDeleteModal(order)} className="text-red-600 hover:text-red-800">
                           <Trash2 size={18} />
                         </button>
                       </div>
                     </td>
-
                   </tr>
                 );
               })
@@ -239,32 +187,33 @@ const ViewOrders = () => {
           </tbody>
         </table>
       </div>
-      {viewModal && (
-  <EditOrderModal
-    order={viewModal}
-    viewOnly={true}
-    onClose={() => setViewModal(null)}
-    onSave={() => {
-      /* no-op for view mode (or optionally show toast if you want) */
-    }}
-  />
-)}
 
-      {/* Other Modals remain unchanged */}
+      {viewModal && (
+        <EditOrderModal
+          order={viewModal}
+          viewOnly={true}
+          onClose={() => setViewModal(null)}
+          onSave={() => {}}
+        />
+      )}
+
       {editModal && (
         <EditOrderModal
           order={editModal}
           products={products}
           onClose={() => setEditModal(null)}
-          onSave={async (updatedOrder) => {
+          onSave={async (payload) => {
             try {
-              await apiClient.put(`/orders/${updatedOrder._id}`, updatedOrder);
+              // payload will contain only status if original order not pending,
+              // or items+payment if order was pending
+              await apiClient.put(`/orders/${payload._id}`, payload);
               alert("Order updated successfully");
               setEditModal(null);
+              // loadOrders() not strictly required because sockets update UI — but fetch to refresh immediate state
               loadOrders();
             } catch (err) {
               console.error(err);
-              alert("Failed to update order");
+              alert(err?.response?.data?.message || "Failed to update order");
             }
           }}
         />
@@ -273,36 +222,21 @@ const ViewOrders = () => {
       {deleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
-          
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">Delete Order</h2>
-              <button onClick={() => setDeleteModal(null)} className="text-gray-500 hover:text-gray-700">
-                <X size={24} />
-              </button>
+              <button onClick={() => setDeleteModal(null)} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
             </div>
 
             <p className="text-gray-600 mb-2">Are you sure you want to delete this order?</p>
             <p className="text-lg font-semibold mb-6">{deleteModal.orderId}</p>
 
             <div className="flex gap-3">
-              <button 
-                onClick={() => setDeleteModal(null)}
-                className="flex-1 bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleConfirmDelete}
-                className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600"
-              >
-                Delete
-              </button>
+              <button onClick={() => setDeleteModal(null)} className="flex-1 bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400">Cancel</button>
+              <button onClick={handleConfirmDelete} className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Delete</button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 };

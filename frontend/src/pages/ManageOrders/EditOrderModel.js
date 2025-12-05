@@ -9,7 +9,6 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
   const [originalItems, setOriginalItems] = useState([]);
   const [rawProducts, setRawProducts] = useState([]);
 
-  /* LOAD RAW PRODUCTS */
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -22,7 +21,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     loadProducts();
   }, []);
 
-  /* PRODUCT DROPDOWN OPTIONS */
+  // build productOptions (unique by name-size-unit)
   const seen = new Set();
   const productOptions = rawProducts
     .filter((p) => {
@@ -40,16 +39,10 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       price: p.price,
     }));
 
-  /* GET WAREHOUSES FOR PRODUCT LIKE CREATE ORDER */
   const getWarehouses = (name, size, unit) => {
     return rawProducts
-      .filter(
-        (p) =>
-          p.name === name &&
-          p.quantityValue === size &&
-          p.quantityUnit === unit
-      )
-      .map((p) => ({
+      .filter(p => p.name === name && p.quantityValue === size && p.quantityUnit === unit)
+      .map(p => ({
         id: p._id,
         warehouseName: p.location?.name || "Unknown",
         warehouseAddress: p.location?.address || "NA",
@@ -57,13 +50,11 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       }));
   };
 
-  /* INITIALIZE FORM */
   useEffect(() => {
     if (!order || rawProducts.length === 0) return;
 
     const rebuilt = order.items.map((it) => {
       const whList = getWarehouses(it.productName, it.quantityValue, it.unitType);
-
       return {
         ...it,
         warehouseOptions: whList,
@@ -75,6 +66,8 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       ...order,
       newStatus: order.status,
       items: rebuilt,
+      // ensure payment details exist
+      paymentDetails: order.paymentDetails || { totalAmount: 0, paidAmount: 0, balanceAmount: 0, paymentStatus: "unpaid" }
     });
 
     setOriginalItems(JSON.parse(JSON.stringify(rebuilt)));
@@ -82,23 +75,23 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
 
   if (!form) return null;
 
-  /* UPDATE FIELD */
+  // whether items can be edited (only when original status was pending)
+  const itemsEditable = order.status === "pending" && !viewOnly;
+
   const updateField = (index, field, value) => {
-    if (viewOnly) return; // prevent editing
+    if (!itemsEditable) return;
     const updated = [...form.items];
     updated[index][field] = value;
     setForm({ ...form, items: updated });
   };
 
-  /* DELETE ITEM */
   const deleteItem = (index) => {
-    if (viewOnly) return;
+    if (!itemsEditable) return;
     const updated = form.items.filter((_, i) => i !== index);
     setForm({ ...form, items: updated });
     setOriginalItems(updated);
   };
 
-  /* CANCEL EDIT */
   const cancelInlineEdit = (index) => {
     const updated = [...form.items];
     updated[index] = originalItems[index];
@@ -106,19 +99,28 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     setEditingIndex(null);
   };
 
-  /* SAVE ORDER (Backend calculates totals) */
   const saveOrder = () => {
+    // If items are not editable (order wasn't pending) -> only allow status change
+    if (!itemsEditable) {
+      // Only status change will be sent
+      onSave({
+        _id: form._id,
+        status: form.newStatus
+      });
+      return;
+    }
+
+    // else, itemsEditable => send items (+payment)
     const updatedItems = form.items.map((item) => {
       const price = Number(item.price || 0);
       const qty = Number(item.quantity || 0);
-
       return {
         productId: item.productId,
         productName: item.productName,
         quantity: qty,
         quantityValue: item.quantityValue,
         unitType: item.unitType,
-        price: price,
+        price,
         totalPrice: price * qty,
         warehouseId: item.warehouseId,
         warehouseName: item.warehouseName,
@@ -132,8 +134,8 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       items: updatedItems,
       paymentDetails: {
         ...form.paymentDetails,
-        paidAmount: form.paymentDetails?.paidAmount || 0,
-      },
+        paidAmount: Number(form.paymentDetails?.paidAmount || 0)
+      }
     });
   };
 
@@ -141,17 +143,11 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
 
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold">
-            {viewOnly ? "View Order" : "Edit Order"}
-          </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={26} />
-          </button>
+          <h2 className="text-3xl font-bold">{viewOnly ? "View Order" : "Edit Order"}</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={26} /></button>
         </div>
 
-        {/* ORDER DETAILS */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div>
             <p className="text-gray-600 text-sm">Order ID</p>
@@ -172,36 +168,31 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
               className="border rounded p-2 w-full disabled:bg-gray-100 disabled:text-gray-500"
             >
               <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
+            {/* show hint */}
+            {!itemsEditable && <p className="text-xs text-gray-500 mt-1">Items can be modified only while order is pending.</p>}
           </div>
 
           <div>
             <p className="text-gray-600 text-sm">Date</p>
-            <p className="font-semibold text-lg">
-              {new Date(form.createdAt).toLocaleDateString()}
-            </p>
+            <p className="font-semibold text-lg">{new Date(form.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
 
-        {/* ITEMS LIST */}
         <h3 className="text-lg font-semibold mb-3">Items</h3>
 
         <div className="bg-gray-50 p-4 rounded-lg space-y-4">
           {form.items.map((item, idx) => {
-            const whSelected =
-              item.warehouseOptions?.find((w) => w.id === item.warehouseId) || {};
+            const whSelected = item.warehouseOptions?.find((w) => w.id === item.warehouseId) || {};
 
             return (
               <div key={idx} className="border-b pb-4 last:border-b-0">
-
-                {/* EDIT MODE */}
-                {editingIndex === idx && !viewOnly ? (
+                {editingIndex === idx && itemsEditable ? (
                   <div className="grid grid-cols-6 gap-3 items-center">
-
-                    {/* PRODUCT */}
                     <div className="col-span-2">
                       <SearchableSelect
                         options={productOptions}
@@ -209,7 +200,6 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                         placeholder="Product"
                         onChange={(selectedId) => {
                           const p = productOptions.find((q) => q._id === selectedId);
-
                           updateField(idx, "productId", selectedId);
                           updateField(idx, "productName", p.name);
                           updateField(idx, "unitType", p.unitType);
@@ -225,91 +215,43 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                       />
                     </div>
 
-                    {/* PRICE */}
-                    <input
-                      type="number"
-                      className="border rounded-lg px-3 py-2.5 bg-gray-100"
-                      value={item.price}
-                      readOnly
-                    />
+                    <input type="number" className="border rounded-lg px-3 py-2.5 bg-gray-100" value={item.price} readOnly />
 
-                    {/* WAREHOUSE */}
-                    <select
-                      className="border rounded-lg px-3 py-2.5"
-                      value={item.warehouseId}
-                      onChange={(e) => {
-                        const wid = e.target.value;
-                        const wh = item.warehouseOptions.find((w) => w.id === wid);
-
-                        updateField(idx, "warehouseId", wid);
-                        updateField(idx, "warehouseName", wh?.warehouseName);
-                        updateField(idx, "warehouseAddress", wh?.warehouseAddress);
-                      }}
-                    >
+                    <select className="border rounded-lg px-3 py-2.5" value={item.warehouseId} onChange={(e) => {
+                      const wid = e.target.value;
+                      const wh = item.warehouseOptions.find((w) => w.id === wid);
+                      updateField(idx, "warehouseId", wid);
+                      updateField(idx, "warehouseName", wh?.warehouseName);
+                      updateField(idx, "warehouseAddress", wh?.warehouseAddress);
+                    }}>
                       <option value="">Select</option>
-                      {item.warehouseOptions?.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.warehouseName} (Stock {w.stock})
-                        </option>
-                      ))}
+                      {item.warehouseOptions?.map((w) => (<option key={w.id} value={w.id}>{w.warehouseName} (Stock {w.stock})</option>))}
                     </select>
 
-                    {/* QTY */}
-                    <input
-                      type="number"
-                      className="border rounded-lg px-3 py-2.5"
-                      value={item.quantity}
-                      onChange={(e) => updateField(idx, "quantity", e.target.value)}
-                    />
+                    <input type="number" className="border rounded-lg px-3 py-2.5" value={item.quantity} onChange={(e) => updateField(idx, "quantity", e.target.value)} />
 
-                    {/* EDIT BUTTONS */}
-                    {!viewOnly && (
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          className="bg-green-600 text-white w-9 h-9 rounded-full"
-                          onClick={() => setEditingIndex(null)}
-                        >
-                          ✔
-                        </button>
-                        <button
-                          className="bg-red-500 text-white w-9 h-9 rounded-full"
-                          onClick={() => cancelInlineEdit(idx)}
-                        >
-                          ✖
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2 justify-center">
+                      <button className="bg-green-600 text-white w-9 h-9 rounded-full" onClick={() => setEditingIndex(null)}>✔</button>
+                      <button className="bg-red-500 text-white w-9 h-9 rounded-full" onClick={() => cancelInlineEdit(idx)}>✖</button>
+                    </div>
                   </div>
                 ) : (
-                  /* VIEW MODE */
                   <div>
                     <div className="flex justify-between">
-                      <p className="font-semibold">
-                        {item.productName} — Qty {item.quantity}
-                      </p>
+                      <p className="font-semibold">{item.productName} — Qty {item.quantity}</p>
 
-                      {/* HIDE EDIT BUTTONS IN VIEW MODE */}
-                      {!viewOnly && (
+                      {/* edit icons only when itemsEditable */}
+                      {itemsEditable && (
                         <div className="flex gap-3">
-                          <Pencil
-                            size={18}
-                            onClick={() => setEditingIndex(idx)}
-                            className="cursor-pointer text-blue-600"
-                          />
-                          <Trash2
-                            size={18}
-                            onClick={() => deleteItem(idx)}
-                            className="cursor-pointer text-red-600"
-                          />
+                          <Pencil size={18} onClick={() => setEditingIndex(idx)} className="cursor-pointer text-blue-600" />
+                          <Trash2 size={18} onClick={() => deleteItem(idx)} className="cursor-pointer text-red-600" />
                         </div>
                       )}
                     </div>
 
                     <p className="text-sm text-gray-600">Warehouse: {item.warehouseName}</p>
                     <p className="text-sm text-gray-600">Price: ₹{item.price}</p>
-                    <p className="text-sm text-gray-600">
-                      Total: ₹{item.price * item.quantity}
-                    </p>
+                    <p className="text-sm text-gray-600">Total: ₹{item.price * item.quantity}</p>
                   </div>
                 )}
               </div>
@@ -317,17 +259,11 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           })}
         </div>
 
-        {/* FOOTER */}
         <div className="mt-6 flex gap-3">
-          <button className="flex-1 bg-gray-300 py-3 rounded" onClick={onClose}>
-            {viewOnly ? "Close" : "Cancel"}
-          </button>
+          <button className="flex-1 bg-gray-300 py-3 rounded" onClick={onClose}>{viewOnly ? "Close" : "Cancel"}</button>
 
           {!viewOnly && (
-            <button
-              className="flex-1 bg-green-600 text-white py-3 rounded"
-              onClick={saveOrder}
-            >
+            <button className="flex-1 bg-green-600 text-white py-3 rounded" onClick={saveOrder}>
               Save Order
             </button>
           )}

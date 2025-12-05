@@ -192,103 +192,121 @@ exports.updateOrder = async (req, res) => {
     const { items, status, paymentDetails } = req.body;
 
     const existingOrder = await Order.findById(orderId);
-    if (!existingOrder)
-      return res.status(404).json({ message: "Order not found" });
+    if (!existingOrder) return res.status(404).json({ message: "Order not found" });
 
-    // ---------------------------------------------
-    // ⭐ STOCK UPDATE ONLY IF ORDER IS STILL PENDING
-    // ---------------------------------------------
+    // Get io
+    const io = req.app.get("io");
+
+    // If order is pending -> allow editing items & payment and adjust stock
     if (existingOrder.status === "pending") {
-      // Restore old quantities (undo old items)
+      // Restore old quantities (undo old reservation)
       for (let oldItem of existingOrder.items) {
-        await Product.findByIdAndUpdate(
-          oldItem.productId,
-          { $inc: { totalQuantity: oldItem.quantity } }
-        );
+        if (oldItem.productId) {
+          await Product.findByIdAndUpdate(oldItem.productId, {
+            $inc: { totalQuantity: Number(oldItem.quantity || 0) }
+          });
+        }
       }
 
+      // Validate new items stock (optional: add validation here if needed)
       // Deduct new quantities
       for (let newItem of items) {
-        await Product.findByIdAndUpdate(
-          newItem.productId,
-          { $inc: { totalQuantity: -Number(newItem.quantity) } }
-        );
+        if (newItem.productId) {
+          await Product.findByIdAndUpdate(newItem.productId, {
+            $inc: { totalQuantity: -Number(newItem.quantity || 0) }
+          });
+        }
       }
+
+      // Build updated items + calculate totalAmount
+      let totalAmount = 0;
+      const updatedItems = items.map((item) => {
+        const price = Number(item.price || 0);
+        const qty = Number(item.quantity || 0);
+        const totalPrice = qty * price;
+        totalAmount += totalPrice;
+
+        return {
+          productId: item.productId,
+          productName: item.productName || "",
+          quantity: qty,
+          quantityValue: item.quantityValue,
+          unitType: item.unitType,
+          price,
+          totalPrice,
+          warehouseName: item.warehouseName || "",
+          warehouseAddress: item.warehouseAddress || "",
+          warehouseId: item.warehouseId || "",
+        };
+      });
+
+      // Recalculate payment details from items (backend source of truth)
+      const paid = Number(paymentDetails?.paidAmount || 0);
+      const balance = totalAmount - paid;
+      const updatedPaymentDetails = {
+        totalAmount,
+        paidAmount: paid,
+        balanceAmount: balance < 0 ? 0 : balance,
+        paymentStatus:
+          paid === 0 ? "unpaid" :
+            paid >= totalAmount ? "paid" : "partial",
+      };
+
+      // Update order (items + payment + status)
+      const updatedOrder = await Order.findByIdAndUpdate(
+        orderId,
+        {
+          status: status || existingOrder.status,
+          items: updatedItems,
+          paymentDetails: updatedPaymentDetails,
+        },
+        { new: true }
+      );
+
+      // Notify sockets
+      io.to("admins").emit("order_updated", updatedOrder);
+      if (updatedOrder.deliveryPersonId) {
+        io.to(updatedOrder.deliveryPersonId.toString()).emit("order_updated", updatedOrder);
+      }
+
+      return res.json({ message: "Order updated successfully", order: updatedOrder });
     }
 
-    // ----------------------------------------------------
-    // ⭐ Build updated items + recalc totalAmount
-    // ----------------------------------------------------
-    let totalAmount = 0;
+    // -------------------------
+    // existingOrder is NOT pending
+    // -------------------------
+    // In this case: DO NOT change items/payment (enforced).
+    // Only allow changing status (if provided).
+    // We will update only the status field.
+    if (typeof status === "undefined" || status === existingOrder.status) {
+      return res.status(403).json({
+        message: `Order items can only be modified when order is 'pending'. Current status: ${existingOrder.status}`
+      });
+    }
 
-    const updatedItems = items.map((item) => {
-      const price = Number(item.price || 0);
-      const qty = Number(item.quantity || 0);
-      const totalPrice = qty * price;
-
-      totalAmount += totalPrice;
-
-      return {
-        productId: item.productId,
-        productName: item.productName || "",
-        quantity: qty,
-        quantityValue: item.quantityValue,
-        unitType: item.unitType,
-        price,
-        totalPrice,
-        warehouseName: item.warehouseName || "",
-        warehouseAddress: item.warehouseAddress || "",
-        warehouseId: item.warehouseId || "",
-      };
-    });
-
-    // ----------------------------------------------------
-    // ⭐ Recalculate payment
-    // ----------------------------------------------------
-    const paid = Number(paymentDetails?.paidAmount || 0);
-    const balance = totalAmount - paid;
-
-    const updatedPaymentDetails = {
-      totalAmount,
-      paidAmount: paid,
-      balanceAmount: balance < 0 ? 0 : balance,
-      paymentStatus:
-        paid === 0 ? "unpaid" :
-        paid >= totalAmount ? "paid" : "partial",
-    };
-
-    // ----------------------------------------------------
-    // ⭐ Update Order
-    // ----------------------------------------------------
+    // Validate status transition? (optional)
+    // Update only status
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
-      {
-        status,
-        items: updatedItems,
-        paymentDetails: updatedPaymentDetails,
-      },
+      { status },
       { new: true }
     );
 
-    const io = req.app.get("io");
+    // Notify sockets about status change
+    io.to("admins").emit("order_status_updated", updatedOrder);
+    if (updatedOrder.deliveryPersonId) {
+      io.to(updatedOrder.deliveryPersonId.toString()).emit("order_status_updated", updatedOrder);
+    }
+    io.emit("order_status_updated_global", updatedOrder);
 
-    // notify admins
-    io.to("admins").emit("order_updated", updatedOrder);
-
-    // notify assigned delivery boy
-    io.to(updatedOrder.deliveryPersonId.toString())
-      .emit("order_updated", updatedOrder);
-
-    return res.json({
-      message: "Order updated successfully",
-      order: updatedOrder,
-    });
+    return res.json({ message: "Order status updated successfully", order: updatedOrder });
 
   } catch (error) {
     console.error("Update Order Error:", error);
-    return res.status(500).json({ message: "Server error", error });
+    return res.status(500).json({ message: "Server error", error: error.message || error });
   }
 };
+
 
 
 
