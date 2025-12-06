@@ -13,7 +13,7 @@ const AgentDashboard = () => {
   const loadOrders = async () => {
     try {
       const res = await apiClient.get(`/orders?deliveryPersonId=${user._id}`);
-      setOrders(res.data.orders || []);
+      setOrders(res.data.data || []);
     } catch (err) {
       console.error("Failed to load orders");
     }

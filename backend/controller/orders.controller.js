@@ -1,5 +1,6 @@
 const Order = require("../models/orders.model");
 const Product = require("../models/product.model");
+const paginate = require("../utils/pagination");
 
 // Helper to generate orderId like STN00001
 const generateOrderId = async () => {
@@ -143,7 +144,7 @@ exports.createOrder = async (req, res) => {
     }
 
     io.to("admins").emit("order_created", newOrder);
-    io.emit("order_created_global", newOrder);
+    //io.emit("order_created_global", newOrder);
 
     return res.status(201).json({
       message: "Order created successfully",
@@ -156,36 +157,41 @@ exports.createOrder = async (req, res) => {
   }
 };
 
-
-
-
-// Get all orders
 exports.getOrders = async (req, res) => {
   try {
     const user = req.user;
     const filter = {};
 
-    // Delivery boy should only get their own orders
-    if (user && user.role === "delivery-boy") {
+    // Delivery boy gets only his orders
+    if (user?.role === "delivery-boy") {
       filter.deliveryPersonId = user._id;
     }
 
-    // Admin and Super Admin can see all orders (no filter applied)
+    // Apply pagination using reusable function
+    const result = await paginate(
+      Order,
+      filter,
+      req,
+      [
+        { path: "clientId", select: "name phone address" },
+        { path: "deliveryPersonId", select: "name phone" }
+      ]
+    );
 
-    const orders = await Order.find(filter)
-      .populate("clientId", "name phone address")
-      .populate("deliveryPersonId", "name phone")
-      .sort({ createdAt: -1 });
+    return res.json({
+      role: user.role,
+      ...result
+    });
 
-      res.json({
-        orders,
-        role: user.role    // ✅ send role to frontend
-      });
   } catch (error) {
     console.error("GetOrders Error:", error);
-    res.status(500).json({ message: "Failed to retrieve orders", error: error.message });
+    return res.status(500).json({ 
+      message: "Failed to retrieve orders", 
+      error: error.message 
+    });
   }
 };
+
 exports.updateOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -297,7 +303,7 @@ exports.updateOrder = async (req, res) => {
     if (updatedOrder.deliveryPersonId) {
       io.to(updatedOrder.deliveryPersonId.toString()).emit("order_status_updated", updatedOrder);
     }
-    io.emit("order_status_updated_global", updatedOrder);
+   // io.emit("order_status_updated_global", updatedOrder);
 
     return res.json({ message: "Order status updated successfully", order: updatedOrder });
 
@@ -317,21 +323,28 @@ exports.collectOrder = async (req, res) => {
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // Find the item inside order.items
+    // Mark only this item as collected
     const item = order.items.id(itemId);
     if (!item) return res.status(404).json({ message: "Item not found" });
 
-    // Mark only this item as collected
     item.collected = true;
-
     await order.save();
+
+    // ⭐ Populate before sending to client
+    const updatedOrder = await Order.findById(id)
+      .populate("clientId", "name phone address")
+      .populate("deliveryPersonId", "name phone");
+
     const io = req.app.get("io");
-    io.emit("order_collected", order);
+
+    // Emit populated order
+    io.to("admins").emit("order_collected", updatedOrder);
+
     res.json({
       message: "Item collected successfully",
-      order,
+      order: updatedOrder,
     });
-   
+
   } catch (error) {
     res.status(500).json({ message: "Failed to collect item", error });
   }

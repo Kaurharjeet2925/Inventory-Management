@@ -26,6 +26,7 @@ import PendingOrders from './pages/Delivery/Deliveries/PendingOrders.js';
 import ShippedOrders from './pages/Delivery/Deliveries/ShippedOrders.js';
 import DeliveredOrders from './pages/Delivery/Deliveries/DeliveredOrders.js';
 import socket from "../src/socket/socketClient.js"; 
+import NotificationHandler from './components/NotificationHandler.js';
 import { useEffect } from 'react';
 
 function App() {  
@@ -43,6 +44,7 @@ useEffect(() => {
 }, []);
   return (
     <div>
+      <NotificationHandler />
       <ToastContainer 
         position="top-right" 
         autoClose={3000} 

@@ -3,7 +3,7 @@ import { Eye, Edit2, Trash2, X } from 'lucide-react';
 import { apiClient } from '../../apiclient/apiclient';
 import EditOrderModal from './EditOrderModel';
 import socket from "../../socket/socketClient";
-
+import Pagination from '../../components/Pagination';
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,10 +11,14 @@ const ViewOrders = () => {
   const [editModal, setEditModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [products, setProducts] = useState([]);
-
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 8;
+  
   useEffect(() => {
-    loadOrders();
-  }, []);
+    loadOrders(currentPage, limit);
+  }, [currentPage]);
+  
 
   useEffect(() => {
     // socket listeners
@@ -47,16 +51,22 @@ const ViewOrders = () => {
     };
   }, []);
 
-  const loadOrders = async () => {
+  const loadOrders = async (page = 1, limit = 8) => {
     try {
-      const res = await apiClient.get('/orders');
-      setOrders(res.data?.orders || []);
+      setLoading(true);
+      const res = await apiClient.get(`/orders?page=${page}&limit=${limit}`);
+  
+      setOrders(res.data.data || []);
+      setTotalPages(res.data.totalPages);
+      setCurrentPage(res.data.page);
     } catch (err) {
-      console.error('Failed to load orders', err);
+      console.error("Failed to load orders", err);
     } finally {
       setLoading(false);
     }
   };
+  
+  
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -109,85 +119,145 @@ const ViewOrders = () => {
       <h1 className="text-3xl font-bold mb-2">View Orders</h1>
       <p className="text-gray-600 mb-6">All orders and their statuses</p>
 
-      <div className="bg-white rounded-lg shadow overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-100 border-b text-sm font-semibold text-gray-700">
-            <tr>
-              <th className="p-4 text-left">Order ID</th>
-              <th className="p-4 text-left">Client Name</th>
-              <th className="p-4 text-left">Products</th>
-              <th className="p-4 text-left">Stocks</th>
-              <th className="p-4 text-left">Warehouse</th>
-              <th className="p-4 text-left">Date</th>
-              <th className="p-4 text-left">Status</th>
-              <th className="p-4 text-left">Total Amount</th>
-              <th className="p-4 text-center">Actions</th>
+      <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mt-4">
+
+{/* Table Header */}
+<div className="overflow-x-auto">
+  <table className="w-full text-sm">
+    <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
+      <tr className="h-12">
+        <th className="px-6 text-left">Order ID</th>
+        <th className="px-6 text-left">Client</th>
+        <th className="px-6 text-left">Products</th>
+        <th className="px-6 text-left">Qty</th>
+        <th className="px-6 text-left">Warehouse</th>
+        <th className="px-6 text-left">Date</th>
+        <th className="px-6 text-left">Status</th>
+        <th className="px-6 text-left">Amount</th>
+        <th className="px-6 text-center">Actions</th>
+      </tr>
+    </thead>
+
+    {/* Table Body */}
+    <tbody className="text-gray-800">
+      {orders.length === 0 ? (
+        <tr>
+          <td colSpan="9" className="text-center py-6 text-gray-500">
+            No orders found
+          </td>
+        </tr>
+      ) : (
+        orders.map((order) => {
+          const calculatedTotal = order.items.reduce(
+            (sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0),
+            0
+          );
+          const totalAmount = order.paymentDetails?.totalAmount ?? calculatedTotal;
+
+          return (
+            <tr
+              key={order._id}
+              className="hover:bg-gray-50 border-b border-gray-200 h-[60px]"
+            >
+              <td className="px-6 font-semibold text-blue-600 whitespace-nowrap">
+                {order.orderId}
+              </td>
+
+              <td className="px-6 whitespace-nowrap">
+                {order.clientId?.name || "N/A"}
+              </td>
+
+              <td className="px-6">
+                {order.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span>
+                      {item.productName} ({item.quantityValue}
+                      {item.unitType})
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 text-xs rounded font-semibold ${
+                        item.collected
+                          ? "bg-green-100 text-green-700 "
+                          : "bg-red-100 text-red-700 text-center"
+                      }`}
+                    >
+                      {item.collected ? "Collected" : "Not Collected"}
+                    </span>
+                  </div>
+                ))}
+              </td>
+
+              <td className="px-6">
+                {order.items.map((i, idx) => (
+                  <div key={idx}>{i.quantity}</div>
+                ))}
+              </td>
+
+              <td className="px-6">
+                {order.items.map((i, idx) => (
+                  <div key={idx}>{i.warehouseName}</div>
+                ))}
+              </td>
+
+              <td className="px-6 whitespace-nowrap">
+                {new Date(order.createdAt).toLocaleDateString()}
+              </td>
+
+              <td className="px-6 whitespace-nowrap">
+                <span
+                  className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(
+                    order.status
+                  )}`}
+                >
+                  {order.status}
+                </span>
+              </td>
+
+              <td className="px-6 font-semibold text-green-700">
+                ₹{totalAmount}
+              </td>
+
+              {/* Actions */}
+              <td className="px-6 text-center">
+                <div className="flex justify-center gap-4">
+                  <button
+                    onClick={() =>
+                      setViewModal({ ...order, viewOnly: true })
+                    }
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <Eye size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => setEditModal(order)}
+                    className="text-green-600 hover:text-green-800"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+
+                  <button
+                    onClick={() => setDeleteModal(order)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </td>
             </tr>
-          </thead>
+          );
+        })
+      )}
+    </tbody>
+  </table>
+</div>
+</div>
 
-          <tbody>
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan="9" className="p-4 text-center text-gray-500">
-                  No orders found
-                </td>
-              </tr>
-            ) : (
-              orders.map((order) => {
-                const calculatedTotal = order.items.reduce((sum, item) => {
-                  const price = Number(item.price || 0);
-                  const qty = Number(item.quantity || 0);
-                  return sum + price * qty;
-                }, 0);
-                const totalAmount = order.paymentDetails?.totalAmount ?? calculatedTotal;
-
-                return (
-                  <tr key={order._id} className="border-b hover:bg-gray-50">
-                    <td className="p-4 font-semibold text-blue-600 whitespace-nowrap">{order.orderId}</td>
-                    <td className="p-4 whitespace-nowrap">{order.clientId?.name || "N/A"}</td>
-                    <td className="p-4 text-sm leading-6">
-                      {order.items?.map((item, idx) => (
-                        <div key={idx} className="mb-1 flex items-center gap-2">
-                          <span>{item.productName} ({item.quantityValue}{item.unitType})</span>
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${item.collected ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                            {item.collected ? "Collected" : "Not Collected"}
-                          </span>
-                        </div>
-                      ))}
-                    </td>
-                    <td className="p-4 text-sm leading-5">
-                      {order.items?.map((item, idx) => (<div key={idx}>{item.quantity}</div>))}
-                    </td>
-                    <td className="p-4 text-sm leading-5">
-                      {order.items?.map((item, idx) => (<div key={idx}>{item.warehouseName}</div>))}
-                    </td>
-                    <td className="p-4 text-sm whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
-                    <td className="p-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(order.status)}`}>{order.status}</span>
-                    </td>
-                    <td className="p-4 font-semibold text-green-700">₹{totalAmount}</td>
-                    <td className="p-4 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-4">
-                        <button onClick={() => setViewModal({ ...order, viewOnly: true })} className="text-blue-600 hover:text-blue-800"><Eye size={18} /></button>
-
-                        {/* Edit button: allowed to open modal always, but modal enforces item-edit only when pending */}
-                        <button onClick={() => setEditModal(order)} className="text-green-600 hover:text-green-800">
-                          <Edit2 size={18} />
-                        </button>
-
-                        <button onClick={() => setDeleteModal(order)} className="text-red-600 hover:text-red-800">
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={(page) => setCurrentPage(page)}
+      /> 
       {viewModal && (
         <EditOrderModal
           order={viewModal}

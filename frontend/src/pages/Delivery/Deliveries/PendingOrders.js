@@ -7,7 +7,7 @@ const PendingOrders = () => {
 
   const loadOrders = async () => {
     const res = await apiClient.get("/orders");
-    setOrders(res.data.orders.filter(o => o.status === "pending"));
+    setOrders(res.data.data.filter(o => o.status === "pending"));
   };
 
   useEffect(() => { loadOrders(); }, []);

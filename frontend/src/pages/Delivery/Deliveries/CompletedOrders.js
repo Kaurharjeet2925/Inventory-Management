@@ -7,7 +7,7 @@ const CompletedOrders = () => {
 
   const load = async () => {
     const res = await apiClient.get("/orders");
-    setOrders(res.data.orders.filter(o => o.status === "completed"));
+    setOrders(res.data.data.filter(o => o.status === "completed"));
   };
 
   useEffect(() => { load(); }, []);

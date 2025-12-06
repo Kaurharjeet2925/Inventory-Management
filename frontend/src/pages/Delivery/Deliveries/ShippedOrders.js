@@ -7,7 +7,7 @@ const ShippedOrders = () => {
 
   const loadOrders = async () => {
     const res = await apiClient.get("/orders");
-    setOrders(res.data.orders.filter(o => o.status === "shipped"));
+    setOrders(res.data.data.filter(o => o.status === "shipped"));
   };
 
   useEffect(() => { loadOrders(); }, []);
