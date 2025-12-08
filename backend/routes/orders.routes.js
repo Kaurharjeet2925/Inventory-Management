@@ -8,7 +8,8 @@ const {
   updateOrderStatus, 
   deleteOrder ,
     collectOrder,
-    updateOrder
+    updateOrder,
+    generateInvoice,
 } = require("../controller/orders.controller");
 
 // Create order
@@ -20,9 +21,11 @@ router.put("/orders/:id/collect-item/:itemId", auth, collectOrder);
 router.put("/orders/:id", auth, updateOrder);
 // Get single order
 router.get("/orders/:id", auth, getOrderById);
+router.get("/invoice/:id", generateInvoice);
 
 // Update status
 router.put("/orders/:id/status", auth, updateOrderStatus);
+
 
 // Delete order
 router.delete("/orders/:id", auth, deleteOrder);

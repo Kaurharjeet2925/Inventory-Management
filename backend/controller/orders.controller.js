@@ -1,7 +1,7 @@
 const Order = require("../models/orders.model");
 const Product = require("../models/product.model");
 const paginate = require("../utils/pagination");
-
+const PDFDocument = require("pdfkit");
 // Helper to generate orderId like STN00001
 const generateOrderId = async () => {
   // Find all orders and get the highest number
@@ -63,9 +63,7 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    // -----------------------------------------------------
-    // ⭐ Deduct Warehouse Stock
-    // -----------------------------------------------------
+  
     for (let item of items) {
       await Product.findByIdAndUpdate(item.warehouseId, {
         $inc: { totalQuantity: -Number(item.quantity) }
@@ -78,9 +76,7 @@ exports.createOrder = async (req, res) => {
     let totalAmount = 0;
     const formattedItems = [];
 
-    // -----------------------------------------------------
-    // ⭐ Prepare items for the order
-    // -----------------------------------------------------
+    
     for (let item of items) {
       const warehouseProduct = await Product.findById(item.warehouseId).populate("location");
 
@@ -95,8 +91,8 @@ exports.createOrder = async (req, res) => {
         productName: item.productName,
         quantity: qty,
         quantityValue: item.quantityValue,
+        quantityUnit:item.quantityUnit,
         unitType: item.unitType,
-
         price: price,
         totalPrice: totalPrice,
 
@@ -106,9 +102,7 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // -----------------------------------------------------
-    // ⭐ Payment Calculations
-    // -----------------------------------------------------
+
     const paid = Number(paymentDetails?.paidAmount || 0);
     const balance = totalAmount - paid;
 
@@ -117,7 +111,7 @@ exports.createOrder = async (req, res) => {
       paidAmount: paid,
       balanceAmount: balance < 0 ? 0 : balance,
       paymentStatus:
-        paid === 0 ? "unpaid" :
+        paid === 0 ? "COD" :
         paid >= totalAmount ? "paid" : "partial"
     };
 
@@ -134,9 +128,7 @@ exports.createOrder = async (req, res) => {
       status
     });
 
-    // -----------------------------------------------------
-    // ⭐ SOCKET EVENTS
-    // -----------------------------------------------------
+
     const io = req.app.get("io");
 
     if (deliveryPersonId) {
@@ -144,7 +136,7 @@ exports.createOrder = async (req, res) => {
     }
 
     io.to("admins").emit("order_created", newOrder);
-    //io.emit("order_created_global", newOrder);
+    io.emit("order_created_global", newOrder);
 
     return res.status(201).json({
       message: "Order created successfully",
@@ -237,7 +229,7 @@ exports.updateOrder = async (req, res) => {
           productName: item.productName || "",
           quantity: qty,
           quantityValue: item.quantityValue,
-          unitType: item.unitType,
+          quantityUnit: item.quantityUnit,
           price,
           totalPrice,
           warehouseName: item.warehouseName || "",
@@ -419,8 +411,8 @@ exports.updateOrderStatus = async (req, res) => {
     io.to(updatedOrder.deliveryPersonId.toString())
       .emit("order_status_updated", updatedOrder);
 
-    // Optional global event
-    io.emit("order_status_updated_global", updatedOrder);
+    // // Optional global event
+    // io.emit("order_status_updated_global", updatedOrder);
 
 
     return res.json({
@@ -475,3 +467,153 @@ exports.deleteOrder = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
+
+exports.generateInvoice = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+
+    const order = await Order.findById(orderId)
+      .populate("clientId", "name phone address")
+      .populate("deliveryPersonId", "name phone");
+
+    if (!order) return res.status(404).send("Order not found");
+
+    // ---------------------------------------------------------
+// FIX: Calculate total from items if paymentDetails is empty
+// ---------------------------------------------------------
+let calculatedTotal = order.items.reduce(
+  (sum, item) => sum + Number(item.totalPrice || 0),
+  0
+);
+
+const payment = {
+  totalAmount: order.paymentDetails?.totalAmount || calculatedTotal,
+  paidAmount: order.paymentDetails?.paidAmount || 0,
+  balanceAmount:
+    order.paymentDetails?.balanceAmount ??
+    calculatedTotal - (order.paymentDetails?.paidAmount || 0),
+  paymentStatus: order.paymentDetails?.paymentStatus || "COD",
+};
+
+    // Create PDF
+    const doc = new PDFDocument({ margin: 40 });
+    const path = require("path");
+
+    // Register custom font that supports ₹ symbol
+    const fontPath = path.join(__dirname, "../fonts/NotoSans_Condensed-Regular.ttf");
+    doc.registerFont("Noto", fontPath);
+    
+    // Set this font globally for the entire document
+    doc.font("Noto");
+    
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename=Invoice-${order.orderId}.pdf`
+    );
+
+    doc.pipe(res);
+
+    //-----------------------------------------
+    // HEADER
+    //-----------------------------------------
+    doc.fontSize(26).text("INVOICE", { align: "center", underline: true });
+    doc.moveDown(1);
+
+    // Company INFO (left)
+    doc.fontSize(12).text("Star Nutrition Supplements");
+    doc.text("Address Line 1");
+    doc.text("City, State");
+    doc.text("Phone: 9999999999");
+
+    // Invoice Info (right)
+    doc.moveUp(4);
+    doc.fontSize(12).text(`Invoice No: ${order.orderId}`, { align: "right" });
+    doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`, {
+      align: "right",
+    });
+    doc.moveDown(3.5);
+
+    //-----------------------------------------
+    // CLIENT INFO
+    //-----------------------------------------
+    doc.fontSize(14).text("Bill To:", { underline: true });
+    doc.fontSize(12).text(order.clientId?.name || "");
+    doc.text(order.clientId?.phone || "");
+    doc.text(order.clientId?.address || "");
+    doc.moveDown(1);
+
+   
+    doc.moveTo(40, doc.y).lineTo(560, doc.y).stroke();
+    doc.moveDown(0.5);
+    
+    const startY = doc.y;
+    
+    doc.fontSize(12).text("Product", 40, startY);
+    doc.text("Location", 260, startY);
+    doc.text("Quantity", 350, startY);
+    doc.text("Price", 430, startY);
+    doc.text("Total", 500, startY);
+    
+    doc.moveTo(40, startY + 25).lineTo(560, startY + 25).stroke();
+    
+    let y = startY + 35;
+    
+    
+    //-----------------------------------------------------------
+    // TABLE ROWS
+    //-----------------------------------------------------------
+    order.items.forEach((item) => {
+    
+      // Build full product name
+      const fullName = `${item.productName} – ${item.quantityValue}${item.quantityUnit}`;
+    
+      doc.text(fullName, 40, y, { width: 200 });
+    
+      // FIXED warehouse location name
+      doc.text(item.warehouseName || "N/A", 260, y);
+    
+      doc.text(String(item.quantity), 350, y);
+    
+      doc.text("₹" + item.price, 430, y);
+      doc.text("₹" + item.totalPrice, 500, y);
+      
+      y += 20; 
+    });
+    
+    doc.moveTo(40, y + 5).lineTo(560, y + 5).stroke();
+    
+    
+    doc.moveTo(40, y + 5).lineTo(560, y + 5).stroke();
+    doc.moveDown(2);
+    doc.fontSize(18).text(
+      `Grand Total: ₹${payment.totalAmount}`,
+      360,    // x-position
+      y + 20, // y-position
+      { width: 200, align: "right" }
+    ); 
+    doc.moveDown(10);
+
+    const thankY = y + 100;
+
+doc.fontSize(20).text(
+  "Thank you for your business!",
+  40,
+  thankY,
+  { width: 520, align: "center" }
+);
+
+   
+    doc.end();
+  } catch (err) {
+    console.error("Invoice Error:", err);
+
+    if (!res.headersSent) {
+      res.status(500).send("Failed to generate invoice");
+    }
+  }
+};
+
+

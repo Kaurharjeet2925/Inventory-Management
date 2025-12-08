@@ -79,7 +79,7 @@ const OrderCard = ({ order, reload }) => {
     <div className="flex justify-between items-start">
       <div>
         <p className="text-sm font-medium text-gray-800">
-          • {item.productName} ({item.quantityValue}{item.unitType}) × {item.quantity}
+          • {item.productName} ({item.quantityValue}{item.quantityUnit}) × {item.quantity}
         </p>
 
         <p className="text-xs text-gray-600 mt-1">

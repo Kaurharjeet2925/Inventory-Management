@@ -40,9 +40,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ------------------------
-// ROUTES
-// ------------------------
+
 app.use("/api", require("./routes/brands.routes"));
 app.use("/api", require("./routes/category.routes"));
 app.use("/api", require("./routes/product.routes"));
@@ -51,9 +49,7 @@ app.use("/api/clients", require("./routes/client.routes"));
 app.use("/api", require("./routes/location.routes"));
 app.use("/api", require("./routes/user.routes"));
 
-// ------------------------
-// SOCKET.IO SETUP
-// ------------------------
+
 const server = http.createServer(app);
 
 const io = new Server(server, {

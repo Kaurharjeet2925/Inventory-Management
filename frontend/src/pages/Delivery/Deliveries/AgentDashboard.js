@@ -7,7 +7,7 @@ import { Clock, Truck, PackageCheck, CheckCircle } from "lucide-react";
 const AgentDashboard = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("agent"));
 
   // 1️⃣ Load orders for this delivery boy
   const loadOrders = async () => {
@@ -21,29 +21,32 @@ const AgentDashboard = () => {
 
   useEffect(() => {
     loadOrders(); // Initial load
-
-    // 2️⃣ Real-time: When admin creates order
-    socket.on("order_created", (newOrder) => {
-      if (newOrder.deliveryPersonId === user._id) {
-        setOrders((prev) => [newOrder, ...prev]);
+  
+    // listen for order assigned to this delivery boy
+    socket.on("deliver_order", (data) => {
+      console.log("📦 Delivery boy RECEIVED ORDER:", data);
+  
+      if (data.order.deliveryPersonId === user._id) {
+        setOrders((prev) => [data.order, ...prev]);
       }
     });
-
-    // 3️⃣ Real-time: When order status updates
+  
+    // Order status update stays same
     socket.on("order_status_updated", (updatedOrder) => {
       if (updatedOrder.deliveryPersonId !== user._id) return;
-
+  
       setOrders((prev) => {
         const others = prev.filter((o) => o._id !== updatedOrder._id);
         return [updatedOrder, ...others];
       });
     });
-
+  
     return () => {
-      socket.off("order_created");
+      socket.off("deliver_order");
       socket.off("order_status_updated");
     };
   }, []);
+  
 
   // COUNT ORDERS BY STATUS
   const stats = {

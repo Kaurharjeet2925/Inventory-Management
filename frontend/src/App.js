@@ -29,21 +29,19 @@ import socket from "../src/socket/socketClient.js";
 import NotificationHandler from './components/NotificationHandler.js';
 import { useEffect } from 'react';
 
-function App() {  
-useEffect(() => {
-  socket.on("connect", () => {
-    console.log("Connected to socket:", socket.id);
-    console.log("Socket connected with token:", localStorage.getItem("token"));
-    console.log("Socket auth user:", socket.user);
+import { NotificationProvider } from "./context/NotificationContext";
 
-  });
-  
-  return () => {
-    socket.off("connect");
-  };
-}, []);
+function App() {
+  useEffect(() => {
+    socket.on("connect", () => {
+      console.log("Connected:", socket.id);
+    });
+
+    return () => socket.off("connect");
+  }, []);
+
   return (
-    <div>
+    <NotificationProvider>
       <NotificationHandler />
       <ToastContainer 
         position="top-right" 
@@ -56,48 +54,45 @@ useEffect(() => {
         draggable 
         pauseOnHover 
       />
-     <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path='/dashboard' element= {<Dashboard/>} />
-     <Route path="/profile" element={<Profile />}>
-        <Route path="edit" element={<EditProfile />} />
-        <Route path="alladmin" element={<AllAdmin/>} />
-        <Route path="view/:id" element={<ViewProfile/>} />
-    </Route>
-   <Route path="/manage-products" element={<ManageProducts/>}>
-        <Route path="brands" element={<Brands/>} />
-        <Route path="categories" element={<Categories/>} />
-        <Route path="products" element={<Product/>} />
-        <Route path="location" element={<Locations/>} />
-    </Route>
-     <Route path="/manage-client" element={<ManageClients/>}>
-        <Route path="client" element={<Client/>} />
-        
-    </Route>
-    <Route path="/orders" element={<ManageOrders/>}>
-        <Route path="generate-order" element={<CreateOrders/>} />
-        <Route path="view-order" element={<ViewOrders/>} />
-    </Route>
-    <Route path="/agent" element={<Agent />}>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/dashboard" element={<Dashboard />} />
 
-  {/* Dashboard Home */}
-  <Route path="agent-dashboard" element={<AgentDashboard />} />
+        <Route path="/profile" element={<Profile />}>
+          <Route path="edit" element={<EditProfile />} />
+          <Route path="alladmin" element={<AllAdmin />} />
+          <Route path="view/:id" element={<ViewProfile />} />
+        </Route>
 
-  {/* Deliveries Section */}
-  <Route path="deliveries">
-    <Route index element={<AgentDashboard />} /> 
-    <Route path="pending" element={<PendingOrders />} />
-    <Route path="shipped" element={<ShippedOrders />} />
-    <Route path="delivered" element={<DeliveredOrders />} />
-    <Route path="completed" element={<CompletedOrders />} />
-  </Route>
+        <Route path="/manage-products" element={<ManageProducts />}>
+          <Route path="brands" element={<Brands />} />
+          <Route path="categories" element={<Categories />} />
+          <Route path="products" element={<Product />} />
+          <Route path="location" element={<Locations />} />
+        </Route>
 
-</Route>
+        <Route path="/manage-client" element={<ManageClients />}>
+          <Route path="client" element={<Client />} />
+        </Route>
 
-   
-    </Routes>
-    </div>
+        <Route path="/orders" element={<ManageOrders />}>
+          <Route path="generate-order" element={<CreateOrders />} />
+          <Route path="view-order" element={<ViewOrders />} />
+        </Route>
+
+        <Route path="/agent" element={<Agent />}>
+          <Route path="agent-dashboard" element={<AgentDashboard />} />
+
+          <Route path="deliveries">
+            <Route index element={<AgentDashboard />} />
+            <Route path="pending" element={<PendingOrders />} />
+            <Route path="shipped" element={<ShippedOrders />} />
+            <Route path="delivered" element={<DeliveredOrders />} />
+            <Route path="completed" element={<CompletedOrders />} />
+          </Route>
+        </Route>
+      </Routes>
+    </NotificationProvider>
   );
 }
-
 export default App;

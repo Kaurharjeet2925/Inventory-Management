@@ -21,7 +21,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     loadProducts();
   }, []);
 
-  // build productOptions (unique by name-size-unit)
+  // build productOptions (unique list)
   const seen = new Set();
   const productOptions = rawProducts
     .filter((p) => {
@@ -39,10 +39,11 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       price: p.price,
     }));
 
+  // get warehouses for selected product
   const getWarehouses = (name, size, unit) => {
     return rawProducts
-      .filter(p => p.name === name && p.quantityValue === size && p.quantityUnit === unit)
-      .map(p => ({
+      .filter((p) => p.name === name && p.quantityValue === size && p.quantityUnit === unit)
+      .map((p) => ({
         id: p._id,
         warehouseName: p.location?.name || "Unknown",
         warehouseAddress: p.location?.address || "NA",
@@ -66,8 +67,13 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       ...order,
       newStatus: order.status,
       items: rebuilt,
-      // ensure payment details exist
-      paymentDetails: order.paymentDetails || { totalAmount: 0, paidAmount: 0, balanceAmount: 0, paymentStatus: "unpaid" }
+      paymentDetails:
+        order.paymentDetails || {
+          totalAmount: 0,
+          paidAmount: 0,
+          balanceAmount: 0,
+          paymentStatus: "unpaid",
+        },
     });
 
     setOriginalItems(JSON.parse(JSON.stringify(rebuilt)));
@@ -75,7 +81,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
 
   if (!form) return null;
 
-  // whether items can be edited (only when original status was pending)
+  // Only pending orders can edit items
   const itemsEditable = order.status === "pending" && !viewOnly;
 
   const updateField = (index, field, value) => {
@@ -83,6 +89,33 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     const updated = [...form.items];
     updated[index][field] = value;
     setForm({ ...form, items: updated });
+  };
+
+  // -------------------------
+  // ⭐ ADD NEW ITEM FUNCTION
+  // -------------------------
+  const addNewItem = () => {
+    if (!itemsEditable) return;
+
+    const newItem = {
+      productId: "",
+      productName: "",
+      quantity: 1,
+      quantityValue: "",
+      unitType: "",
+      price: 0,
+      totalPrice: 0,
+      warehouseId: "",
+      warehouseName: "",
+      warehouseAddress: "",
+      warehouseOptions: [],
+    };
+
+    const updated = [...form.items, newItem];
+    setForm({ ...form, items: updated });
+
+    // Open the new row in edit mode
+    setEditingIndex(updated.length - 1);
   };
 
   const deleteItem = (index) => {
@@ -100,20 +133,15 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
   };
 
   const saveOrder = () => {
-    // If items are not editable (order wasn't pending) -> only allow status change
     if (!itemsEditable) {
-      // Only status change will be sent
-      onSave({
-        _id: form._id,
-        status: form.newStatus
-      });
+      onSave({ _id: form._id, status: form.newStatus });
       return;
     }
 
-    // else, itemsEditable => send items (+payment)
     const updatedItems = form.items.map((item) => {
       const price = Number(item.price || 0);
       const qty = Number(item.quantity || 0);
+
       return {
         productId: item.productId,
         productName: item.productName,
@@ -134,8 +162,8 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       items: updatedItems,
       paymentDetails: {
         ...form.paymentDetails,
-        paidAmount: Number(form.paymentDetails?.paidAmount || 0)
-      }
+        paidAmount: Number(form.paymentDetails?.paidAmount || 0),
+      },
     });
   };
 
@@ -143,11 +171,15 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg p-6 max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
 
+        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold">{viewOnly ? "View Order" : "Edit Order"}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700"><X size={26} /></button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={26} />
+          </button>
         </div>
 
+        {/* ORDER INFO */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div>
             <p className="text-gray-600 text-sm">Order ID</p>
@@ -164,7 +196,9 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
             <select
               disabled={viewOnly}
               value={form.newStatus}
-              onChange={(e) => setForm({ ...form, newStatus: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, newStatus: e.target.value })
+              }
               className="border rounded p-2 w-full disabled:bg-gray-100 disabled:text-gray-500"
             >
               <option value="pending">Pending</option>
@@ -173,26 +207,51 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
-            {/* show hint */}
-            {!itemsEditable && <p className="text-xs text-gray-500 mt-1">Items can be modified only while order is pending.</p>}
+
+            {!itemsEditable && (
+              <p className="text-xs text-gray-500 mt-1">
+                Items can be modified only while order is pending.
+              </p>
+            )}
           </div>
 
           <div>
             <p className="text-gray-600 text-sm">Date</p>
-            <p className="font-semibold text-lg">{new Date(form.createdAt).toLocaleDateString()}</p>
+            <p className="font-semibold text-lg">
+              {new Date(form.createdAt).toLocaleDateString()}
+            </p>
           </div>
         </div>
 
-        <h3 className="text-lg font-semibold mb-3">Items</h3>
+        {/* ITEMS HEADER + ADD BUTTON */}
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-semibold">Items</h3>
 
+          {itemsEditable && (
+            <button
+              onClick={addNewItem}
+              className="bg-blue-600 text-white px-3 py-1 rounded flex items-center gap-1"
+            >
+              + Add Item
+            </button>
+          )}
+        </div>
+
+        {/* ITEMS LIST */}
         <div className="bg-gray-50 p-4 rounded-lg space-y-4">
           {form.items.map((item, idx) => {
-            const whSelected = item.warehouseOptions?.find((w) => w.id === item.warehouseId) || {};
+            const whSelected =
+              item.warehouseOptions?.find((w) => w.id === item.warehouseId) || {};
 
             return (
               <div key={idx} className="border-b pb-4 last:border-b-0">
                 {editingIndex === idx && itemsEditable ? (
+                  // --------------------
+                  // Edit Mode
+                  // --------------------
                   <div className="grid grid-cols-6 gap-3 items-center">
+
+                    {/* Product Select */}
                     <div className="col-span-2">
                       <SearchableSelect
                         options={productOptions}
@@ -200,13 +259,19 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                         placeholder="Product"
                         onChange={(selectedId) => {
                           const p = productOptions.find((q) => q._id === selectedId);
+
                           updateField(idx, "productId", selectedId);
                           updateField(idx, "productName", p.name);
                           updateField(idx, "unitType", p.unitType);
                           updateField(idx, "quantityValue", p.size);
                           updateField(idx, "price", p.price);
 
-                          const wh = getWarehouses(p.name, p.size, p.unitType);
+                          const wh = getWarehouses(
+                            p.name,
+                            p.size,
+                            p.unitType
+                          );
+
                           updateField(idx, "warehouseOptions", wh);
                           updateField(idx, "warehouseId", wh[0]?.id || "");
                           updateField(idx, "warehouseName", wh[0]?.warehouseName);
@@ -215,43 +280,99 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                       />
                     </div>
 
-                    <input type="number" className="border rounded-lg px-3 py-2.5 bg-gray-100" value={item.price} readOnly />
+                    {/* Price */}
+                    <input
+                      type="number"
+                      className="border rounded-lg px-3 py-2.5 bg-gray-100"
+                      value={item.price}
+                      readOnly
+                    />
 
-                    <select className="border rounded-lg px-3 py-2.5" value={item.warehouseId} onChange={(e) => {
-                      const wid = e.target.value;
-                      const wh = item.warehouseOptions.find((w) => w.id === wid);
-                      updateField(idx, "warehouseId", wid);
-                      updateField(idx, "warehouseName", wh?.warehouseName);
-                      updateField(idx, "warehouseAddress", wh?.warehouseAddress);
-                    }}>
+                    {/* Warehouse */}
+                    <select
+                      className="border rounded-lg px-3 py-2.5"
+                      value={item.warehouseId}
+                      onChange={(e) => {
+                        const wid = e.target.value;
+                        const wh = item.warehouseOptions.find((w) => w.id === wid);
+
+                        updateField(idx, "warehouseId", wid);
+                        updateField(idx, "warehouseName", wh?.warehouseName);
+                        updateField(idx, "warehouseAddress", wh?.warehouseAddress);
+                      }}
+                    >
                       <option value="">Select</option>
-                      {item.warehouseOptions?.map((w) => (<option key={w.id} value={w.id}>{w.warehouseName} (Stock {w.stock})</option>))}
+                      {item.warehouseOptions?.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.warehouseName} (Stock {w.stock})
+                        </option>
+                      ))}
                     </select>
 
-                    <input type="number" className="border rounded-lg px-3 py-2.5" value={item.quantity} onChange={(e) => updateField(idx, "quantity", e.target.value)} />
+                    {/* Quantity */}
+                    <input
+                      type="number"
+                      className="border rounded-lg px-3 py-2.5"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        updateField(idx, "quantity", e.target.value)
+                      }
+                    />
 
+                    {/* Save / Cancel */}
                     <div className="flex gap-2 justify-center">
-                      <button className="bg-green-600 text-white w-9 h-9 rounded-full" onClick={() => setEditingIndex(null)}>✔</button>
-                      <button className="bg-red-500 text-white w-9 h-9 rounded-full" onClick={() => cancelInlineEdit(idx)}>✖</button>
+                      <button
+                        className="bg-green-600 text-white w-9 h-9 rounded-full"
+                        onClick={() => setEditingIndex(null)}
+                      >
+                        ✔
+                      </button>
+
+                      <button
+                        className="bg-red-500 text-white w-9 h-9 rounded-full"
+                        onClick={() => cancelInlineEdit(idx)}
+                      >
+                        ✖
+                      </button>
                     </div>
                   </div>
                 ) : (
+                  // --------------------
+                  // View Mode
+                  // --------------------
                   <div>
                     <div className="flex justify-between">
-                      <p className="font-semibold">{item.productName} — Qty {item.quantity}</p>
+                      <p className="font-semibold">
+                        {item.productName} — Qty {item.quantity}
+                      </p>
 
-                      {/* edit icons only when itemsEditable */}
                       {itemsEditable && (
                         <div className="flex gap-3">
-                          <Pencil size={18} onClick={() => setEditingIndex(idx)} className="cursor-pointer text-blue-600" />
-                          <Trash2 size={18} onClick={() => deleteItem(idx)} className="cursor-pointer text-red-600" />
+                          <Pencil
+                            size={18}
+                            onClick={() => setEditingIndex(idx)}
+                            className="cursor-pointer text-blue-600"
+                          />
+                          <Trash2
+                            size={18}
+                            onClick={() => deleteItem(idx)}
+                            className="cursor-pointer text-red-600"
+                          />
                         </div>
                       )}
                     </div>
 
-                    <p className="text-sm text-gray-600">Warehouse: {item.warehouseName}</p>
-                    <p className="text-sm text-gray-600">Price: ₹{item.price}</p>
-                    <p className="text-sm text-gray-600">Total: ₹{item.price * item.quantity}</p>
+                    <p className="text-sm text-gray-600">
+                      Warehouse: {item.warehouseName}
+                    </p>
+
+                    <p className="text-sm text-gray-600">
+                      Price: ₹{item.price}
+                    </p>
+
+                    <p className="text-sm text-gray-600">
+                      Total: ₹{item.price * item.quantity}
+                    </p>
                   </div>
                 )}
               </div>
@@ -259,11 +380,20 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           })}
         </div>
 
+        {/* FOOTER BUTTONS */}
         <div className="mt-6 flex gap-3">
-          <button className="flex-1 bg-gray-300 py-3 rounded" onClick={onClose}>{viewOnly ? "Close" : "Cancel"}</button>
+          <button
+            className="flex-1 bg-gray-300 py-3 rounded"
+            onClick={onClose}
+          >
+            {viewOnly ? "Close" : "Cancel"}
+          </button>
 
           {!viewOnly && (
-            <button className="flex-1 bg-green-600 text-white py-3 rounded" onClick={saveOrder}>
+            <button
+              className="flex-1 bg-green-600 text-white py-3 rounded"
+              onClick={saveOrder}
+            >
               Save Order
             </button>
           )}

@@ -4,6 +4,7 @@ import { apiClient } from '../../apiclient/apiclient';
 import EditOrderModal from './EditOrderModel';
 import socket from "../../socket/socketClient";
 import Pagination from '../../components/Pagination';
+import { FaFileInvoice } from 'react-icons/fa';
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,8 @@ const ViewOrders = () => {
       setLoading(true);
       const res = await apiClient.get(`/orders?page=${page}&limit=${limit}`);
   
+      console.log("ORDER ITEMS --->", res.data.data[0]?.items); // 🔥 ADD THIS
+  
       setOrders(res.data.data || []);
       setTotalPages(res.data.totalPages);
       setCurrentPage(res.data.page);
@@ -67,6 +70,7 @@ const ViewOrders = () => {
   };
   
   
+  
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -75,8 +79,8 @@ const ViewOrders = () => {
         const formatted = res.data.map((p) => ({
           _id: p._id,
           productName: `${p.name} – ${p.quantityValue}${p.quantityUnit}`,
-          unitType: p.quantityUnit,
-          quantityValue: p.quantityValue,
+          // unitType: p.quantityUnit,
+          // quantityValue: p.quantityValue,
         }));
         setProducts(formatted);
       } catch (err) {
@@ -168,24 +172,25 @@ const ViewOrders = () => {
               </td>
 
               <td className="px-6">
-                {order.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span>
-                      {item.productName} ({item.quantityValue}
-                      {item.unitType})
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 text-xs rounded font-semibold ${
-                        item.collected
-                          ? "bg-green-100 text-green-700 "
-                          : "bg-red-100 text-red-700 text-center"
-                      }`}
-                    >
-                      {item.collected ? "Collected" : "Not Collected"}
-                    </span>
-                  </div>
-                ))}
-              </td>
+  {order.items.map((item, idx) => (
+    <div key={idx} className="flex items-center gap-2">
+      <span>
+        {item.productName} ({item.quantityValue}{item.quantityUnit})
+      </span>
+
+      <span
+        className={`px-2 py-0.5 text-xs rounded font-semibold ${
+          item.collected
+            ? "bg-green-100 text-green-700"
+            : "bg-red-100 text-red-700"
+        }`}
+      >
+        {item.collected ? "Collected" : "Not Collected"}
+      </span>
+    </div>
+  ))}
+</td>
+
 
               <td className="px-6">
                 {order.items.map((i, idx) => (
@@ -220,6 +225,8 @@ const ViewOrders = () => {
               {/* Actions */}
               <td className="px-6 text-center">
                 <div className="flex justify-center gap-4">
+                
+
                   <button
                     onClick={() =>
                       setViewModal({ ...order, viewOnly: true })
@@ -235,6 +242,18 @@ const ViewOrders = () => {
                   >
                     <Edit2 size={18} />
                   </button>
+                  <button
+  onClick={() =>
+    window.open(
+      `${process.env.REACT_APP_BACKEND_URL}/invoice/${order._id}`,
+      "_blank"
+    )
+  }
+  className="text-purple-600 hover:text-purple-800"
+  title="Download Invoice"
+>
+ <FaFileInvoice/>
+</button>
 
                   <button
                     onClick={() => setDeleteModal(order)}

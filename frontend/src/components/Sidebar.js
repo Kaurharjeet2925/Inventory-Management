@@ -10,6 +10,13 @@ const Sidebar = () => {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const location = useLocation();
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+  };
+  
+
   useEffect(() => {
     setProfileOpen(location.pathname.startsWith("/profile"));
   }, [location.pathname]);
@@ -178,6 +185,14 @@ const Sidebar = () => {
             Agent Dashboard
           </NavLink>
         </nav>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
+    <button
+      onClick={handleLogout}
+      className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
+    >
+      Logout
+    </button>
+  </div>
       </aside>
     </>
   );

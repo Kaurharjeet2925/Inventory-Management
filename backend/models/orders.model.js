@@ -16,7 +16,7 @@ const orderSchema = new mongoose.Schema(
         productName: String,
         totalQuantity: Number,           // how many units ordered
         quantityValue: Number,       // size of each unit (e.g., 20 pieces per packet)
-        unitType: String,           // unit type (packet, piece, etc.)
+        quantityUnit: String,           // unit type (packet, piece, etc.)
         quantity: { type: Number, required: true }, // ⭐ ordered quantity
         warehouseName: String,
         warehouseAddress: String,
