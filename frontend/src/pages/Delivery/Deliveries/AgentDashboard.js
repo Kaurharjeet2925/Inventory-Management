@@ -12,10 +12,11 @@ const AgentDashboard = () => {
   // 1️⃣ Load orders for this delivery boy
   const loadOrders = async () => {
     try {
-      const res = await apiClient.get(`/orders?deliveryPersonId=${user._id}`);
+      const res = await apiClient.get(`/orders`);
+      console.log("📦 Loaded orders:", res.data.data);
       setOrders(res.data.data || []);
     } catch (err) {
-      console.error("Failed to load orders");
+      console.error("Failed to load orders", err);
     }
   };
 

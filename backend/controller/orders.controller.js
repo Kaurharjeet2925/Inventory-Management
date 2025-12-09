@@ -2,6 +2,7 @@ const Order = require("../models/orders.model");
 const Product = require("../models/product.model");
 const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
+const io = require("../server").io;
 // Helper to generate orderId like STN00001
 const generateOrderId = async () => {
   // Find all orders and get the highest number
@@ -33,6 +34,7 @@ exports.createOrder = async (req, res) => {
       notes, 
       status = "pending" 
     } = req.body;
+    const assignedBy = req.user._id; // Get current user ID
 
     console.log("Create Order Request:", req.body);
 
@@ -41,9 +43,9 @@ exports.createOrder = async (req, res) => {
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Order must contain at least 1 item" });
 
-    // -----------------------------------------------------
-    // ⭐ Validate Warehouse-level Stock
-    // -----------------------------------------------------
+    // Get io instance early so it's available throughout function
+    const io = req.app.get("io");
+
     for (let item of items) {
       const warehouseProduct = await Product.findById(item.warehouseId).populate("location");
 
@@ -64,10 +66,22 @@ exports.createOrder = async (req, res) => {
     }
 
   
+  
+
     for (let item of items) {
-      await Product.findByIdAndUpdate(item.warehouseId, {
+      const resUpdate = await Product.findByIdAndUpdate(item.warehouseId, {
         $inc: { totalQuantity: -Number(item.quantity) }
-      });
+      }, { new: true });
+
+      // Debug logs: show product id, decremented amount and new total
+      console.log(`Stock update for product ${item.warehouseId}: -${item.quantity}, newTotal: ${resUpdate ? resUpdate.totalQuantity : 'N/A'}`);
+
+      // Emit product_updated so clients can refresh availability immediately
+      try {
+        io.emit('product_updated', { productId: item.warehouseId, totalQuantity: resUpdate ? resUpdate.totalQuantity : null });
+      } catch (e) {
+        console.error('Failed to emit product_updated', e);
+      }
     }
 
     // Generate Order ID
@@ -116,31 +130,49 @@ exports.createOrder = async (req, res) => {
     };
 
     // -----------------------------------------------------
-    // ⭐ Save Order
-    // -----------------------------------------------------
+    // Save Order
+    // ⭐ -------------------------------------------------
     const newOrder = await Order.create({
       orderId,
       clientId,
       deliveryPersonId,
+      assignedBy,
       paymentDetails: finalPaymentDetails,
       items: formattedItems,
       notes,
       status
     });
 
+    // Fetch and populate order before emitting via socket
+    const populatedOrder = await Order.findById(newOrder._id)
+      .populate("deliveryPersonId", "name phone email")
+      .populate("assignedBy", "name role")
+      .populate("clientId", "name phone address");
 
-    const io = req.app.get("io");
+      let dpId =
+      typeof deliveryPersonId === "string"
+        ? deliveryPersonId
+        : (deliveryPersonId?._id || "").toString();
+    
+    // Emit only if ID exists
+    if (dpId) {
+      io.to(dpId).emit("order_created", populatedOrder);
+      console.log("🔥 SENT order_created to delivery boy room:", dpId);
+    } else {
+      console.log("⚠️ deliveryPersonId EMPTY or INVALID → cannot emit");
+    }
+    
 
-    if (deliveryPersonId) {
-      io.to(deliveryPersonId.toString()).emit("order_created", newOrder);
+    // Notify the specific admin who assigned this order
+    if (assignedBy) {
+      io.to(`admin_${assignedBy.toString()}`).emit("order_created", populatedOrder);
     }
 
-    io.to("admins").emit("order_created", newOrder);
-    io.emit("order_created_global", newOrder);
+    io.emit("order_created_global", populatedOrder);
 
     return res.status(201).json({
       message: "Order created successfully",
-      order: newOrder
+      order: populatedOrder
     });
 
   } catch (error) {
@@ -152,11 +184,16 @@ exports.createOrder = async (req, res) => {
 exports.getOrders = async (req, res) => {
   try {
     const user = req.user;
+    const userId = user._id.toString();
     const filter = {};
 
     // Delivery boy gets only his orders
     if (user?.role === "delivery-boy") {
-      filter.deliveryPersonId = user._id;
+      filter.deliveryPersonId = userId;
+    }
+    // Admin/SuperAdmin gets only orders they assigned
+    else if (user?.role === "admin" || user?.role === "superAdmin") {
+      filter.assignedBy = userId;
     }
 
     // Apply pagination using reusable function
@@ -166,7 +203,8 @@ exports.getOrders = async (req, res) => {
       req,
       [
         { path: "clientId", select: "name phone address" },
-        { path: "deliveryPersonId", select: "name phone" }
+        { path: "deliveryPersonId", select: "name phone email" },
+        { path: "assignedBy", select: "name role" }
       ]
     );
 
@@ -200,9 +238,11 @@ exports.updateOrder = async (req, res) => {
       // Restore old quantities (undo old reservation)
       for (let oldItem of existingOrder.items) {
         if (oldItem.productId) {
-          await Product.findByIdAndUpdate(oldItem.productId, {
+          const resRestore = await Product.findByIdAndUpdate(oldItem.productId, {
             $inc: { totalQuantity: Number(oldItem.quantity || 0) }
-          });
+          }, { new: true });
+          console.log(`Stock restored for product ${oldItem.productId}: +${oldItem.quantity}, newTotal: ${resRestore ? resRestore.totalQuantity : 'N/A'}`);
+          try { io.emit('product_updated', { productId: oldItem.productId, totalQuantity: resRestore ? resRestore.totalQuantity : null }); } catch (e) { console.error('Emit product_updated failed', e); }
         }
       }
 
@@ -210,9 +250,11 @@ exports.updateOrder = async (req, res) => {
       // Deduct new quantities
       for (let newItem of items) {
         if (newItem.productId) {
-          await Product.findByIdAndUpdate(newItem.productId, {
+          const resDeduct = await Product.findByIdAndUpdate(newItem.productId, {
             $inc: { totalQuantity: -Number(newItem.quantity || 0) }
-          });
+          }, { new: true });
+          console.log(`Stock deducted for product ${newItem.productId}: -${newItem.quantity}, newTotal: ${resDeduct ? resDeduct.totalQuantity : 'N/A'}`);
+          try { io.emit('product_updated', { productId: newItem.productId, totalQuantity: resDeduct ? resDeduct.totalQuantity : null }); } catch (e) { console.error('Emit product_updated failed', e); }
         }
       }
 
@@ -262,7 +304,9 @@ exports.updateOrder = async (req, res) => {
       );
 
       // Notify sockets
-      io.to("admins").emit("order_updated", updatedOrder);
+      if (updatedOrder.assignedBy) {
+        io.to(`admin_${updatedOrder.assignedBy.toString()}`).emit("order_updated", updatedOrder);
+      }
       if (updatedOrder.deliveryPersonId) {
         io.to(updatedOrder.deliveryPersonId.toString()).emit("order_updated", updatedOrder);
       }
@@ -291,7 +335,9 @@ exports.updateOrder = async (req, res) => {
     );
 
     // Notify sockets about status change
-    io.to("admins").emit("order_status_updated", updatedOrder);
+    if (updatedOrder.assignedBy) {
+      io.to(`admin_${updatedOrder.assignedBy.toString()}`).emit("order_status_updated", updatedOrder);
+    }
     if (updatedOrder.deliveryPersonId) {
       io.to(updatedOrder.deliveryPersonId.toString()).emit("order_status_updated", updatedOrder);
     }
@@ -325,12 +371,15 @@ exports.collectOrder = async (req, res) => {
     // ⭐ Populate before sending to client
     const updatedOrder = await Order.findById(id)
       .populate("clientId", "name phone address")
-      .populate("deliveryPersonId", "name phone");
+      .populate("deliveryPersonId", "name phone")
+      .populate("assignedBy", "name role");
 
     const io = req.app.get("io");
 
-    // Emit populated order
-    io.to("admins").emit("order_collected", updatedOrder);
+    // Emit populated order to the admin who assigned it
+    if (updatedOrder.assignedBy) {
+      io.to(`admin_${updatedOrder.assignedBy._id.toString()}`).emit("order_collected", updatedOrder);
+    }
 
     res.json({
       message: "Item collected successfully",
@@ -404,12 +453,19 @@ exports.updateOrderStatus = async (req, res) => {
     }
     const io = req.app.get("io");
 
-    // Notify admin panel
-    io.to("admins").emit("order_status_updated", updatedOrder);
+    // First, populate the order to get assignedBy field
+    await updatedOrder.populate("assignedBy", "name role");
+
+    // Notify the specific admin who assigned this order
+    if (updatedOrder.assignedBy) {
+      io.to(`admin_${updatedOrder.assignedBy._id.toString()}`).emit("order_status_updated", updatedOrder);
+    }
 
     // Notify delivery boy assigned to this order
-    io.to(updatedOrder.deliveryPersonId.toString())
-      .emit("order_status_updated", updatedOrder);
+    if (updatedOrder.deliveryPersonId) {
+      io.to(updatedOrder.deliveryPersonId.toString())
+        .emit("order_status_updated", updatedOrder);
+    }
 
     // // Optional global event
     // io.emit("order_status_updated_global", updatedOrder);
@@ -444,20 +500,23 @@ exports.deleteOrder = async (req, res) => {
     if (!order) return res.status(404).json({ message: "Order not found" });
 
     // STEP 2: Restore stock
+    const io = req.app.get("io");
     for (let item of order.items) {
       const restoreQty = Number(item.quantity) || 0;
 
       if (restoreQty > 0) {
-        await Product.findByIdAndUpdate(
+        const resRestore = await Product.findByIdAndUpdate(
           item.productId,
-          { $inc: { totalQuantity: restoreQty } }
+          { $inc: { totalQuantity: restoreQty } },
+          { new: true }
         );
+        console.log(`Stock restored on delete for product ${item.productId}: +${restoreQty}, newTotal: ${resRestore ? resRestore.totalQuantity : 'N/A'}`);
+        try { io.emit('product_updated', { productId: item.productId, totalQuantity: resRestore ? resRestore.totalQuantity : null }); } catch (e) { console.error('Emit product_updated failed', e); }
       }
     }
 
     // STEP 3: Delete the order after stock is restored
     await Order.findByIdAndDelete(id);
-    const io = req.app.get("io");
     io.emit("order_deleted", { orderId: id });
     return res.json({ message: "Order deleted successfully" });
 

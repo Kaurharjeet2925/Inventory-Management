@@ -14,7 +14,7 @@ const ViewOrders = () => {
   const [products, setProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const limit = 8;
+  const limit = 5;
   
   useEffect(() => {
     loadOrders(currentPage, limit);
@@ -52,7 +52,7 @@ const ViewOrders = () => {
     };
   }, []);
 
-  const loadOrders = async (page = 1, limit = 8) => {
+  const loadOrders = async (page = 1) => {
     try {
       setLoading(true);
       const res = await apiClient.get(`/orders?page=${page}&limit=${limit}`);
@@ -132,7 +132,8 @@ const ViewOrders = () => {
       <tr className="h-12">
         <th className="px-6 text-left">Order ID</th>
         <th className="px-6 text-left">Client</th>
-        <th className="px-6 text-left">Products</th>
+        <th className="px-6 text-left">Agent</th>
+        <th className="px-6 text-left w-96">Products</th>
         <th className="px-6 text-left">Qty</th>
         <th className="px-6 text-left">Warehouse</th>
         <th className="px-6 text-left">Date</th>
@@ -143,7 +144,7 @@ const ViewOrders = () => {
     </thead>
 
     {/* Table Body */}
-    <tbody className="text-gray-800">
+    <tbody className="text-gray-800 mb-4">
       {orders.length === 0 ? (
         <tr>
           <td colSpan="9" className="text-center py-6 text-gray-500">
@@ -171,15 +172,23 @@ const ViewOrders = () => {
                 {order.clientId?.name || "N/A"}
               </td>
 
-              <td className="px-6">
+              <td className="px-6 whitespace-nowrap">
+                {order.deliveryPersonId?.name || "N/A"}
+              </td>
+
+              <td className="px-6" style={{ minWidth: "300px" }}>
   {order.items.map((item, idx) => (
-    <div key={idx} className="flex items-center gap-2">
-      <span>
+    <div
+      key={idx}
+      className="flex items-center justify-between w-full mb-3 mt-1 whitespace-nowrap"
+      style={{ gap: "10px" }}
+    >
+      <span className="text-sm font-medium">
         {item.productName} ({item.quantityValue}{item.quantityUnit})
       </span>
 
       <span
-        className={`px-2 py-0.5 text-xs rounded font-semibold ${
+        className={`px-2 py-0.5 text-xs rounded font-semibold whitespace-nowrap ${
           item.collected
             ? "bg-green-100 text-green-700"
             : "bg-red-100 text-red-700"
@@ -192,17 +201,23 @@ const ViewOrders = () => {
 </td>
 
 
-              <td className="px-6">
-                {order.items.map((i, idx) => (
-                  <div key={idx}>{i.quantity}</div>
-                ))}
-              </td>
 
-              <td className="px-6">
-                {order.items.map((i, idx) => (
-                  <div key={idx}>{i.warehouseName}</div>
-                ))}
-              </td>
+<td className="px-6" style={{ minWidth: "80px" }}>
+  {order.items.map((i, idx) => (
+    <div key={idx} className="mb-3 whitespace-nowrap">
+      {i.quantity}
+    </div>
+  ))}
+</td>
+
+<td className="px-6" style={{ minWidth: "160px" }}>
+  {order.items.map((i, idx) => (
+    <div key={idx} className="mb-3 whitespace-nowrap">
+      {i.warehouseName}
+    </div>
+  ))}
+</td>
+
 
               <td className="px-6 whitespace-nowrap">
                 {new Date(order.createdAt).toLocaleDateString()}
@@ -270,13 +285,16 @@ const ViewOrders = () => {
     </tbody>
   </table>
 </div>
+<div className="mt-6">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </div> 
 </div>
 
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={(page) => setCurrentPage(page)}
-      /> 
+      
       {viewModal && (
         <EditOrderModal
           order={viewModal}

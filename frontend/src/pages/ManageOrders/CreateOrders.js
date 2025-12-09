@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../../apiclient/apiclient';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Edit3 } from 'lucide-react';
 import AddClient from '../ManageClient/AddClient';
 import socket from "../../socket/socketClient";
 
@@ -10,6 +10,7 @@ const CreateOrders = () => {
 
   const [deliveryPersons, setDeliveryPersons] = useState([]);
   const [orderItems, setOrderItems] = useState([]);
+  const [editingItemId, setEditingItemId] = useState(null);
 
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [qtyError, setQtyError] = useState("");
@@ -22,7 +23,7 @@ const CreateOrders = () => {
     totalAmount: "",
     paidAmount: "",
     balanceAmount: "",
-    paymentStatus: "unpaid",
+    paymentStatus: "COD",
   });
 
   const [itemForm, setItemForm] = useState({
@@ -50,6 +51,24 @@ const CreateOrders = () => {
     return () => {
       socket.off("order_created");
     };
+  }, []);
+
+  // Listen for product stock updates from server and update local product list
+  useEffect(() => {
+    const handleProductUpdated = ({ productId, totalQuantity }) => {
+      if (!productId) return;
+      setRawProducts((prev) =>
+        prev.map((p) => (p._id === productId ? { ...p, totalQuantity } : p))
+      );
+
+      // Also update warehouseOptions if present
+      setWarehouseOptions((prev) =>
+        prev.map((w) => (w.id === productId ? { ...w, stock: totalQuantity } : w))
+      );
+    };
+
+    socket.on("product_updated", handleProductUpdated);
+    return () => socket.off("product_updated", handleProductUpdated);
   }, []);
   
   /* -------------------------------------------------------
@@ -223,9 +242,7 @@ const CreateOrders = () => {
     setItemForm({ ...itemForm, [name]: value });
   };
 
-  /* -------------------------------------------------------
-      ADD ITEM
-  -------------------------------------------------------- */
+
   const addItem = () => {
     if (!itemForm.productId) return alert("Select a product");
     if (!selectedWarehouseId) return alert("Select a warehouse");
@@ -249,14 +266,17 @@ const CreateOrders = () => {
   
     setOrderItems([...orderItems, itemToAdd]);
   
-    // Do NOT reset productId, do NOT reset warehouses
+    // Clear product selection and reset item inputs after adding
     setItemForm({
-      productId: itemForm.productId,
+      productId: "",
       productName: "",
       quantity: "",
-      unitType: itemForm.unitType,
-      price: itemForm.price,
+      unitType: "",
+      price: "",
     });
+
+    // clear editing flag after add/update
+    setEditingItemId(null);
   
     setSelectedWarehouseId("");
     setQtyError("");
@@ -266,6 +286,24 @@ const CreateOrders = () => {
    
   const removeItem = (id) => {
     setOrderItems(orderItems.filter((item) => item.id !== id));
+  };
+
+  const handleEditItem = (item) => {
+    // populate form with selected item
+    setItemForm({
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitType: item.quantityUnit || item.unitType || "",
+      price: item.price,
+    });
+
+    setSelectedWarehouseId(item.warehouseId);
+
+    // remove item from list so it can be updated when user clicks Add/Update
+    setOrderItems(orderItems.filter((it) => it.id !== item.id));
+    setQtyError("");
+    setEditingItemId(item.id);
   };
   useEffect(() => {
     const total = orderItems.reduce((sum, item) => sum + (item.quantity * item.price), 0);
@@ -286,7 +324,7 @@ const CreateOrders = () => {
       balanceAmount: balance >= 0 ? balance : 0,
       paymentStatus:
         paid === 0
-          ? "unpaid"
+          ? "cod"
           : paid >= total
           ? "paid"
           : "partial",
@@ -335,7 +373,7 @@ const CreateOrders = () => {
         totalAmount: "",
         paidAmount: "",
         balanceAmount: "",
-        paymentStatus: "unpaid",
+        paymentStatus: "cod",
       });
 
       setSelectedWarehouseId("");
@@ -421,10 +459,10 @@ const CreateOrders = () => {
   <h2 className="text-xl font-bold mb-4">Order Items</h2>
 
   {/* 3-column layout: Product – Stock – Add */}
-  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4 items-end">
+  <div className="grid grid-cols-1 sm:grid-cols-7 gap-3 mb-4 items-end">
 
     {/* PRODUCT SELECT */}
-    <div className="sm:col-span-1">
+    <div className="sm:col-span-2">
       <label className="block text-sm font-semibold mb-1">Product</label>
 
       <SearchableSelect
@@ -460,7 +498,7 @@ const CreateOrders = () => {
         placeholder="Search product..."
       />
     </div>
-    <div>
+    <div className="sm:col-span-2">
   <label className="font-semibold">Warehouse</label>
   <select
     value={selectedWarehouseId}
@@ -494,10 +532,10 @@ const CreateOrders = () => {
 <input
   type="number"
   className="border rounded p-2 w-full"
-  value={itemForm.price}
-  onChange={(e) => setItemForm({ ...itemForm, price: Number(e.target.value) })}
+  value={itemForm.price ?? ""}
+  onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
   placeholder="Enter price"
-/>
+/> 
 
 </div>
     {/* STOCK (order quantity) */}
@@ -558,9 +596,17 @@ const CreateOrders = () => {
           !selectedWarehouseId ||
           warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
         }
-        className="w-full bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center justify-center gap-2"
+        className="w-full bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center justify-center gap-2 h-10"
       >
-        <Plus size={18} /> Add
+        {editingItemId ? (
+          <>
+            <Edit3 size={16} /> Update
+          </>
+        ) : (
+          <>
+            <Plus size={18} /> Add
+          </>
+        )}
       </button>
     </div>
 
@@ -597,11 +643,21 @@ const CreateOrders = () => {
              ₹{Number(item.quantity) * Number(item.price || 0)}
            </td>
          
-           <td className="p-4 text-left">
+           <td className="p-4 text-left flex items-center gap-2">
+             <button
+               type="button"
+               onClick={() => handleEditItem(item)}
+               className="text-blue-500 hover:text-blue-700"
+               title="Edit"
+             >
+               <Edit3 size={18} />
+             </button>
+
              <button
                type="button"
                onClick={() => removeItem(item.id)}
                className="text-red-500 hover:text-red-700"
+               title="Remove"
              >
                <Trash2 size={18} />
              </button>

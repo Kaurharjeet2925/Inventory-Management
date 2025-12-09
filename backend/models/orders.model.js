@@ -10,6 +10,11 @@ const orderSchema = new mongoose.Schema(
       ref: "Users",
       required: true
     },
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users",
+      required: true
+    },
     items: [
       {
         productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },

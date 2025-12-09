@@ -55,6 +55,15 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
     if (!order || rawProducts.length === 0) return;
 
     const rebuilt = order.items.map((it) => {
+      // Safety check for undefined items
+      if (!it || !it.productName) {
+        return {
+          ...it,
+          warehouseOptions: [],
+          warehouseId: it?.warehouseId || "",
+        };
+      }
+
       const whList = getWarehouses(it.productName, it.quantityValue, it.unitType);
       return {
         ...it,
@@ -78,6 +87,16 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
 
     setOriginalItems(JSON.parse(JSON.stringify(rebuilt)));
   }, [order, rawProducts]);
+
+  // Scroll edited row into view when edit mode opens
+  useEffect(() => {
+    if (editingIndex === null) return;
+    const id = `item-row-${editingIndex}`;
+    const el = document.getElementById(id);
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [editingIndex]);
 
   if (!form) return null;
 
@@ -126,10 +145,39 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
   };
 
   const cancelInlineEdit = (index) => {
+    // If item doesn't exist in originalItems, it's a new item being added, so delete it
+    if (!originalItems[index]) {
+      const updated = form.items.filter((_, i) => i !== index);
+      setForm({ ...form, items: updated });
+      setEditingIndex(null);
+      return;
+    }
+
+    // Otherwise restore from originalItems
     const updated = [...form.items];
     updated[index] = originalItems[index];
     setForm({ ...form, items: updated });
     setEditingIndex(null);
+  };
+
+  // Ensure warehouse options exist for an item before editing
+  const startInlineEdit = (index) => {
+    const item = form.items[index];
+    if (!item) return setEditingIndex(index);
+
+    // populate warehouseOptions if empty
+    if (!item.warehouseOptions || item.warehouseOptions.length === 0) {
+      const whList = getWarehouses(item.productName, item.quantityValue, item.unitType);
+      updateField(index, "warehouseOptions", whList);
+
+      if (!item.warehouseId && whList.length > 0) {
+        updateField(index, "warehouseId", whList[0].id);
+        updateField(index, "warehouseName", whList[0].warehouseName);
+        updateField(index, "warehouseAddress", whList[0].warehouseAddress);
+      }
+    }
+
+    setEditingIndex(index);
   };
 
   const saveOrder = () => {
@@ -192,6 +240,11 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           </div>
 
           <div>
+            <p className="text-gray-600 text-sm">Agent</p>
+            <p className="font-semibold text-lg">{form.deliveryPersonId?.name || "N/A"}</p>
+          </div>
+
+          <div>
             <p className="text-gray-600 text-sm">Status</p>
             <select
               disabled={viewOnly}
@@ -240,11 +293,8 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
         {/* ITEMS LIST */}
         <div className="bg-gray-50 p-4 rounded-lg space-y-4">
           {form.items.map((item, idx) => {
-            const whSelected =
-              item.warehouseOptions?.find((w) => w.id === item.warehouseId) || {};
-
             return (
-              <div key={idx} className="border-b pb-4 last:border-b-0">
+              <div key={idx} id={`item-row-${idx}`} className="border-b pb-4 last:border-b-0">
                 {editingIndex === idx && itemsEditable ? (
                   // --------------------
                   // Edit Mode
@@ -281,12 +331,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                     </div>
 
                     {/* Price */}
-                    <input
-                      type="number"
-                      className="border rounded-lg px-3 py-2.5 bg-gray-100"
-                      value={item.price}
-                      readOnly
-                    />
+                   
 
                     {/* Warehouse */}
                     <select
@@ -302,13 +347,19 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                       }}
                     >
                       <option value="">Select</option>
-                      {item.warehouseOptions?.map((w) => (
+                      {(item.warehouseOptions || [])?.map((w) => (
                         <option key={w.id} value={w.id}>
                           {w.warehouseName} (Stock {w.stock})
                         </option>
                       ))}
                     </select>
-
+                    <input
+                      type="number"
+                      className="border rounded-lg px-3 py-2.5"
+                      value={item.price ?? ""}
+                      onChange={(e) => updateField(idx, "price", e.target.value)}
+                      placeholder="price"
+                    />
                     {/* Quantity */}
                     <input
                       type="number"
@@ -350,7 +401,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
                         <div className="flex gap-3">
                           <Pencil
                             size={18}
-                            onClick={() => setEditingIndex(idx)}
+                            onClick={() => startInlineEdit(idx)}
                             className="cursor-pointer text-blue-600"
                           />
                           <Trash2

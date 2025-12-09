@@ -63,9 +63,6 @@ const io = new Server(server, {
 // Make io available in controllers
 app.set("io", io);
 
-// ------------------------
-// SOCKET AUTH (JWT)
-// ------------------------
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth?.token;
@@ -98,14 +95,15 @@ io.use(async (socket, next) => {
 io.on("connection", (socket) => {
   console.log("⚡ Socket connected:", socket.id, "User:", socket.user?.name);
 
-  // Auto join room by user id (delivery boy)
+  // Auto join room by user id (delivery boy and admin)
   socket.join(socket.user._id.toString());
   console.log(`➡️ Joined room: ${socket.user._id}`);
 
   // Admin rooms
   if (socket.user.role === "admin" || socket.user.role === "superAdmin") {
     socket.join("admins");
-    console.log(`👑 Joined admins room`);
+    socket.join(`admin_${socket.user._id.toString()}`);
+    console.log(`👑 Joined admins room and admin_${socket.user._id.toString()}`);
   }
 
   socket.on("disconnect", () => {
