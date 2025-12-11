@@ -2,6 +2,7 @@
 const express = require("express");
 const { verify } = require("jsonwebtoken");
 const User = require("./models/user.model");
+const mongoose = require("mongoose");
 
 const http = require("http");
 const { Server } = require("socket.io");
@@ -9,6 +10,14 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./config/db");
+const ProductRoutes = require("./routes/product.routes");
+const CategoryRoutes = require("./routes/category.routes");
+const BrandRoutes = require("./routes/brands.routes");
+const OrderRoutes = require("./routes/orders.routes");
+const ClientRoutes = require("./routes/client.routes");
+const LocationRoutes = require("./routes/location.routes");
+const ReportRoutes = require("./routes/report.routes");
+const UserRoutes = require("./routes/user.routes");
 
 // Load environment & DB
 dotenv.config();
@@ -41,13 +50,14 @@ app.use((req, res, next) => {
 });
 
 
-app.use("/api", require("./routes/brands.routes"));
-app.use("/api", require("./routes/category.routes"));
-app.use("/api", require("./routes/product.routes"));
-app.use("/api", require("./routes/orders.routes"));
-app.use("/api/clients", require("./routes/client.routes"));
-app.use("/api", require("./routes/location.routes"));
-app.use("/api", require("./routes/user.routes"));
+app.use("/api", BrandRoutes);
+app.use("/api", CategoryRoutes);
+app.use("/api", ProductRoutes);
+app.use("/api", OrderRoutes);
+app.use("/api/clients", ClientRoutes);
+app.use("/api", LocationRoutes);
+app.use("/api", ReportRoutes);
+app.use("/api", UserRoutes);
 
 
 const server = http.createServer(app);

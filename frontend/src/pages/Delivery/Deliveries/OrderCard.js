@@ -143,7 +143,7 @@ const OrderCard = ({ order, reload }) => {
             onClick={() => updateStatus(order._id, "completed")}
             className="flex-1 bg-purple-500 text-white py-2 rounded"
           >
-            Mark Delivered
+            Mark completed
           </button>
         </div>
       )}

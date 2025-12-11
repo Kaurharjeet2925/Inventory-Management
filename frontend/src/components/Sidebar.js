@@ -8,6 +8,7 @@ const Sidebar = () => {
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [clientsOpen, setClientsOpen] = useState(false);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const location = useLocation();
 
   const handleLogout = () => {
@@ -33,6 +34,9 @@ const Sidebar = () => {
   useEffect(() => {
     setDeliveryOpen(location.pathname.startsWith("/agent"));
   }, [location.pathname]);
+  useEffect(() => {
+    setReportsOpen(location.pathname.startsWith("/reports"));
+  }, [location.pathname]);
   const linkClass = ({ isActive }) =>
     `block px-4 py-2 rounded hover:bg-gray-700 ${
       isActive ? "bg-gray-800 text-white" : "text-gray-300"
@@ -45,30 +49,43 @@ const Sidebar = () => {
       setOrdersOpen(false);
       setClientsOpen(false);
       setDeliveryOpen(false);
+      setReportsOpen(false);
     } else if (menu === 'product') {
       setProductOpen(!productOpen);
       setProfileOpen(false);
       setOrdersOpen(false);
       setClientsOpen(false);
       setDeliveryOpen(false);
+      setReportsOpen(false);
     } else if (menu === 'orders') {
       setOrdersOpen(!ordersOpen);
       setProfileOpen(false);
       setProductOpen(false);
       setClientsOpen(false);
       setDeliveryOpen(false);
+      setReportsOpen(false);
     } else if (menu === 'clients') {
       setClientsOpen(!clientsOpen);
       setProfileOpen(false);
       setProductOpen(false);
       setOrdersOpen(false);
       setDeliveryOpen(false);
+      setReportsOpen(false);
     } else if (menu === 'agent') {
       setDeliveryOpen(!deliveryOpen);
       setProfileOpen(false);
       setProductOpen(false);
       setOrdersOpen(false);
       setClientsOpen(false);
+      setReportsOpen(false);
+    }
+    else if (menu === 'reports') {
+      setReportsOpen(!reportsOpen);
+      setProfileOpen(false);
+      setProductOpen(false);
+      setOrdersOpen(false);
+      setClientsOpen(false);
+      setDeliveryOpen(false);
     }
   };
 
@@ -180,10 +197,31 @@ const Sidebar = () => {
              
             </div>
            )}
-         
+          <button
+            onClick={() => handleMenuToggle('reports')}
+            className={`w-full text-left px-4 py-2 rounded flex justify-between hover:bg-gray-700 ${
+              reportsOpen ? "bg-gray-800 text-white" : "text-gray-300"
+            }`}
+          >
+            <span>Reports</span>
+            <span>{reportsOpen ? "▾" : "▸"}</span>
+          </button>
+
+          {reportsOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              <NavLink to="/reports/sales-reports" className={linkClass}>
+                Sales Reports
+              </NavLink>
+              <NavLink to="/reports/inventory-reports" className={linkClass}>
+                Inventory Reports
+              </NavLink>
+            </div>
+          )}
+
           <NavLink to="/agent/agent-dashboard" className={linkClass}>
             Agent Dashboard
           </NavLink>
+
         </nav>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
     <button

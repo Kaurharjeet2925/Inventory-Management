@@ -8,6 +8,9 @@ const Client = () => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+const [selectedClient, setSelectedClient] = useState(null);
+
 
   useEffect(() => {
     fetchClients();
@@ -44,9 +47,18 @@ const Client = () => {
     }
   };
 
-  const handleAddClient = (newClient) => {
-    setClients([...clients, newClient]);
+  const handleAddClient = (client, editMode) => {
+    if (editMode) {
+      // 🔥 Update existing client
+      setClients(prev =>
+        prev.map(c => (c._id === client._id ? client : c))
+      );
+    } else {
+      // ➕ Add new client
+      setClients(prev => [...prev, client]);
+    }
   };
+  
 
   return (
     <div className="ml-64 mt-12 p-6">
@@ -84,40 +96,52 @@ const Client = () => {
       {!loading && (
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="w-full border-collapse">
-            <thead className="bg-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Phone</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Address</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">City</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
+          <thead className="bg-gray-200">
+  <tr>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Phone</th>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Address</th>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">City</th>
+    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
+  </tr>
+         </thead>
+
             <tbody>
               {filteredClients.length > 0 ? (
                 filteredClients.map((client) => (
                   <tr key={client._id} className="border-b hover:bg-gray-50 transition">
-                    <td className="px-6 py-3 text-gray-800">{client.name}</td>
-                    <td className="px-6 py-3 text-gray-800">{client.email}</td>
-                    <td className="px-6 py-3 text-gray-800">{client.phone}</td>
-                    <td className="px-6 py-3 text-gray-800">{client.address || '-'}</td>
-                    <td className="px-6 py-3 text-gray-800">{client.city || '-'}</td>
-                    <td className="px-6 py-3 space-x-2">
-                      <button
-                        onClick={() => console.log('Edit', client._id)}
-                        className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(client._id)}
-                        className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+  <td className="px-6 py-3 text-gray-800">{client.name}</td>
+  <td className="px-6 py-3 text-gray-800">{client.email}</td>
+  <td className="px-6 py-3 text-gray-800">{client.phone}</td>
+
+  {/* New Company Column */}
+  <td className="px-6 py-3 text-gray-800">{client.companyName || '-'}</td>
+
+  <td className="px-6 py-3 text-gray-800">{client.address || '-'}</td>
+  <td className="px-6 py-3 text-gray-800">{client.city || '-'}</td>
+  
+  <td className="px-6 py-3 space-x-2">
+  <button
+  onClick={() => {
+    setSelectedClient(client);
+    setIsEdit(true);
+    setIsAddClientOpen(true);
+  }}
+      className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition"
+    >
+      Edit
+    </button>
+    <button
+      onClick={() => handleDelete(client._id)}
+      className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition"
+    >
+      Delete
+    </button>
+  </td>
+</tr>
+
                 ))
               ) : (
                 <tr>
@@ -133,10 +157,17 @@ const Client = () => {
 
       {/* Add Client Modal */}
       <AddClient 
-        isOpen={isAddClientOpen} 
-        onClose={() => setIsAddClientOpen(false)} 
-        onAddClient={handleAddClient} 
-      />
+  isOpen={isAddClientOpen}
+  onClose={() => {
+    setIsAddClientOpen(false);
+    setIsEdit(false);
+    setSelectedClient(null);
+  }}
+  onAddClient={handleAddClient}
+  clientData={selectedClient}
+  isEdit={isEdit}
+/>
+
     </div>
   );
 };

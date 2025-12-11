@@ -130,9 +130,7 @@ const CreateOrders = () => {
     loadProducts();
   }, []);
 
-  /* -------------------------------------------------------
-      SEARCHABLE DROPDOWN COMPONENT
-  -------------------------------------------------------- */
+ 
   const SearchableSelect = ({ options = [], value, onChange, placeholder }) => {
     const [query, setQuery] = useState("");
     const [open, setOpen] = useState(false);
@@ -427,8 +425,9 @@ const CreateOrders = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div><b>Name:</b> {selectedClient.name}</div>
                 <div><b>Phone:</b> {selectedClient.phone}</div>
+                <div><b>Company:</b> {selectedClient.companyName || '-'}</div>
                 <div><b>Email:</b> {selectedClient.email}</div>
-                <div><b>City:</b> {selectedClient.city}</div>
+               
               </div>
             </div>
           )}

@@ -1,7 +1,6 @@
-const express = require("express");
-const router = express.Router();
-const { downloadSalesReport } = require("../controllers/report.controller");
+const router = require("express").Router();
+const { generateDailySalesReport } = require("../controller/report.controller");
 
-router.get("/sales-report", downloadSalesReport);
+router.get("/daily-sales", generateDailySalesReport);
 
 module.exports = router;

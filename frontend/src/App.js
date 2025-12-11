@@ -28,8 +28,10 @@ import DeliveredOrders from './pages/Delivery/Deliveries/DeliveredOrders.js';
 import socket from "../src/socket/socketClient.js"; 
 import NotificationHandler from './components/NotificationHandler.js';
 import { useEffect } from 'react';
-
+import SalesReports from './pages/Reports/SalesReports.js';
+import InventoryReports from './pages/Reports/InventoryReports.js';
 import { NotificationProvider } from "./context/NotificationContext";
+import Reports from './pages/Reports/Reports.js';
 
 function App() {
   useEffect(() => {
@@ -79,7 +81,11 @@ function App() {
           <Route path="generate-order" element={<CreateOrders />} />
           <Route path="view-order" element={<ViewOrders />} />
         </Route>
-
+        <Route path="reports" element={<Reports />}>
+            {/* <Route index element={<Reports />} /> */}
+            <Route path="sales-reports" element={<SalesReports />} />
+            <Route path="inventory-reports" element={<InventoryReports />} />
+          </Route>
         <Route path="/agent" element={<Agent />}>
           <Route path="agent-dashboard" element={<AgentDashboard />} />
 
@@ -90,6 +96,7 @@ function App() {
             <Route path="delivered" element={<DeliveredOrders />} />
             <Route path="completed" element={<CompletedOrders />} />
           </Route>
+          
         </Route>
       </Routes>
     </NotificationProvider>
