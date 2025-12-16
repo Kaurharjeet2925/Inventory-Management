@@ -15,6 +15,7 @@ const orderSchema = new mongoose.Schema(
       ref: "Users",
       required: true
     },
+
     items: [
       {
         productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
@@ -32,6 +33,17 @@ const orderSchema = new mongoose.Schema(
       }
 
     ],
+    paymentDetails: {
+  totalAmount: { type: Number, required: true },
+  paidAmount: { type: Number, default: 0 },
+  balanceAmount: { type: Number, default: 0 },
+  paymentStatus: {
+    type: String,
+    enum: ["cod", "paid", "partial"],
+    default: "cod",
+  },
+},
+
     collected: { type: Boolean, default: false },
     notes: String,
     status: { type: String, default: "pending" }, 

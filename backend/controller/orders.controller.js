@@ -117,17 +117,20 @@ exports.createOrder = async (req, res) => {
     }
 
 
-    const paid = Number(paymentDetails?.paidAmount || 0);
-    const balance = totalAmount - paid;
+   const paid = Math.max(Number(paymentDetails?.paidAmount) || 0, 0);
+const balance = Math.max(totalAmount - paid, 0);
 
-    const finalPaymentDetails = {
-      totalAmount,
-      paidAmount: paid,
-      balanceAmount: balance < 0 ? 0 : balance,
-      paymentStatus:
-        paid === 0 ? "COD" :
-        paid >= totalAmount ? "paid" : "partial"
-    };
+const finalPaymentDetails = {
+  totalAmount,
+  paidAmount: paid,
+  balanceAmount: balance,
+  paymentStatus:
+    paid === 0
+      ? "cod"
+      : paid >= totalAmount
+      ? "paid"
+      : "partial",
+};
 
     // -----------------------------------------------------
     // Save Order
@@ -144,10 +147,12 @@ exports.createOrder = async (req, res) => {
     });
 
     // Fetch and populate order before emitting via socket
-    const populatedOrder = await Order.findById(newOrder._id)
-      .populate("deliveryPersonId", "name phone email")
-      .populate("assignedBy", "name role")
-      .populate("clientId", "name phone address");
+   const populatedOrder = await Order.findById(newOrder._id)
+  .select("+paymentDetails") // ✅ ADD THIS
+  .populate("deliveryPersonId", "name phone email")
+  .populate("assignedBy", "name role")
+  .populate("clientId", "name phone address");
+
 
       let dpId =
       typeof deliveryPersonId === "string"
@@ -169,7 +174,7 @@ exports.createOrder = async (req, res) => {
     }
 
     io.emit("order_created_global", populatedOrder);
-
+  console.log("FINAL PAYMENT DETAILS =>", finalPaymentDetails);
     return res.status(201).json({
       message: "Order created successfully",
       order: populatedOrder
@@ -288,8 +293,13 @@ exports.updateOrder = async (req, res) => {
           totalAmount,
           paidAmount: paid,
           balanceAmount: balance < 0 ? 0 : balance,
-          paymentStatus:
-            paid === 0 ? "COD" : paid >= totalAmount ? "paid" : "partial",
+        paymentStatus:
+  paid === 0
+    ? "cod"
+    : paid >= totalAmount
+    ? "paid"
+    : "partial",
+
         },
       },
       { new: true }
@@ -347,7 +357,8 @@ exports.updateOrderPayment = async (req, res) => {
     const finalPaid = previousPaid + addedPaid;
     const balance = Math.max(totalAmount - finalPaid, 0);
 
-    let paymentStatus = "unpaid";
+   let paymentStatus = "cod";
+
     if (finalPaid >= totalAmount) paymentStatus = "paid";
     else if (finalPaid > 0) paymentStatus = "partial";
 
@@ -588,7 +599,8 @@ const payment = {
   balanceAmount:
     order.paymentDetails?.balanceAmount ??
     calculatedTotal - (order.paymentDetails?.paidAmount || 0),
-  paymentStatus: order.paymentDetails?.paymentStatus || "COD",
+    paymentStatus: order.paymentDetails?.paymentStatus || "cod",
+
 };
 
     // Create PDF

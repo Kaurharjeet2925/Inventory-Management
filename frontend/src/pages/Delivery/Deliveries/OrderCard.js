@@ -9,12 +9,10 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
-const OrderCard = ({ order, reload }) => {
+  const OrderCard = ({ order, reload, viewOnly = false, onClose }) => {
   const [payAmount, setPayAmount] = useState("");
 
-  // ---------------------------
-  // STATUS HELPERS
-  // ---------------------------
+
   const getStatusColor = (status) => {
     switch (status) {
       case "pending":
@@ -125,6 +123,15 @@ const OrderCard = ({ order, reload }) => {
 
   return (
     <div className="bg-white rounded-lg shadow p-4 border border-gray-200 mb-4">
+      {viewOnly && (
+  <button
+    onClick={onClose}
+    className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+  >
+    ✕
+  </button>
+)}
+
       {/* HEADER */}
       <div className="flex justify-between items-start mb-4">
         <div>
@@ -230,6 +237,7 @@ const OrderCard = ({ order, reload }) => {
 
         {/* INPUT ONLY WHEN DELIVERED */}
         {order.status === "delivered" && paymentStatus !== "paid" && (
+          
           <div className="flex gap-2 mt-3">
             <input
               type="number"
@@ -249,7 +257,8 @@ const OrderCard = ({ order, reload }) => {
       </div>
 
       {/* STATUS ACTIONS */}
-      {order.items?.every((i) => i.collected) &&
+      {!viewOnly &&
+      order.items?.every((i) => i.collected) &&
         order.status === "pending" && (
           <button
             onClick={() => updateStatus(order._id, "shipped")}

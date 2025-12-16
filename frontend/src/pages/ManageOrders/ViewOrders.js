@@ -5,6 +5,22 @@ import EditOrderModal from './EditOrderModel';
 import socket from "../../socket/socketClient";
 import Pagination from '../../components/Pagination';
 import { FaFileInvoice } from 'react-icons/fa';
+
+const getPaymentBadge = (status) => {
+  const styles = {
+    paid: "bg-green-100 text-green-700",
+    partial: "bg-orange-100 text-orange-700",
+    cod: "bg-gray-100 text-gray-700",
+    unpaid: "bg-gray-100 text-gray-700",
+  };
+  return styles[status?.toLowerCase()] || "bg-gray-100 text-gray-700";
+};
+
+const formatPaymentStatus = (status) => {
+  if (!status) return "COD";
+  return status.toUpperCase();
+};
+
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -208,7 +224,9 @@ const ViewOrders = () => {
         <th className="px-6 text-left">Warehouse</th>
         <th className="px-6 text-left">Date</th>
         <th className="px-6 text-left">Status</th>
-        <th className="px-6 text-left">Amount</th>
+        <th className="px-6 text-left">Payment</th>
+        <th className="px-6 text-left">Amount</th>      
+        <th className="px-6 text-left">Balance</th>
         <th className="px-6 text-center">Actions</th>
       </tr>
     </thead>
@@ -223,11 +241,22 @@ const ViewOrders = () => {
         </tr>
       ) : (
         filteredOrders.map((order) => {
-          const calculatedTotal = order.items.reduce(
-            (sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0),
-            0
-          );
-          const totalAmount = order.paymentDetails?.totalAmount ?? calculatedTotal;
+         const calculatedTotal = order.items.reduce(
+  (sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0),
+  0
+);
+
+const totalAmount =
+  order.paymentDetails?.totalAmount ?? calculatedTotal;
+
+const paidAmount = order.paymentDetails?.paidAmount ?? 0;
+
+const balanceAmount =
+  order.paymentDetails?.balanceAmount ??
+  Math.max(totalAmount - paidAmount, 0);
+
+const paymentStatus =
+  order.paymentDetails?.paymentStatus || "cod";
 
           return (
             <tr
@@ -302,10 +331,23 @@ const ViewOrders = () => {
                   {formatStatus(order.status)}
                 </span>
               </td>
+              <td className="px-6 whitespace-nowrap">
+  <span
+    className={`px-3 py-1 rounded text-xs font-semibold ${getPaymentBadge(
+      paymentStatus
+    )}`}
+  >
+    {formatPaymentStatus(paymentStatus)}
+  </span>
+</td>
 
               <td className="px-6 font-semibold text-green-700">
-                ₹{totalAmount}
-              </td>
+  ₹{totalAmount}
+</td>
+
+              <td className="px-6 font-semibold text-red-600 whitespace-nowrap">
+  ₹{balanceAmount}
+</td>
 
               {/* Actions */}
               <td className="px-6 text-center">

@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { apiClient } from "../../apiclient/apiclient";
 import socket from "../../socket/socketClient";
-import { useNavigate } from "react-router-dom";
-
+//import { useNavigate } from "react-router-dom";
+import OrderCard from "../Delivery/Deliveries/OrderCard";
+import {Eye} from "lucide-react";
 const DeliveriesList = () => {
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState("");
-
+ const [viewModal, setViewModal] = useState(null);
   const loadOrders = async () => {
     const res = await apiClient.get("/orders?page=1&limit=100");
     setOrders(res.data.data || []);
@@ -74,6 +75,7 @@ const DeliveriesList = () => {
                   </td>
 
                   <td className="px-3 py-2 text-gray-600">
+                 
                     {new Date(order.createdAt).toLocaleDateString()}
                   </td>
 
@@ -96,14 +98,14 @@ const DeliveriesList = () => {
                   </td>
 
                   <td className="px-3 py-2 text-center">
-                    <button
-                      onClick={() =>
-                        navigate(`/agent/delivery/${order._id}`)
-                      }
-                      className="text-blue-600 text-xs font-medium"
-                    >
-                      View
-                    </button>
+                  <button
+                                      onClick={() =>
+                                        setViewModal({ ...order, viewOnly: true })
+                                      }
+                                      className="text-blue-600 hover:text-blue-800"
+                                    >
+                                      <Eye size={18} />
+                                    </button>
                   </td>
                 </tr>
               ))
@@ -111,6 +113,14 @@ const DeliveriesList = () => {
           </tbody>
         </table>
       </div>
+         {viewModal && (
+              <OrderCard
+                order={viewModal}
+                viewOnly={true}
+                onClose={() => setViewModal(null)}
+                onSave={() => {}}
+              />
+            )}
     </div>
   );
 };

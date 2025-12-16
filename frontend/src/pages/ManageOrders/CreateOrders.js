@@ -312,22 +312,26 @@ const CreateOrders = () => {
   /* -------------------------------------------------------
       BALANCE CALCULATION
   -------------------------------------------------------- */
-  useEffect(() => {
-    const total = Number(amountData.totalAmount || 0);
-    const paid = Number(amountData.paidAmount || 0);
-    const balance = total - paid;
+ useEffect(() => {
+  const total = Number(amountData.totalAmount || 0);
+  const paid = Number(amountData.paidAmount || 0);
 
-    setAmountData((prev) => ({
-      ...prev,
-      balanceAmount: balance >= 0 ? balance : 0,
-      paymentStatus:
-        paid === 0
-          ? "cod"
-          : paid >= total
-          ? "paid"
-          : "partial",
-    }));
-  }, [amountData.totalAmount, amountData.paidAmount]);
+  const balance = Math.max(total - paid, 0);
+
+  let status = "COD";
+  if (paid >= total && total > 0) {
+    status = "PAID";
+  } else if (paid > 0 && paid < total) {
+    status = "PARTIAL";
+  }
+
+  setAmountData(prev => ({
+    ...prev,
+    balanceAmount: balance,
+    paymentStatus: status,
+  }));
+}, [amountData.totalAmount, amountData.paidAmount]);
+
 
   /* -------------------------------------------------------
       SUBMIT ORDER
@@ -341,16 +345,18 @@ const CreateOrders = () => {
 
     if (!amountData.totalAmount) return alert("Total amount required");
 
-    const payload = {
-      clientId: selectedClientId,
-      deliveryPersonId: selectedDeliveryPersonId,
+   const payload = {
+  clientId: selectedClientId,
+  deliveryPersonId: selectedDeliveryPersonId,
 
-      paymentDetails: amountData,
-      items: orderItems,
+  paymentDetails: {
+    paidAmount: Number(amountData.paidAmount) || 0,
+  },
 
-      notes: formData.notes,
-      status: "pending",
-    };
+  items: orderItems,
+  notes: formData.notes,
+  status: "pending",
+};
 
     try {
       await apiClient.post("/orders", payload);
@@ -693,8 +699,12 @@ const CreateOrders = () => {
                 type="number"
                 value={amountData.paidAmount}
                 onChange={(e) =>
-                  setAmountData({ ...amountData, paidAmount: e.target.value })
-                }
+                 setAmountData({
+                   ...amountData,
+                paidAmount: Number(e.target.value) || 0,
+                })
+               }
+
                 className="border p-2 rounded w-full"
               />
             </div>

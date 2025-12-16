@@ -71,31 +71,32 @@ const SalesReport = () => {
 
   /* ================= DOWNLOAD ================= */
   const downloadExcel = async () => {
-    try {
-      const res = await apiClient.get(
-        `/daily-sales?start=${from}&end=${to}&download=true`,
-        {
-          responseType: "blob",
-        }
-      );
-  
-      const blob = new Blob([res.data], {
-        type:
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-  
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "DailySalesReport.xlsx";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) {
-      console.error(err);
-      alert("You are not authorized to download this report");
-    }
-  };
+  try {
+    const res = await apiClient.get(
+      `/daily-sales?start=${from}&end=${to}&download=true&search=${search}`,
+      {
+        responseType: "blob",
+      }
+    );
+
+    const blob = new Blob([res.data], {
+      type:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "DailySalesReport.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (err) {
+    console.error(err);
+    alert("You are not authorized to download this report");
+  }
+};
+
   
 
   return (
@@ -312,42 +313,67 @@ const SalesReport = () => {
       {/* ================= SALES TABLE ================= */}
       <div className="bg-white rounded-xl shadow p-6">
         <h3 className="text-lg font-semibold mb-4">Sales Details</h3>
+ <div className="max-h-[400px] overflow-y-auto">
+    <table className="w-full border border-collapse">
+       <thead className="sticky top-0 bg-slate-100 z-10">
+        <tr>
+    <th className="border p-2">Order ID</th>
+    <th className="border p-2">Date</th>
+    <th className="border p-2">Client</th>
+    <th className="border p-2">Products</th>
+    <th className="border p-2">Total</th>
+    <th className="border p-2">Paid</th>
+    <th className="border p-2">Balance</th>
+    <th className="border p-2">Payment Status</th>
+    <th className="border p-2">Order Status</th>
+  </tr>
+</thead>
 
-        <table className="w-full border">
-          <thead className="bg-slate-100 ">
-            <tr>
-              <th className="border p-2">Order ID</th>
-              <th className="border p-2">Date</th>
-              <th className="border p-2">Customer</th>
-              <th className="border p-2">Amount</th>
-              <th className="border p-2">Status</th>
-            </tr>
-          </thead>
+
           <tbody>
-          {filteredTable.map((row) => (
-              <tr key={row.orderId}>
-                <td className="border p-2 text-center">{row.orderId}</td>
-                <td className="border p-2 text-center">{row.date}</td>
-                <td className="border p-2 text-center">{row.clientName}</td>
-                <td className="border p-2 text-center">₹ {row.amount}</td>
-                <td className="border p-2 text-center">
-                
- 
-    <span
-      className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(row.status)}`}
-    >
-      {row.status || "N/A"}
-    </span>
-  
-</td>
+  {table.map((row) => (
+    <tr key={row.orderId}>
+      <td className="border p-2 text-center">{row.orderId}</td>
+      <td className="border p-2 text-center">{row.date}</td>
+      <td className="border p-2 text-center">{row.clientName}</td>
 
+      <td className="border p-2">{row.productName}</td>
 
+      <td className="border p-2 text-center">₹ {row.totalAmount}</td>
+      <td className="border p-2 text-center">₹ {row.paidAmount}</td>
+      <td className="border p-2 text-center">₹ {row.balanceAmount}</td>
 
+      {/* ✅ PAYMENT STATUS */}
+      <td className="border p-2 text-center">
+        <span
+          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+            row.paymentStatus === "paid"
+              ? "bg-green-100 text-green-700"
+              : row.paymentStatus === "partial"
+              ? "bg-orange-100 text-orange-700"
+              : "bg-gray-100 text-gray-700"
+          }`}
+        >
+          {row.paymentStatus}
+        </span>
+      </td>
 
-              </tr>
-            ))}
-          </tbody>
+      {/* ✅ ORDER STATUS */}
+      <td className="border p-2 text-center">
+        <span
+          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(
+            row.orderStatus
+          )}`}
+        >
+          {row.orderStatus}
+        </span>
+      </td>
+    </tr>
+  ))}
+</tbody>
+
         </table>
+        </div>
       </div>
 
     </div>

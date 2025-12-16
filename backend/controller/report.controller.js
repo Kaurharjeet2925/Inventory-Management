@@ -5,7 +5,7 @@ const Product = require("../models/product.model");
 
 exports.generateDailySalesReport = async (req, res) => {
   try {
-    let { start, end, download } = req.query;
+    let { start, end, download, search } = req.query;
 
     /* ================= DATE HANDLING ================= */
     if (!start || !end) {
@@ -30,13 +30,33 @@ exports.generateDailySalesReport = async (req, res) => {
       .populate("assignedBy");
 
     /* =================================================
-       📥 EXCEL DOWNLOAD (UNCHANGED ROW STRUCTURE + PAYMENT STATUS)
+       🔍 APPLY SEARCH (Order / Client / Status / Product)
+       ================================================= */
+    let searchedOrders = filteredOrders;
+
+    if (search) {
+      const q = search.toLowerCase();
+
+      searchedOrders = filteredOrders.filter((order) => {
+        const orderIdMatch = order.orderId?.toLowerCase().includes(q);
+        const clientMatch = order.clientId?.name?.toLowerCase().includes(q);
+        const statusMatch = order.status?.toLowerCase().includes(q);
+
+        const productMatch = order.items?.some((item) =>
+          item.productName?.toLowerCase().includes(q)
+        );
+
+        return orderIdMatch || clientMatch || statusMatch || productMatch;
+      });
+    }
+
+    /* =================================================
+       📥 EXCEL DOWNLOAD (SEARCH APPLIED)
        ================================================= */
     if (download === "true") {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Daily Sales Report");
 
-      // HEADER
       sheet.addRow([
         "Date",
         "Order ID",
@@ -50,50 +70,52 @@ exports.generateDailySalesReport = async (req, res) => {
         "Warehouse",
         "Order Status",
         "Amount",
-        "Payment Status", // ✅ ADDED
+        "Balance ",
+        "Payment Status",
       ]);
 
       sheet.getRow(1).eachCell((cell) => (cell.font = { bold: true }));
 
-      // DATA
-      filteredOrders.forEach((order) => {
-        const items = order.items || [];
-        const orderAmount =
-          order.paymentDetails?.totalAmount ||
-          items.reduce(
-            (sum, item) =>
-              sum + (item.price || 0) * (item.quantity || 0),
-            0
-          );
+      searchedOrders.forEach((order) => {
+  const items = order.items || [];
+
+  const orderAmount =
+    order.paymentDetails?.totalAmount ||
+    items.reduce(
+      (sum, item) =>
+        sum + (item.price || 0) * (item.quantity || 0),
+      0
+    );
+
+  const paidAmount = order.paymentDetails?.paidAmount ?? 0;
+  const balanceAmount =
+    order.paymentDetails?.balanceAmount ?? orderAmount - paidAmount;
+
 
         items.forEach((item, index) => {
           sheet.addRow([
-            index === 0
-              ? moment(order.createdAt).format("DD-MM-YYYY")
-              : "",
+            index === 0 ? moment(order.createdAt).format("DD-MM-YYYY") : "",
             index === 0 ? order.orderId : "",
             index === 0 ? order.assignedBy?.name || "N/A" : "",
             index === 0 ? order.clientId?.name || "N/A" : "",
-            index === 0
-              ? order.clientId?.companyName || "N/A"
-              : "",
+            index === 0 ? order.clientId?.companyName || "N/A" : "",
             index === 0 ? order.clientId?.address || "N/A" : "",
-            index === 0
-              ? order.deliveryPersonId?.name || "N/A"
-              : "",
+            index === 0 ? order.deliveryPersonId?.name || "N/A" : "",
             `${item.productName} (${item.quantityValue}${item.quantityUnit})`,
             item.quantity,
             item.warehouseName || "N/A",
             index === 0 ? order.status : "",
             index === 0 ? orderAmount : "",
+            index === 0? balanceAmount :"",
             index === 0
-              ? order.paymentDetails?.status || "Unpaid"
-              : "",
+               ? order.paymentDetails?.paymentStatus || "cod"
+              : ""
+
+
           ]);
         });
       });
 
-      // AUTO WIDTH
       sheet.columns.forEach((col) => {
         let maxLength = 10;
         col.eachCell({ includeEmpty: true }, (cell) => {
@@ -119,7 +141,7 @@ exports.generateDailySalesReport = async (req, res) => {
     }
 
     /* =================================================
-       📊 DASHBOARD CARDS (ALL ORDERS)
+       📊 DASHBOARD CARDS (ALL ORDERS – unchanged)
        ================================================= */
     const todayStart = moment().startOf("day");
     const todayEnd = moment().endOf("day");
@@ -135,7 +157,7 @@ exports.generateDailySalesReport = async (req, res) => {
       totalSales = 0,
       totalOrders = allOrders.length;
 
-    const productMap = {}; // for top selling product
+    const productMap = {};
 
     allOrders.forEach((order) => {
       const items = order.items || [];
@@ -168,7 +190,6 @@ exports.generateDailySalesReport = async (req, res) => {
       });
     });
 
-    // TOP SELLING PRODUCT
     let topProduct = "N/A";
     let topProductQty = 0;
     Object.entries(productMap).forEach(([name, qty]) => {
@@ -177,20 +198,17 @@ exports.generateDailySalesReport = async (req, res) => {
         topProductQty = qty;
       }
     });
-    // TOP 5 SELLING PRODUCTS (for chart)
+
     const topProducts = Object.entries(productMap)
-      .map(([name, qty]) => ({
-        name,
-        quantity: qty,
-      }))
+      .map(([name, qty]) => ({ name, quantity: qty }))
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
-    
+
     /* =================================================
-       📈 CHART (FILTERED ORDERS)
+       📈 CHART (SEARCHED ORDERS)
        ================================================= */
     const chartMap = {};
-    filteredOrders.forEach((order) => {
+    searchedOrders.forEach((order) => {
       const items = order.items || [];
       const amount =
         order.paymentDetails?.totalAmount ||
@@ -209,23 +227,42 @@ exports.generateDailySalesReport = async (req, res) => {
     }));
 
     /* =================================================
-       📋 TABLE (FILTERED ORDERS)
+       📋 TABLE (SEARCHED ORDERS)
        ================================================= */
-    const table = filteredOrders.map((o) => {
-      const items = o.items || [];
-      return {
-        orderId: o.orderId,
-        date: moment(o.createdAt).format("YYYY-MM-DD"),
-        clientName: o.clientId?.name || "N/A",
-        amount:
-          o.paymentDetails?.totalAmount ||
-          items.reduce(
-            (s, i) => s + (i.price || 0) * (i.quantity || 0),
-            0
-          ),
-          status: o.status,
-      };
-    });
+  const table = searchedOrders.map((o) => {
+  const items = o.items || [];
+
+  const totalAmount =
+  o.paymentDetails?.totalAmount ||
+  items.reduce((s, i) => s + (i.price || 0) * (i.quantity || 0), 0);
+
+const paidAmount = o.paymentDetails?.paidAmount ?? 0;
+const balanceAmount =
+  o.paymentDetails?.balanceAmount ?? totalAmount - paidAmount;
+
+
+  return {
+    orderId: o.orderId,
+    date: moment(o.createdAt).format("YYYY-MM-DD"),
+    clientName: o.clientId?.name || "N/A",
+
+    productName: items
+      .map(
+        (i) => `${i.productName} (${i.quantityValue}${i.quantityUnit})`
+      )
+      .join(", "),
+
+    totalAmount,
+    paidAmount,
+    balanceAmount,
+
+    // ✅ BOTH STATUS
+    orderStatus: o.status,
+    paymentStatus: o.paymentDetails?.paymentStatus || "cod",
+  };
+});
+
+
 
     /* ================= FINAL RESPONSE ================= */
     res.json({
@@ -244,13 +281,13 @@ exports.generateDailySalesReport = async (req, res) => {
       chart,
       topProducts,
       table,
-      
     });
   } catch (err) {
     console.error("Sales Report Error:", err);
     res.status(500).json({ message: "Failed to generate sales report" });
   }
 };
+
 
 
 exports.generateInventoryReport = async (req, res) => {
