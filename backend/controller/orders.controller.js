@@ -228,126 +228,161 @@ exports.updateOrder = async (req, res) => {
     const { items, status, paymentDetails } = req.body;
 
     const existingOrder = await Order.findById(orderId);
-    if (!existingOrder) return res.status(404).json({ message: "Order not found" });
+    if (!existingOrder) {
+      return res.status(404).json({ message: "Order not found" });
+    }
 
-    // Get io
-    const io = req.app.get("io");
+    // 🔒 Only admin can edit full order
+    if (req.user.role === "delivery-boy") {
+      return res.status(403).json({ message: "Not allowed" });
+    }
 
-    // If order is pending -> allow editing items & payment and adjust stock
-    if (existingOrder.status === "pending") {
-      // Restore old quantities (undo old reservation)
-      for (let oldItem of existingOrder.items) {
-        if (oldItem.productId) {
-          const resRestore = await Product.findByIdAndUpdate(oldItem.productId, {
-            $inc: { totalQuantity: Number(oldItem.quantity || 0) }
-          }, { new: true });
-          console.log(`Stock restored for product ${oldItem.productId}: +${oldItem.quantity}, newTotal: ${resRestore ? resRestore.totalQuantity : 'N/A'}`);
-          try { io.emit('product_updated', { productId: oldItem.productId, totalQuantity: resRestore ? resRestore.totalQuantity : null }); } catch (e) { console.error('Emit product_updated failed', e); }
-        }
-      }
-
-      // Validate new items stock (optional: add validation here if needed)
-      // Deduct new quantities
-      for (let newItem of items) {
-        if (newItem.productId) {
-          const resDeduct = await Product.findByIdAndUpdate(newItem.productId, {
-            $inc: { totalQuantity: -Number(newItem.quantity || 0) }
-          }, { new: true });
-          console.log(`Stock deducted for product ${newItem.productId}: -${newItem.quantity}, newTotal: ${resDeduct ? resDeduct.totalQuantity : 'N/A'}`);
-          try { io.emit('product_updated', { productId: newItem.productId, totalQuantity: resDeduct ? resDeduct.totalQuantity : null }); } catch (e) { console.error('Emit product_updated failed', e); }
-        }
-      }
-
-      // Build updated items + calculate totalAmount
-      let totalAmount = 0;
-      const updatedItems = items.map((item) => {
-        const price = Number(item.price || 0);
-        const qty = Number(item.quantity || 0);
-        const totalPrice = qty * price;
-        totalAmount += totalPrice;
-
-        return {
-          productId: item.productId,
-          productName: item.productName || "",
-          quantity: qty,
-          quantityValue: item.quantityValue,
-          quantityUnit: item.quantityUnit,
-          price,
-          totalPrice,
-          warehouseName: item.warehouseName || "",
-          warehouseAddress: item.warehouseAddress || "",
-          warehouseId: item.warehouseId || "",
-        };
+    // -------------------------------
+    // ONLY PENDING ORDERS CAN CHANGE ITEMS
+    // -------------------------------
+    if (existingOrder.status !== "pending") {
+      return res.status(400).json({
+        message: "Only pending orders can be edited",
       });
+    }
 
-      // Recalculate payment details from items (backend source of truth)
-      const paid = Number(paymentDetails?.paidAmount || 0);
-      const balance = totalAmount - paid;
-      const updatedPaymentDetails = {
-        totalAmount,
-        paidAmount: paid,
-        balanceAmount: balance < 0 ? 0 : balance,
-        paymentStatus:
-          paid === 0 ? "unpaid" :
-            paid >= totalAmount ? "paid" : "partial",
+    // Restore old stock
+    for (const oldItem of existingOrder.items) {
+      await Product.findByIdAndUpdate(oldItem.productId, {
+        $inc: { totalQuantity: oldItem.quantity },
+      });
+    }
+
+    // Deduct new stock
+    for (const newItem of items) {
+      await Product.findByIdAndUpdate(newItem.productId, {
+        $inc: { totalQuantity: -newItem.quantity },
+      });
+    }
+
+    // Recalculate totals
+    let totalAmount = 0;
+    const updatedItems = items.map((item) => {
+      const price = Number(item.price || 0);
+      const qty = Number(item.quantity || 0);
+      const totalPrice = price * qty;
+      totalAmount += totalPrice;
+
+      return {
+        ...item,
+        price,
+        quantity: qty,
+        totalPrice,
       };
+    });
 
-      // Update order (items + payment + status)
-      const updatedOrder = await Order.findByIdAndUpdate(
-        orderId,
-        {
-          status: status || existingOrder.status,
-          items: updatedItems,
-          paymentDetails: updatedPaymentDetails,
-        },
-        { new: true }
-      );
+    const paid = Number(paymentDetails?.paidAmount || 0);
+    const balance = totalAmount - paid;
 
-      // Notify sockets
-      if (updatedOrder.assignedBy) {
-        io.to(`admin_${updatedOrder.assignedBy.toString()}`).emit("order_updated", updatedOrder);
-      }
-      if (updatedOrder.deliveryPersonId) {
-        io.to(updatedOrder.deliveryPersonId.toString()).emit("order_updated", updatedOrder);
-      }
-
-      return res.json({ message: "Order updated successfully", order: updatedOrder });
-    }
-
-    // -------------------------
-    // existingOrder is NOT pending
-    // -------------------------
-    // In this case: DO NOT change items/payment (enforced).
-    // Only allow changing status (if provided).
-    // We will update only the status field.
-    if (typeof status === "undefined" || status === existingOrder.status) {
-      return res.status(403).json({
-        message: `Order items can only be modified when order is 'pending'. Current status: ${existingOrder.status}`
-      });
-    }
-
-    // Validate status transition? (optional)
-    // Update only status
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
-      { status },
+      {
+        status: status || "pending",
+        items: updatedItems,
+        paymentDetails: {
+          totalAmount,
+          paidAmount: paid,
+          balanceAmount: balance < 0 ? 0 : balance,
+          paymentStatus:
+            paid === 0 ? "COD" : paid >= totalAmount ? "paid" : "partial",
+        },
+      },
       { new: true }
     );
 
-    // Notify sockets about status change
-    if (updatedOrder.assignedBy) {
-      io.to(`admin_${updatedOrder.assignedBy.toString()}`).emit("order_status_updated", updatedOrder);
-    }
-    if (updatedOrder.deliveryPersonId) {
-      io.to(updatedOrder.deliveryPersonId.toString()).emit("order_status_updated", updatedOrder);
-    }
-   // io.emit("order_status_updated_global", updatedOrder);
+    return res.json({
+      message: "Order updated successfully",
+      order: updatedOrder,
+    });
+  } catch (err) {
+    console.error("updateOrder error", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
-    return res.json({ message: "Order status updated successfully", order: updatedOrder });
+
+// PUT /orders/:id/payment
+// PUT /api/orders/:id/payment
+// PUT /api/orders/:id/payment
+exports.updateOrderPayment = async (req, res) => {
+  try {
+    const { paidAmount } = req.body;
+    const orderId = req.params.id;
+
+    if (!paidAmount || Number(paidAmount) <= 0) {
+      return res.status(400).json({ message: "Invalid payment amount" });
+    }
+
+    const order = await Order.findById(orderId)
+      .populate("clientId", "name phone address")
+      .populate("deliveryPersonId", "name phone")
+      .populate("assignedBy", "name role");
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // ✅ Ensure paymentDetails exists
+    if (!order.paymentDetails) {
+      const calculatedTotal = order.items.reduce(
+        (sum, item) => sum + Number(item.totalPrice || item.price * item.quantity || 0),
+        0
+      );
+
+      order.paymentDetails = {
+        totalAmount: calculatedTotal,
+        paidAmount: 0,
+        balanceAmount: calculatedTotal,
+        paymentStatus: "unpaid",
+      };
+    }
+
+    const totalAmount = Number(order.paymentDetails.totalAmount);
+    const previousPaid = Number(order.paymentDetails.paidAmount || 0);
+    const addedPaid = Number(paidAmount);
+
+    const finalPaid = previousPaid + addedPaid;
+    const balance = Math.max(totalAmount - finalPaid, 0);
+
+    let paymentStatus = "unpaid";
+    if (finalPaid >= totalAmount) paymentStatus = "paid";
+    else if (finalPaid > 0) paymentStatus = "partial";
+
+    order.paymentDetails = {
+      totalAmount,
+      paidAmount: finalPaid,
+      balanceAmount: balance,
+      paymentStatus,
+    };
+
+    await order.save();
+
+    const io = req.app.get("io");
+
+    // 🔔 Notify admin
+    if (order.assignedBy) {
+      io.to(`admin_${order.assignedBy._id}`).emit("order_updated", order);
+    }
+
+    // 🔔 Notify delivery boy
+    if (order.deliveryPersonId) {
+      io.to(order.deliveryPersonId._id.toString()).emit("order_updated", order);
+    }
+
+    return res.json({
+      message: "Payment updated successfully",
+      order,
+    });
 
   } catch (error) {
-    console.error("Update Order Error:", error);
-    return res.status(500).json({ message: "Server error", error: error.message || error });
+    console.error("updateOrderPayment error:", error);
+    return res.status(500).json({
+      message: "Payment update failed",
+      error: error.message,
+    });
   }
 };
 

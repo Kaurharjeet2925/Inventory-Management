@@ -8,17 +8,15 @@ const AgentBottomNav = () => {
 
   const tabs = [
     { name: "Home", icon: Home, path: "/agent/agent-dashboard" },
-    { name: "Deliveries", icon: Truck, path: "/agent/deliveries" },
-    { name: "History", icon: History, path: "/agent/history" },
+    { name: "Deliveries", icon: Truck, path: "/agent/deliveries-history" },
     { name: "Profile", icon: User, path: "/agent/profile" },
   ];
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t shadow-lg py-2 flex justify-around z-50">
-
       {tabs.map((tab) => {
         const Icon = tab.icon;
-        const isActive = location.pathname === tab.path;
+        const isActive = location.pathname.startsWith(tab.path); // ✅ FIX
 
         return (
           <button
@@ -41,7 +39,6 @@ const AgentBottomNav = () => {
           </button>
         );
       })}
-
     </div>
   );
 };

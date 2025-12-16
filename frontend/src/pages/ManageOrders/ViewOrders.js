@@ -8,6 +8,8 @@ import { FaFileInvoice } from 'react-icons/fa';
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending'|'shipped'|'delivered'|'completed'
+  const [search, setSearch] = useState('');
   const [viewModal, setViewModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
@@ -19,6 +21,12 @@ const ViewOrders = () => {
   useEffect(() => {
     loadOrders(currentPage, limit);
   }, [currentPage]);
+
+  // Reload when active tab changes (reset to page 1)
+  useEffect(() => {
+    setCurrentPage(1);
+    loadOrders(1, limit, activeTab);
+  }, [activeTab]);
   
 
   useEffect(() => {
@@ -52,10 +60,12 @@ const ViewOrders = () => {
     };
   }, []);
 
-  const loadOrders = async (page = 1) => {
+  const loadOrders = async (page = 1, lim = limit, status = null) => {
     try {
       setLoading(true);
-      const res = await apiClient.get(`/orders?page=${page}&limit=${limit}`);
+      let url = `/orders?page=${page}&limit=${lim}`;
+      if (status) url += `&status=${encodeURIComponent(status)}`;
+      const res = await apiClient.get(url);
   
       console.log("ORDER ITEMS --->", res.data.data[0]?.items); // 🔥 ADD THIS
   
@@ -93,12 +103,19 @@ const ViewOrders = () => {
   const getStatusBadge = (status) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-700',
+      processing: 'bg-blue-100 text-blue-700', // shipped
       shipped: 'bg-blue-100 text-blue-700',
       delivered: 'bg-purple-100 text-purple-700',
       completed: 'bg-green-100 text-green-700',
       cancelled: 'bg-red-100 text-red-700',
     };
     return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-700';
+  };
+
+  const formatStatus = (status) => {
+    if (!status) return '';
+    if (status === 'processing' || status === 'shipped') return 'Shipped';
+    return status[0].toUpperCase() + status.slice(1);
   };
 
   const handleConfirmDelete = async () => {
@@ -118,10 +135,63 @@ const ViewOrders = () => {
     return <div className="ml-64 mt-12 p-6 text-gray-600">Loading orders...</div>;
   }
 
+  // Filter orders by active tab and search (client-side safety fallback)
+  const filteredOrders = orders.filter((order) => {
+    let matchesTab = true;
+    if (activeTab === 'pending') matchesTab = order.status === 'pending';
+    else if (activeTab === 'shipped') matchesTab = order.status === 'processing' || order.status === 'shipped';
+    else if (activeTab === 'delivered') matchesTab = order.status === 'delivered';
+    else if (activeTab === 'completed') matchesTab = order.status === 'completed';
+
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || (order.orderId || '').toLowerCase().includes(q) || (order.clientId?.name || '').toLowerCase().includes(q);
+    return matchesTab && matchesSearch;
+  });
+
   return (
     <div className="ml-64 mt-12 p-6">
       <h1 className="text-3xl font-bold mb-2">View Orders</h1>
       <p className="text-gray-600 mb-6">All orders and their statuses</p>
+
+      {/* Tabs + Search */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-yellow-50 text-yellow-700'}`}
+          >
+            Pending ({orders.filter(o => o.status === 'pending').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('shipped')}
+            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'shipped' ? 'bg-blue-100 text-blue-800' : 'bg-blue-50 text-blue-700'}`}
+          >
+            Shipped ({orders.filter(o => o.status === 'processing' || o.status === 'shipped').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('delivered')}
+            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'delivered' ? 'bg-purple-100 text-purple-800' : 'bg-purple-50 text-purple-700'}`}
+          >
+            Delivered ({orders.filter(o => o.status === 'delivered').length})
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'completed' ? 'bg-green-100 text-green-800' : 'bg-green-50 text-green-700'}`}
+          >
+            Completed ({orders.filter(o => o.status === 'completed').length})
+          </button>
+        </div>
+
+        <div className="ml-auto w-full sm:w-64">
+          <input
+            type="text"
+            placeholder="Search by order id or client name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full border rounded px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
 
       <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mt-4">
 
@@ -145,14 +215,14 @@ const ViewOrders = () => {
 
     {/* Table Body */}
     <tbody className="text-gray-800 mb-4">
-      {orders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <tr>
-          <td colSpan="9" className="text-center py-6 text-gray-500">
-            No orders found
+          <td colSpan="10" className="text-center py-6 text-gray-500">
+            No orders found for selected tab
           </td>
         </tr>
       ) : (
-        orders.map((order) => {
+        filteredOrders.map((order) => {
           const calculatedTotal = order.items.reduce(
             (sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0),
             0
@@ -229,7 +299,7 @@ const ViewOrders = () => {
                     order.status
                   )}`}
                 >
-                  {order.status}
+                  {formatStatus(order.status)}
                 </span>
               </td>
 

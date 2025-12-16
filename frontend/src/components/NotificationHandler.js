@@ -10,6 +10,7 @@ const NotificationHandler = () => {
     const audio = new Audio("/notification_sound.mp3");
     const user = JSON.parse(localStorage.getItem("agent") || localStorage.getItem("user") || localStorage.getItem("auth") || "{}");
     const userId = user?._id || user?.id || user?.userId || "";
+    console.log("🔔 NotificationHandler initialized for user:", user?.name, user?.role, "id:", userId);
 
     const push = (msg, data) => {
       console.log("🔥 Notification Added:", msg, data);
@@ -33,10 +34,18 @@ const NotificationHandler = () => {
       const deliveryPersonId = typeof order.deliveryPersonId === "string" 
         ? order.deliveryPersonId 
         : order.deliveryPersonId?._id;
+      // assignedBy may be string id or populated user object
+      const assignedById = typeof order.assignedBy === "string" ? order.assignedBy : order.assignedBy?._id;
       
       // Send notification to assigned delivery person only
       if (user?.role === "delivery-boy" && deliveryPersonId === userId) {
         push(`🆕 New order assigned to you: ${order.orderId}`, order);
+      }
+
+      // Notify the admin who created/assigned the order
+      if ((user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId) {
+        console.log("🔔 Notifying admin assignedById matches userId", { assignedById, userId });
+        push(`🆕 Order ${order.orderId} created`, order);
       }
     });
 
@@ -112,6 +121,14 @@ const NotificationHandler = () => {
       // Notify admin who assigned the order
       if ((user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId) {
         push(`❌ Order ${orderId} has been deleted`, orderId);
+      }
+    });
+
+    // Global order creation (server may emit to all) — notify admins
+    socket.on("order_created_global", (order) => {
+      if (user?.role === "admin" || user?.role === "superAdmin") {
+        console.log("📢 SOCKET RECEIVED: order_created_global", order);
+        push(`🆕 New order created: ${order.orderId}`, order);
       }
     });
 

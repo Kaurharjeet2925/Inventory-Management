@@ -1,6 +1,6 @@
 const router = require("express").Router();
-const { generateDailySalesReport } = require("../controller/report.controller");
-
-router.get("/daily-sales", generateDailySalesReport);
-
+const { generateDailySalesReport, generateInventoryReport } = require("../controller/report.controller");
+const auth = require("../middleware/auth");
+router.get("/daily-sales",auth, generateDailySalesReport);
+router.get("/inventory-report",auth, generateInventoryReport);
 module.exports = router;

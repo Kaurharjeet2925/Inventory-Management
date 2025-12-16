@@ -10,6 +10,7 @@ const {
     collectOrder,
     updateOrder,
     generateInvoice,
+    updateOrderPayment
 } = require("../controller/orders.controller");
 
 // Create order
@@ -19,6 +20,8 @@ router.post("/orders", auth, createOrder);
 router.get("/orders", auth, getOrders);
 router.put("/orders/:id/collect-item/:itemId", auth, collectOrder);
 router.put("/orders/:id", auth, updateOrder);
+router.put("/orders/:id/payment", auth, updateOrderPayment);
+
 // Get single order
 router.get("/orders/:id", auth, getOrderById);
 router.get("/invoice/:id", generateInvoice);

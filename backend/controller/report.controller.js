@@ -1,99 +1,385 @@
 const Order = require("../models/orders.model");
 const ExcelJS = require("exceljs");
 const moment = require("moment");
+const Product = require("../models/product.model");
 
 exports.generateDailySalesReport = async (req, res) => {
   try {
-    const { start, end } = req.query;
+    let { start, end, download } = req.query;
 
-    const startDate = moment(start, "DD-MM-YYYY").startOf("day");
-    const endDate = moment(end, "DD-MM-YYYY").endOf("day");
+    /* ================= DATE HANDLING ================= */
+    if (!start || !end) {
+      start = moment().startOf("day");
+      end = moment().endOf("day");
+    } else {
+      start = moment(start).startOf("day");
+      end = moment(end).endOf("day");
+    }
 
-    const orders = await Order.find({
-      createdAt: { $gte: startDate, $lte: endDate },
+    /* ================= FETCH DATA ================= */
+    const allOrders = await Order.find({})
+      .populate("clientId")
+      .populate("deliveryPersonId")
+      .populate("assignedBy");
+
+    const filteredOrders = await Order.find({
+      createdAt: { $gte: start.toDate(), $lte: end.toDate() },
     })
       .populate("clientId")
       .populate("deliveryPersonId")
       .populate("assignedBy");
 
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Daily Sales Report");
+    /* =================================================
+       📥 EXCEL DOWNLOAD (UNCHANGED ROW STRUCTURE + PAYMENT STATUS)
+       ================================================= */
+    if (download === "true") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Daily Sales Report");
 
-    // HEADER
-    sheet.addRow([
-      "Date",
-      "Order ID",
-      "Admin Name",
-      "Client Name",
-      "Company Name",
-      "Client Address",
-      "Agent",
-      "Product",
-      "Qty",
-      "Warehouse",
-      "Status",
-      "Amount",
-    ]);
+      // HEADER
+      sheet.addRow([
+        "Date",
+        "Order ID",
+        "Admin Name",
+        "Client Name",
+        "Company Name",
+        "Client Address",
+        "Agent",
+        "Product",
+        "Qty",
+        "Warehouse",
+        "Order Status",
+        "Amount",
+        "Payment Status", // ✅ ADDED
+      ]);
 
-    sheet.getRow(1).eachCell((cell) => (cell.font = { bold: true }));
+      sheet.getRow(1).eachCell((cell) => (cell.font = { bold: true }));
 
-    // MAIN DATA
-    orders.forEach((order) => {
-      const orderAmount =
+      // DATA
+      filteredOrders.forEach((order) => {
+        const items = order.items || [];
+        const orderAmount =
+          order.paymentDetails?.totalAmount ||
+          items.reduce(
+            (sum, item) =>
+              sum + (item.price || 0) * (item.quantity || 0),
+            0
+          );
+
+        items.forEach((item, index) => {
+          sheet.addRow([
+            index === 0
+              ? moment(order.createdAt).format("DD-MM-YYYY")
+              : "",
+            index === 0 ? order.orderId : "",
+            index === 0 ? order.assignedBy?.name || "N/A" : "",
+            index === 0 ? order.clientId?.name || "N/A" : "",
+            index === 0
+              ? order.clientId?.companyName || "N/A"
+              : "",
+            index === 0 ? order.clientId?.address || "N/A" : "",
+            index === 0
+              ? order.deliveryPersonId?.name || "N/A"
+              : "",
+            `${item.productName} (${item.quantityValue}${item.quantityUnit})`,
+            item.quantity,
+            item.warehouseName || "N/A",
+            index === 0 ? order.status : "",
+            index === 0 ? orderAmount : "",
+            index === 0
+              ? order.paymentDetails?.status || "Unpaid"
+              : "",
+          ]);
+        });
+      });
+
+      // AUTO WIDTH
+      sheet.columns.forEach((col) => {
+        let maxLength = 10;
+        col.eachCell({ includeEmpty: true }, (cell) => {
+          maxLength = Math.max(
+            maxLength,
+            cell.value ? cell.value.toString().length : 10
+          );
+        });
+        col.width = maxLength + 4;
+      });
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=DailySalesReport.xlsx"
+      );
+
+      await workbook.xlsx.write(res);
+      return res.end();
+    }
+
+    /* =================================================
+       📊 DASHBOARD CARDS (ALL ORDERS)
+       ================================================= */
+    const todayStart = moment().startOf("day");
+    const todayEnd = moment().endOf("day");
+    const weekStart = moment().subtract(6, "days").startOf("day");
+    const monthStart = moment().startOf("month");
+
+    let todaySales = 0,
+      todayOrders = 0,
+      weekSales = 0,
+      weekOrders = 0,
+      monthSales = 0,
+      monthOrders = 0,
+      totalSales = 0,
+      totalOrders = allOrders.length;
+
+    const productMap = {}; // for top selling product
+
+    allOrders.forEach((order) => {
+      const items = order.items || [];
+      const amount =
         order.paymentDetails?.totalAmount ||
-        order.items.reduce(
-          (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+        items.reduce(
+          (sum, i) => sum + (i.price || 0) * (i.quantity || 0),
           0
         );
-    
-      order.items.forEach((item, index) => {
-        sheet.addRow([
-          index === 0 ? moment(order.createdAt).format("DD-MM-YYYY") : "",
-          index === 0 ? order.orderId : "",
-          index === 0 ? order.assignedBy?.name || "N/A" : "",
-          index === 0 ? order.clientId?.name || "N/A" : "",
-          index === 0 ? order.clientId?.companyName || "N/A" : "",
-          index === 0 ? order.clientId?.address || "N/A" : "",
-          index === 0 ? order.deliveryPersonId?.name || "N/A" : "",
-    
-          `${item.productName} (${item.quantityValue}${item.quantityUnit})`,
-          item.quantity,
-          item.warehouseName || "N/A",
-    
-          index === 0 ? order.status : "",
-          index === 0 ? orderAmount : "",
-        ]);
-      });
-    
-      // ❌ Removed this line:
-      // sheet.addRow([]);
-    });
-    
 
-    // Auto column width
-    sheet.columns.forEach((col) => {
-      let maxLength = 0;
-      col.eachCell({ includeEmpty: true }, (cell) => {
-        const columnLength = cell.value ? cell.value.toString().length : 10;
-        if (columnLength > maxLength) maxLength = columnLength;
+      totalSales += amount;
+      const created = moment(order.createdAt);
+
+      if (created.isBetween(todayStart, todayEnd, null, "[]")) {
+        todaySales += amount;
+        todayOrders++;
+      }
+      if (created.isSameOrAfter(weekStart)) {
+        weekSales += amount;
+        weekOrders++;
+      }
+      if (created.isSameOrAfter(monthStart)) {
+        monthSales += amount;
+        monthOrders++;
+      }
+
+      items.forEach((i) => {
+        productMap[i.productName] =
+          (productMap[i.productName] || 0) + i.quantity;
       });
-      col.width = maxLength + 5;
     });
 
-    // SEND FILE
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=DailySalesReport.xlsx"
-    );
+    // TOP SELLING PRODUCT
+    let topProduct = "N/A";
+    let topProductQty = 0;
+    Object.entries(productMap).forEach(([name, qty]) => {
+      if (qty > topProductQty) {
+        topProduct = name;
+        topProductQty = qty;
+      }
+    });
+    // TOP 5 SELLING PRODUCTS (for chart)
+    const topProducts = Object.entries(productMap)
+      .map(([name, qty]) => ({
+        name,
+        quantity: qty,
+      }))
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5);
+    
+    /* =================================================
+       📈 CHART (FILTERED ORDERS)
+       ================================================= */
+    const chartMap = {};
+    filteredOrders.forEach((order) => {
+      const items = order.items || [];
+      const amount =
+        order.paymentDetails?.totalAmount ||
+        items.reduce(
+          (sum, i) => sum + (i.price || 0) * (i.quantity || 0),
+          0
+        );
 
-    await workbook.xlsx.write(res);
-    res.end();
+      const key = moment(order.createdAt).format("YYYY-MM-DD");
+      chartMap[key] = (chartMap[key] || 0) + amount;
+    });
+
+    const chart = Object.keys(chartMap).map((d) => ({
+      date: d,
+      amount: chartMap[d],
+    }));
+
+    /* =================================================
+       📋 TABLE (FILTERED ORDERS)
+       ================================================= */
+    const table = filteredOrders.map((o) => {
+      const items = o.items || [];
+      return {
+        orderId: o.orderId,
+        date: moment(o.createdAt).format("YYYY-MM-DD"),
+        clientName: o.clientId?.name || "N/A",
+        amount:
+          o.paymentDetails?.totalAmount ||
+          items.reduce(
+            (s, i) => s + (i.price || 0) * (i.quantity || 0),
+            0
+          ),
+          status: o.status,
+      };
+    });
+
+    /* ================= FINAL RESPONSE ================= */
+    res.json({
+      cards: {
+        todaySales,
+        todayOrders,
+        weekSales,
+        weekOrders,
+        monthSales,
+        monthOrders,
+        totalSales,
+        totalOrders,
+        topProduct,
+        topProductQty,
+      },
+      chart,
+      topProducts,
+      table,
+      
+    });
   } catch (err) {
-    console.error("Report Error:", err);
-    res.status(500).json({ message: "Failed to generate report" });
+    console.error("Sales Report Error:", err);
+    res.status(500).json({ message: "Failed to generate sales report" });
   }
 };
+
+
+exports.generateInventoryReport = async (req, res) => {
+  try {
+    const products = await Product.find()
+      .populate("category", "name")
+      .populate("brand", "name")
+      .populate("location", "name address"); // ✅ ADDRESS ADDED
+
+    let totalProducts = products.length;
+    let totalStock = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    const productChart = [];
+    const statusChart = {
+      inStock: 0,
+      lowStock: 0,
+      outOfStock: 0,
+    };
+
+    const table = [];
+
+    products.forEach((p) => {
+      const qty = Number(p.totalQuantity ?? 0);
+      totalStock += qty;
+
+      let status = "In Stock";
+
+      if (qty === 0) {
+        status = "Out of Stock";
+        outOfStockCount++;
+        statusChart.outOfStock++;
+      } else if (qty <= 10) {
+        status = "Low Stock";
+        lowStockCount++;
+        statusChart.lowStock++;
+      } else {
+        statusChart.inStock++;
+      }
+
+      productChart.push({
+        name: p.name,
+        quantity: qty,
+      });
+
+      table.push({
+        productName: p.name,
+        category: p.category?.name || "N/A",
+        brand: p.brand?.name || "N/A",
+        quantity: qty,
+        unit: p.quantityValue
+          ? `${p.quantityValue} ${p.quantityUnit}`
+          : "-",
+        price: p.price || 0,
+
+        // ✅ LOCATION DETAILS
+        locationName: p.location?.name || "N/A",
+        locationAddress: p.location?.address || "N/A",
+
+        status,
+      });
+    });
+
+    /* ================= EXCEL DOWNLOAD ================= */
+    if (req.query.download === "true") {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Inventory Report");
+
+      sheet.addRow([
+        "Product",
+        "Category",
+        "Brand",
+        "Quantity",
+        "Unit",
+        "Price",
+        "Location Name",
+        "Location Address",
+        "Stock Status",
+      ]);
+
+      sheet.getRow(1).eachCell((c) => (c.font = { bold: true }));
+
+      table.forEach((r) => {
+        sheet.addRow([
+          r.productName,
+          r.category,
+          r.brand,
+          r.quantity,
+          r.unit,
+          r.price,
+          r.locationName,
+          r.locationAddress,
+          r.status,
+        ]);
+      });
+
+      sheet.columns.forEach((c) => (c.width = 22));
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=InventoryReport.xlsx"
+      );
+
+      await workbook.xlsx.write(res);
+      return res.end();
+    }
+
+    /* ================= FINAL RESPONSE ================= */
+    res.json({
+      cards: {
+        totalProducts,
+        totalStock,
+        lowStockCount,
+        outOfStockCount,
+      },
+      productChart: productChart
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10),
+      statusChart,
+      table,
+    });
+  } catch (err) {
+    console.error("Inventory Report Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+

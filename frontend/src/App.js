@@ -19,7 +19,7 @@ import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
 import Locations from './pages/ManageProduct/Locations.js';
 import Agent from './pages/Delivery/Agent.js';
-import History from './pages/Delivery/History.js';
+//import History from './pages/Delivery/History.js';
 import CompletedOrders from './pages/Delivery/Deliveries/CompletedOrders.js';
 import AgentDashboard from './pages/Delivery/Deliveries/AgentDashboard.js';
 import PendingOrders from './pages/Delivery/Deliveries/PendingOrders.js';
@@ -32,6 +32,7 @@ import SalesReports from './pages/Reports/SalesReports.js';
 import InventoryReports from './pages/Reports/InventoryReports.js';
 import { NotificationProvider } from "./context/NotificationContext";
 import Reports from './pages/Reports/Reports.js';
+import DeliveryList from './pages/Delivery/DeliveriesList.js';
 
 function App() {
   useEffect(() => {
@@ -96,7 +97,7 @@ function App() {
             <Route path="delivered" element={<DeliveredOrders />} />
             <Route path="completed" element={<CompletedOrders />} />
           </Route>
-          
+          <Route path="deliveries-history" element={<DeliveryList />} />
         </Route>
       </Routes>
     </NotificationProvider>
