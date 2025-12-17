@@ -17,21 +17,20 @@ exports.generateDailySalesReport = async (req, res) => {
     }
 
     /* ================= FETCH DATA ================= */
-    const allOrders = await Order.find({})
+    const allOrders = await Order.find({ status: "completed" })
+
       .populate("clientId")
       .populate("deliveryPersonId")
       .populate("assignedBy");
 
     const filteredOrders = await Order.find({
+      status: "completed",
       createdAt: { $gte: start.toDate(), $lte: end.toDate() },
     })
       .populate("clientId")
       .populate("deliveryPersonId")
       .populate("assignedBy");
 
-    /* =================================================
-       🔍 APPLY SEARCH (Order / Client / Status / Product)
-       ================================================= */
     let searchedOrders = filteredOrders;
 
     if (search) {
@@ -49,6 +48,11 @@ exports.generateDailySalesReport = async (req, res) => {
         return orderIdMatch || clientMatch || statusMatch || productMatch;
       });
     }
+    // 🔒 SAFETY FILTER (ensure only completed)
+          searchedOrders = searchedOrders.filter(
+            (order) => order.status === "completed"
+            );
+
 
     /* =================================================
        📥 EXCEL DOWNLOAD (SEARCH APPLIED)

@@ -1,95 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { apiClient } from "../../apiclient/apiclient";
 import socket from "../../socket/socketClient";
+//import { useNavigate } from "react-router-dom";
 import OrderCard from "../Delivery/Deliveries/OrderCard";
-import { Eye } from "lucide-react";
-
-/* 🔹 SIMPLE MOBILE MODAL */
-const Modal = ({ children, onClose }) => {
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => (document.body.style.overflow = "auto");
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center">
-      <div
-        className="
-          bg-white w-full
-          h-[90vh] sm:h-auto
-          sm:max-w-3xl
-          rounded-t-2xl sm:rounded-xl
-          shadow-lg
-          overflow-y-auto
-          relative
-        "
-      >
-        {/* Drag bar (mobile) */}
-        <div className="sm:hidden flex justify-center py-2">
-          <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
-        </div>
-
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 text-lg"
-        >
-          ✕
-        </button>
-
-        <div className="p-4">{children}</div>
-      </div>
-    </div>
-  );
-};
-
+import {Eye} from "lucide-react";
 const DeliveriesList = () => {
+  //const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [search, setSearch] = useState("");
-  const [viewModal, setViewModal] = useState(null);
+ const [viewModal, setViewModal] = useState(null);
+  const loadOrders = async () => {
+    const res = await apiClient.get("/orders?page=1&limit=100");
+    setOrders(res.data.data || []);
+  };
 
-  /* ================= LOAD ORDERS ================= */
-const loadOrders = async () => {
-  const res = await apiClient.get("/orders?page=1&limit=100");
-
-  // ✅ SHOW ONLY COMPLETED ORDERS
-  const completedOrders = (res.data.data || []).filter(
-    (o) => o.status === "completed"
-  );
-
-  setOrders(completedOrders);
-};
-
-
-  /* ================= INITIAL LOAD ================= */
   useEffect(() => {
     loadOrders();
+    socket.on("order_status_updated", loadOrders);
+    return () => socket.off("order_status_updated");
   }, []);
 
-  /* ================= SOCKET REALTIME ================= */
-  useEffect(() => {
-    const handleOrderUpdate = (updatedOrder) => {
-      // update table list
-      setOrders((prev) =>
-        prev.map((o) => (o._id === updatedOrder._id ? updatedOrder : o))
-      );
-
-      // update open modal
-      setViewModal((prev) =>
-        prev && prev._id === updatedOrder._id ? updatedOrder : prev
-      );
-    };
-
-    socket.on("order_updated", handleOrderUpdate);
-    socket.on("order_status_updated", handleOrderUpdate);
-
-    return () => {
-      socket.off("order_updated", handleOrderUpdate);
-      socket.off("order_status_updated", handleOrderUpdate);
-    };
-  }, []);
-
-  /* ================= SEARCH ================= */
   const filteredOrders = orders.filter((o) => {
     const q = search.toLowerCase();
     return (
@@ -110,7 +40,7 @@ const loadOrders = async () => {
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      {/* ================= TABLE ================= */}
+      {/* TABLE WRAPPER (important for mobile) */}
       <div className="bg-white border rounded-lg overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-100 text-gray-700 text-xs uppercase">
@@ -132,7 +62,10 @@ const loadOrders = async () => {
               </tr>
             ) : (
               filteredOrders.map((order) => (
-                <tr key={order._id} className="border-t hover:bg-gray-50">
+                <tr
+                  key={order._id}
+                  className="border-t hover:bg-gray-50"
+                >
                   <td className="px-3 py-2 font-semibold text-blue-600">
                     {order.orderId}
                   </td>
@@ -142,6 +75,7 @@ const loadOrders = async () => {
                   </td>
 
                   <td className="px-3 py-2 text-gray-600">
+                 
                     {new Date(order.createdAt).toLocaleDateString()}
                   </td>
 
@@ -164,12 +98,14 @@ const loadOrders = async () => {
                   </td>
 
                   <td className="px-3 py-2 text-center">
-                    <button
-                      onClick={() => setViewModal(order)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <Eye size={18} />
-                    </button>
+                  <button
+                                      onClick={() =>
+                                        setViewModal({ ...order, viewOnly: true })
+                                      }
+                                      className="text-blue-600 hover:text-blue-800"
+                                    >
+                                      <Eye size={18} />
+                                    </button>
                   </td>
                 </tr>
               ))
@@ -177,17 +113,14 @@ const loadOrders = async () => {
           </tbody>
         </table>
       </div>
-
-      {/* ================= MODAL ================= */}
-      {viewModal && (
-        <Modal onClose={() => setViewModal(null)}>
-          <OrderCard
-            order={viewModal}
-            viewOnly={true}
-            onClose={() => setViewModal(null)}
-          />
-        </Modal>
-      )}
+         {viewModal && (
+              <OrderCard
+                order={viewModal}
+                viewOnly={true}
+                onClose={() => setViewModal(null)}
+                onSave={() => {}}
+              />
+            )}
     </div>
   );
 };
