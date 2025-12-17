@@ -250,11 +250,10 @@ const balanceAmount =
     date: moment(o.createdAt).format("YYYY-MM-DD"),
     clientName: o.clientId?.name || "N/A",
 
-    productName: items
-      .map(
-        (i) => `${i.productName} (${i.quantityValue}${i.quantityUnit})`
-      )
-      .join(", "),
+   productName: items.map(
+  (i) => `${i.productName} (${i.quantityValue}${i.quantityUnit})`
+),
+
 
     totalAmount,
     paidAmount,

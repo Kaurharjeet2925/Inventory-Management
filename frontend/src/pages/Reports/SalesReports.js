@@ -12,7 +12,7 @@ import {
 } from "recharts";
 import { apiClient } from "../../apiclient/apiclient";
 import { Download } from "lucide-react";
-
+import Pagination from "../../components/Pagination";
 const getStatusBadge = (status) => {
   const styles = {
     pending: 'bg-yellow-100 text-yellow-700',
@@ -34,7 +34,8 @@ const SalesReport = () => {
   const [topProducts, setTopProducts] = useState([]);
   const [table, setTable] = useState([]);
   const [search, setSearch] = useState("");
-
+const [pageSize, setPageSize] = useState(10);
+const [currentPage, setCurrentPage] = useState(1);
   /* ================= FETCH REPORT ================= */
   const fetchReport = async (startDate, endDate) => {
     const res = await apiClient.get(
@@ -47,14 +48,23 @@ const SalesReport = () => {
     setTable(res.data.table || []);
   };
   const filteredTable = table.filter((row) => {
-    const q = search.toLowerCase();
-    return (
-      row.orderId?.toLowerCase().includes(q) ||
-      row.clientName?.toLowerCase().includes(q) ||
-      row.status?.toLowerCase().includes(q)
-    );
-  });
+  const q = search.toLowerCase();
   
+  return (
+    row.orderId?.toLowerCase().includes(q) ||
+    row.clientName?.toLowerCase().includes(q) ||
+    row.productName?.toLowerCase().includes(q) ||
+    row.orderStatus?.toLowerCase().includes(q) ||
+    row.paymentStatus?.toLowerCase().includes(q)
+  );
+});
+const totalPages = Math.ceil(filteredTable.length / pageSize);
+
+const paginatedTable = filteredTable.slice(
+  (currentPage - 1) * pageSize,
+  currentPage * pageSize
+);
+
   /* ================= DEFAULT = LAST 7 DAYS ================= */
   useEffect(() => {
     const today = new Date();
@@ -311,70 +321,145 @@ const SalesReport = () => {
 
 
       {/* ================= SALES TABLE ================= */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Sales Details</h3>
- <div className="max-h-[400px] overflow-y-auto">
-    <table className="w-full border border-collapse">
-       <thead className="sticky top-0 bg-slate-100 z-10">
-        <tr>
-    <th className="border p-2">Order ID</th>
-    <th className="border p-2">Date</th>
-    <th className="border p-2">Client</th>
-    <th className="border p-2">Products</th>
-    <th className="border p-2">Total</th>
-    <th className="border p-2">Paid</th>
-    <th className="border p-2">Balance</th>
-    <th className="border p-2">Payment Status</th>
-    <th className="border p-2">Order Status</th>
-  </tr>
-</thead>
+     <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+  <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+    <h3 className="text-lg font-semibold text-slate-800">
+      Sales Details
+    </h3>
+   <div className="flex items-center gap-3">
+  <span className="text-sm text-slate-500">
+    {filteredTable.length} records
+  </span>
+
+  <div className="flex items-center gap-2">
+    <span className="text-sm text-slate-500">Rows:</span>
+    <select
+      value={pageSize}
+      onChange={(e) => setPageSize(Number(e.target.value))}
+      className="border border-slate-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-indigo-500"
+    >
+      <option value={10}>10</option>
+      <option value={20}>20</option>
+      <option value={50}>50</option>
+    </select>
+  </div>
+</div>
+
+    
+  </div>
+
+  <div className="overflow-x-auto max-h-[420px]">
+    <table className="min-w-full text-sm">
+      <thead className="sticky top-0 bg-slate-50 z-10">
+        <tr className="text-slate-600 text-xs uppercase tracking-wide">
+          <th className="px-4 py-3 text-left">Order ID</th>
+          <th className="px-4 py-3 text-center">Date</th>
+          <th className="px-4 py-3 text-left">Client</th>
+          <th className="px-4 py-3 text-left">Products</th>
+          <th className="px-4 py-3 text-right">Total</th>
+          <th className="px-4 py-3 text-right">Paid</th>
+          <th className="px-4 py-3 text-right">Balance</th>
+          <th className="px-4 py-3 text-center">Payment</th>
+          <th className="px-4 py-3 text-center">Status</th>
+        </tr>
+      </thead>
+
+      <tbody className="divide-y divide-slate-100">
+ {paginatedTable.map((row, index) => (  
+          <tr
+            key={row.orderId}
+            className={`hover:bg-indigo-50 transition ${
+              index % 2 === 0 ? "bg-white" : "bg-slate-50"
+            }`}
+          >
+            <td className="px-4 py-3 font-medium text-slate-700">
+              {row.orderId}
+            </td>
+
+            <td className="px-4 py-3 text-center text-slate-600">
+              {row.date}
+            </td>
+
+            <td className="px-4 py-3 text-slate-700">
+              {row.clientName}
+            </td>
+
+            <td className="px-4 py-3 text-slate-600">
+  <div className="flex flex-col gap-1">
+    {Array.isArray(row.productName) ? (
+      row.productName.map((p, i) => (
+        <span key={i}>{p}</span>
+      ))
+    ) : (
+      <span>{row.productName}</span>
+    )}
+  </div>
+</td>
 
 
-          <tbody>
-  {table.map((row) => (
-    <tr key={row.orderId}>
-      <td className="border p-2 text-center">{row.orderId}</td>
-      <td className="border p-2 text-center">{row.date}</td>
-      <td className="border p-2 text-center">{row.clientName}</td>
+            <td className="px-4 py-3 text-right font-semibold text-slate-800">
+              ₹ {row.totalAmount}
+            </td>
 
-      <td className="border p-2">{row.productName}</td>
+            <td className="px-4 py-3 text-right text-green-700">
+              ₹ {row.paidAmount}
+            </td>
 
-      <td className="border p-2 text-center">₹ {row.totalAmount}</td>
-      <td className="border p-2 text-center">₹ {row.paidAmount}</td>
-      <td className="border p-2 text-center">₹ {row.balanceAmount}</td>
+            <td className="px-4 py-3 text-right text-red-600">
+              ₹ {row.balanceAmount}
+            </td>
 
-      {/* ✅ PAYMENT STATUS */}
-      <td className="border p-2 text-center">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-            row.paymentStatus === "paid"
-              ? "bg-green-100 text-green-700"
-              : row.paymentStatus === "partial"
-              ? "bg-orange-100 text-orange-700"
-              : "bg-gray-100 text-gray-700"
-          }`}
-        >
-          {row.paymentStatus}
-        </span>
-      </td>
+            {/* PAYMENT STATUS */}
+            <td className="px-4 py-3 text-center">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+                  row.paymentStatus === "paid"
+                    ? "bg-green-100 text-green-700"
+                    : row.paymentStatus === "partial"
+                    ? "bg-orange-100 text-orange-700"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {row.paymentStatus}
+              </span>
+            </td>
 
-      {/* ✅ ORDER STATUS */}
-      <td className="border p-2 text-center">
-        <span
-          className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(
-            row.orderStatus
-          )}`}
-        >
-          {row.orderStatus}
-        </span>
-      </td>
-    </tr>
-  ))}
-</tbody>
+            {/* ORDER STATUS */}
+            <td className="px-4 py-3 text-center">
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(
+                  row.orderStatus
+                )}`}
+              >
+                {row.orderStatus}
+              </span>
+            </td>
+          </tr>
+        ))}
 
-        </table>
-        </div>
-      </div>
+        {filteredTable.length === 0 && (
+          <tr>
+            <td
+              colSpan={9}
+              className="px-4 py-6 text-center text-slate-500"
+            >
+              No sales found
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+    <div className="flex justify-center items-center py-5 bg-slate-50 border-t border-slate-200 rounded-b-2xl">
+  <Pagination
+    currentPage={currentPage}
+    totalPages={totalPages}
+    onPageChange={setCurrentPage}
+  />
+</div>
+
+  </div>
+</div>
+
 
     </div>
   );
