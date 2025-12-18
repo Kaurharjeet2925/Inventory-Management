@@ -1,17 +1,182 @@
-exports.getProductsDashboard = (req, res) => {
-  const user = req.user || {};
-  res.json({
-    message: "Products dashboard data",
-    user: {
-      id: user._id || user.id || null,
-      name: user.name || null,
-      email: user.email || null
-    },
-    // example dashboard payload
-    stats: {
-      totalProducts: 120,
-      lowStock: 7,
-      recentSales: 15
-    }
-  });
+const Order = require("../models/orders.model");
+
+exports.getPaymentStatusPie = async (req, res) => {
+  try {
+    const orders = await Order.find({ status: "completed" });
+
+    let paidAmount = 0;
+    let pendingAmount = 0;
+
+    orders.forEach(order => {
+      const items = order.items || [];
+
+      const total =
+        order.paymentDetails?.totalAmount ||
+        items.reduce(
+          (sum, i) => sum + (i.price || 0) * (i.quantity || 0),
+          0
+        );
+
+      const paid = order.paymentDetails?.paidAmount || 0;
+
+      paidAmount += paid;
+      pendingAmount += Math.max(total - paid, 0);
+    });
+
+    res.json([
+      { name: "Paid", value: paidAmount },
+      { name: "Pending", value: pendingAmount }
+    ]);
+  } catch (err) {
+    console.error("Payment Pie Error:", err);
+    res.status(500).json({ message: "Failed to load payment summary" });
+  }
+};
+exports.getTopProducts = async (req, res) => {
+  try {
+    const limit = Number(req.query.limit || 5);
+
+    // Aggregate sales by productId so we can lookup product metadata (name, thumbnail)
+    const result = await Order.aggregate([
+      { $match: { status: "completed" } },
+      { $unwind: "$items" },
+      { $group: { _id: "$items.productId", totalQty: { $sum: "$items.quantity" }, sampleName: { $first: "$items.productName" } } },
+      { $sort: { totalQty: -1 } },
+      { $limit: limit },
+      // lookup product details
+      {
+        $lookup: {
+          from: "products",
+          localField: "_id",
+          foreignField: "_id",
+          as: "product",
+        }
+      },
+      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          totalQty: 1,
+          // Prefer product document name, then fallback to the name stored on the order item, otherwise mark Unknown
+          productName: { $ifNull: ["$product.name", "$sampleName", "Unknown product"] },
+          image: {
+            $cond: [
+              { $ifNull: ["$product.thumbnail", false] },
+              { $concat: ["/uploads/", "$product.thumbnail"] },
+              { $arrayElemAt: ["$product.images", 0] }
+            ]
+          }
+        }
+      }
+    ]);
+
+    // 🔹 normalize image paths and format response
+    const normalizeImage = (img) => {
+      if (!img) return null;
+      // If already absolute URL, keep it
+      if (typeof img === 'string' && img.startsWith('http')) return img;
+
+      let out = img;
+      // If stored like 'uploads/...' -> make '/uploads/...'
+      if (out.startsWith('uploads/')) out = '/' + out;
+      // If stored like '/uploads/uploads/...' -> collapse to '/uploads/...'
+      out = out.replace(/\/uploads\/uploads\//g, '/uploads/');
+      // If it's just a filename (no 'uploads' prefix), ensure '/uploads/filename'
+      if (!out.startsWith('/uploads/')) {
+        if (out.startsWith('/')) out = '/uploads' + out;
+        else out = '/uploads/' + out;
+      }
+
+      return out;
+    };
+
+    const formatted = result.map((p, index) => ({
+      rank: index + 1,
+      productId: p._id,
+      productName: p.productName,
+      quantitySold: p.totalQty,
+      image: normalizeImage(p.image),
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error("Top Products Error:", err);
+    res.status(500).json({ message: "Failed to load top products" });
+  }
+};
+
+// Dashboard summary: order counts, sales totals and growth, inventory overview
+exports.getDashboardSummary = async (req, res) => {
+  try {
+    // range in days for sales summary (default: 7 days)
+    const rangeDays = Number(req.query.rangeDays || 7);
+    const now = new Date();
+    const startCurrent = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+    const startPrev = new Date(now.getTime() - 2 * rangeDays * 24 * 60 * 60 * 1000);
+
+    // Order counts by normalized status (lowercase + trimmed)
+    const countsAgg = await Order.aggregate([
+      { $project: { normStatus: { $toLower: { $trim: { input: { $ifNull: ["$status", ""] } } } }, orderId: 1 } },
+      { $group: { _id: "$normStatus", count: { $sum: 1 } } }
+    ]);
+    const counts = countsAgg.reduce((acc, item) => {
+      acc[item._id] = item.count;
+      return acc;
+    }, {});
+
+    // Also collect a small sample of orderIds per status to aid debugging
+    const samplesAgg = await Order.aggregate([
+      { $project: { normStatus: { $toLower: { $trim: { input: { $ifNull: ["$status", ""] } } } }, orderId: 1 } },
+      { $group: { _id: "$normStatus", sampleOrders: { $push: "$orderId" } } }
+    ]);
+    const samples = samplesAgg.reduce((acc, item) => {
+      acc[item._id] = (item.sampleOrders || []).slice(0, 10);
+      return acc;
+    }, {});
+
+    const pending = counts.pending || 0;
+    const processing = counts.processing || 0;
+    const shipped = counts.shipped || 0;
+    const delivered = counts.delivered || 0;
+    const completed = counts.completed || 0;
+
+    // Sales total for the current period (completed orders)
+    const salesCurrentAgg = await Order.aggregate([
+      { $match: { status: "completed", createdAt: { $gte: startCurrent } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ["$paymentDetails.totalAmount", 0] } } } }
+    ]);
+    const totalSalesCurrent = (salesCurrentAgg[0] && salesCurrentAgg[0].total) || 0;
+
+    // Sales total for the previous period
+    const salesPrevAgg = await Order.aggregate([
+      { $match: { status: "completed", createdAt: { $gte: startPrev, $lt: startCurrent } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ["$paymentDetails.totalAmount", 0] } } } }
+    ]);
+    const totalSalesPrev = (salesPrevAgg[0] && salesPrevAgg[0].total) || 0;
+
+    // Growth percentage vs previous period
+    let growth = 0;
+    if (totalSalesPrev === 0 && totalSalesCurrent > 0) growth = 100;
+    else if (totalSalesPrev === 0 && totalSalesCurrent === 0) growth = 0;
+    else growth = ((totalSalesCurrent - totalSalesPrev) / Math.abs(totalSalesPrev)) * 100;
+
+    // Inventory overview
+    const Product = require("../models/product.model");
+    const products = await Product.find();
+    const totalQty = products.reduce((s, p) => s + (p.totalQuantity || 0), 0);
+    const lowStock = products.filter(p => (p.totalQuantity || 0) <= 5).length;
+    const outOfStock = products.filter(p => (p.totalQuantity || 0) <= 0).length;
+
+    res.json({
+      // include processing separately for clarity
+      orders: { pending, processing, shipped, delivered, completed },
+      // debugging samples for quick inspection
+      ordersDebug: { samples },
+      sales: { total: totalSalesCurrent, growth: Number(growth.toFixed(2)), periodDays: rangeDays },
+      inventory: { totalQty, lowStock, outOfStock }
+    });
+  } catch (err) {
+    console.error('Dashboard Summary Error:', err);
+    res.status(500).json({ message: 'Failed to load dashboard summary' });
+  }
 };

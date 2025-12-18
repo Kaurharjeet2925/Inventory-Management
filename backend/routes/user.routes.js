@@ -19,12 +19,12 @@ const auth = require("../middleware/auth");
 const onlySuperAdmin = require("../middleware/onlySuperAdmin");
 const allowAdminAndSuperAdmin = require("../middleware/allowAdminAndSuperAdmin");
 
-const { getProductsDashboard } = require("../controller/dashboard.controller");
+//const { getProductsDashboard } = require("../controller/dashboard.controller");
 
 // Specific routes FIRST (before /:id pattern)
 router.post("/register", registerValidation, registerUser);
 router.post("/login", loginValidation, loginUser);
-router.get("/dashboard", auth, getProductsDashboard);
+//router.get("/dashboard", auth, getProductsDashboard);
 router.get("/all", auth, onlySuperAdmin, getAllUsers);
 router.get("/delivery-persons", auth, allowAdminAndSuperAdmin, getDeliveryPersons);
 router.post(

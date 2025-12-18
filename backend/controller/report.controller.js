@@ -423,3 +423,67 @@ exports.generateInventoryReport = async (req, res) => {
   }
 };
 
+
+exports.getSalesTrend = async (req, res) => {
+  try {
+    const { range } = req.query;
+    let startDate;
+    let groupFormat;
+
+    // 🔹 LAST 7 DAYS → DATE-WISE
+    if (!range || range === "7days") {
+      startDate = moment().subtract(6, "days").startOf("day").toDate();
+      groupFormat = "%d %b";
+    }
+
+    // 🔹 THIS MONTH → DATE-WISE
+    else if (range === "month") {
+      startDate = moment().startOf("month").toDate();
+      groupFormat = "%d %b";
+    }
+
+    // 🔹 THIS YEAR → MONTH-WISE
+    else if (range === "year") {
+      startDate = moment().startOf("year").toDate();
+      groupFormat = "%b";
+    }
+
+    const result = await Order.aggregate([
+      {
+        $match: {
+          status: "completed",
+          createdAt: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: groupFormat,
+              date: "$createdAt"
+            }
+          },
+          sales: {
+            $sum: {
+              $ifNull: ["$paymentDetails.totalAmount", 0]
+            }
+          }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // 🔹 Final format for chart
+    const formatted = result.map(r => ({
+      label: r._id,
+      sales: r.sales
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error("Sales Trend Error:", err);
+    res.status(500).json({ message: "Failed to load sales trend" });
+  }
+};
+
+

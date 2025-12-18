@@ -3,7 +3,7 @@ import Login from './pages/Login.js';
 import { Routes, Route } from "react-router-dom";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Dashboard from './pages/Dasboard.js';
+import Dashboard from './pages/Dashboard/Dasboard.js';
 import Profile from './pages/Profile.js';
 import EditProfile from './pages/EditProfile.js';
 import AllAdmin from './pages/AllAdmin.js';
@@ -82,7 +82,7 @@ function App() {
           <Route path="generate-order" element={<CreateOrders />} />
           <Route path="view-order" element={<ViewOrders />} />
         </Route>
-        <Route path="reports" element={<Reports />}>
+        <Route path="/reports" element={<Reports />}>
             {/* <Route index element={<Reports />} /> */}
             <Route path="sales-reports" element={<SalesReports />} />
             <Route path="inventory-reports" element={<InventoryReports />} />

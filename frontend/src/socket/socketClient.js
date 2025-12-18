@@ -1,4 +1,5 @@
 import { io } from "socket.io-client";
+import { toast } from "react-toastify";
 
 let token = localStorage.getItem("token");
 
@@ -31,13 +32,19 @@ socket.on("disconnect", (reason) => {
 socket.on("connect_error", (err) => {
   console.log("❌ Socket connect error:", err.message);
 
-  // Token expired / wrong token → refresh token
-  if (err.message === "Unauthorized socket" || err.message === "No token") {
-    token = localStorage.getItem("token");
-    socket.auth = { token };
+  // Handle auth-related errors explicitly
+  const m = (err.message || '').toLowerCase();
+  if (m.includes('no token') || m.includes('invalid token') || m.includes('unauthorized') || m.includes('jwt expired')) {
+    // Clear token and user and notify
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    toast.error('Socket authentication failed: please sign in again.');
+    // Redirect to login (allow UI to react)
+    try { window.location.href = '/login'; } catch(e){}
+    return; // don't retry connect
   }
 
-  // Retry
+  // Non-auth errors → retry connection after delay
   setTimeout(() => {
     socket.connect();
   }, 1000);

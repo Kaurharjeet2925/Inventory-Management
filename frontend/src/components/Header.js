@@ -20,7 +20,7 @@ const Header = () => {
     localStorage.removeItem("agent");
     localStorage.removeItem("user");
     localStorage.removeItem("auth");
-    window.location.href = "/login";
+    window.location.href = "/";
   };
 
   // get current user display name from localStorage
