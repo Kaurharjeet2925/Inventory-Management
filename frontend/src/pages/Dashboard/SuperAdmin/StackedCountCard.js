@@ -1,31 +1,50 @@
-import { useState, useRef } from "react";
-
-const cardsData = [
-  {
-    id: "clients",
-    title: "Clients",
-    value: 128,
-    gradient: "from-purple-500 via-indigo-600 to-blue-700",
-  },
-  {
-    id: "admins",
-    title: "Admins",
-    value: 3,
-    gradient: "from-orange-500 via-amber-600 to-yellow-600",
-  },
-  {
-    id: "delivery",
-    title: "Delivery Partners",
-    value: 12,
-    gradient: "from-emerald-500 via-green-600 to-teal-700",
-  },
-];
+import { useEffect, useRef, useState } from "react";
+import { apiClient } from "../../../apiclient/apiclient";
 
 const SwipeableLayeredStatsCard = () => {
-  const [cards, setCards] = useState(cardsData);
+  const [cards, setCards] = useState([]);
   const startX = useRef(0);
   const dragging = useRef(false);
 
+  /* ----------------------------
+     LOAD DATA FROM BACKEND
+  ----------------------------- */
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const res = await apiClient.get("/user-stats");
+
+        setCards([
+          {
+            id: "clients",
+            title: "Clients",
+            value: res.data.clients || 0,
+            gradient: "from-purple-500 via-indigo-600 to-blue-700",
+          },
+          {
+            id: "admins",
+            title: "Admins",
+            value: res.data.admins || 0,
+            gradient: "from-orange-500 via-amber-600 to-yellow-600",
+          },
+          {
+            id: "delivery",
+            title: "Delivery Partners",
+            value: res.data.delivery || 0,
+            gradient: "from-emerald-500 via-green-600 to-teal-700",
+          },
+        ]);
+      } catch (err) {
+        console.error("Failed to load user stats", err);
+      }
+    };
+
+    loadStats();
+  }, []);
+
+  /* ----------------------------
+     SWIPE LOGIC (UNCHANGED)
+  ----------------------------- */
   const rotateCards = () => {
     setCards((prev) => {
       const [first, ...rest] = prev;
@@ -42,7 +61,7 @@ const SwipeableLayeredStatsCard = () => {
     if (!dragging.current) return;
     const diff = x - startX.current;
 
-    // 🚀 FAST swap trigger
+    // ⚡ fast swap
     if (Math.abs(diff) > 20) {
       dragging.current = false;
       rotateCards();
@@ -53,6 +72,18 @@ const SwipeableLayeredStatsCard = () => {
     dragging.current = false;
   };
 
+  /* ----------------------------
+     LOADING STATE
+  ----------------------------- */
+  if (!cards.length) {
+    return (
+      <div className="h-64 w-full rounded-xl bg-gray-100 animate-pulse" />
+    );
+  }
+
+  /* ----------------------------
+     UI
+  ----------------------------- */
   return (
     <div className="relative h-64 w-full select-none">
       {cards.map((card, index) => (
