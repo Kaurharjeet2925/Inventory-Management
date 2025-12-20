@@ -7,7 +7,8 @@ const {
   getUserById,
   updateUser,
   deleteUser,
-  getDeliveryPersons
+  getDeliveryPersons,
+
 } = require("../controller/user.controller");
 const upload = require("../middleware/multer");
 const { 
@@ -26,6 +27,7 @@ router.post("/register", registerValidation, registerUser);
 router.post("/login", loginValidation, loginUser);
 //router.get("/dashboard", auth, getProductsDashboard);
 router.get("/all", auth, onlySuperAdmin, getAllUsers);
+
 router.get("/delivery-persons", auth, allowAdminAndSuperAdmin, getDeliveryPersons);
 router.post(
   "/superadmin/create-user",
@@ -34,6 +36,7 @@ router.post(
   upload.single("image"),
   createUserBySuperAdmin  
 );
+
 
 // Generic ID routes LAST (after specific routes)
 router.get("/:id", auth, getUserById);

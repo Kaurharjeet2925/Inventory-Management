@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { apiClient } from "../../../apiclient/apiclient";
-import SalesSummary from "./SalesSummary";
+//import SalesSummary from "./SalesSummary";
 import socket from "../../../socket/socketClient";
 
 /* ===============================
@@ -89,8 +89,12 @@ const StatsCards = () => {
     const events = ["order_created", "order_updated", "order_status_updated", "order_deleted", "order_collected"];
     events.forEach((ev) => socket.on(ev, loadSummary));
 
+    // Also reload summary when socket reconnects
+    socket.on('connect', loadSummary);
+
     return () => {
       events.forEach((ev) => socket.off(ev, loadSummary));
+      socket.off('connect', loadSummary);
     };
   }, []);
 

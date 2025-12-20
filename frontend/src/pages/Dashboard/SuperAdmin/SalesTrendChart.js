@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
@@ -9,35 +11,33 @@ import {
 } from "recharts";
 import { apiClient } from "../../../apiclient/apiclient";
 
-const SalesTrendChart = () => {
-  const [range, setRange] = useState("7days");
+const SalesTrendChart = ({ range, setRange }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const res = await apiClient.get(`/sales-trend?range=${range}`);
-      setData(res.data || []);
-    } catch (err) {
-      console.error("Failed to load sales trend", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const chartColor = "#2563eb";
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const res = await apiClient.get(
+          `/sales-trend?range=${range}&metric=sales`
+        );
+        setData(res.data || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
   }, [range]);
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-gray-200 w-full">
-      
-      {/* HEADER */}
+    <div className="bg-white rounded-xl p-4 border border-gray-200 w-full h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-700">
-          Sales Trend
-        </h4>
+        <h4 className="text-sm font-semibold text-gray-700">Sales Trend</h4>
 
         <select
           value={range}
@@ -50,8 +50,7 @@ const SalesTrendChart = () => {
         </select>
       </div>
 
-      {/* CHART */}
-      <div className="h-64">
+       <div className="h-56">
         {loading ? (
           <p className="text-center text-gray-400 text-sm mt-20">
             Loading sales data...
@@ -62,26 +61,51 @@ const SalesTrendChart = () => {
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data}>
+            <ComposedChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" />
               <YAxis
                 tickFormatter={(v) => `₹${v}`}
                 domain={[0, "dataMax + 100"]}
               />
-              <Tooltip formatter={(v) => `₹${v}`} />
+              <Tooltip
+  content={({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+
+    // take first value only
+    const value = payload[0].value;
+
+    return (
+      <div className="bg-white border rounded-md px-3 py-2 text-sm shadow">
+        <p className="font-medium">{label}</p>
+        <p className="text-blue-600">Sales: ₹{value}</p>
+      </div>
+    );
+  }}
+/>
+
+              <Area
+                type="monotone"
+                dataKey={'sales'}
+                fill={chartColor}
+                stroke={chartColor}
+                fillOpacity={0.12}
+                strokeWidth={0}
+              />
               <Line
                 type="monotone"
-                dataKey="sales"
-                stroke="#2563eb"
+                dataKey={'sales'}
+                stroke={chartColor}
                 strokeWidth={2}
                 dot={{ r: 4 }}
               />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
     </div>
   );
 };
+
 
 export default SalesTrendChart;

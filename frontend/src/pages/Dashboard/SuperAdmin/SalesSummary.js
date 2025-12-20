@@ -1,51 +1,85 @@
-import { ArrowUp, ArrowDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiClient } from "../../../apiclient/apiclient";
 
-const SalesSummary = () => {
-  const [data, setData] = useState(null);
+const SalesSummary = ({ range = "7days" }) => {
+  const [trend, setTrend] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  /* -----------------------------
+     Range label mapping
+  ------------------------------ */
+  const RANGE_LABELS = {
+    "7days": "last 7 days",
+    "month": "this month",
+    "year": "this year",
+  };
+
+  /* -----------------------------
+     Fetch sales trend (single source)
+  ------------------------------ */
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const res = await apiClient.get("/summary?rangeDays=7");
-        setData(res.data);
+        const res = await apiClient.get(
+          `/sales-trend?range=${range}&metric=sales`
+        );
+        setTrend(res.data || []);
       } catch (err) {
-        console.error("Failed to load dashboard summary", err);
+        console.error("Failed to load sales summary", err);
       } finally {
         setLoading(false);
       }
     };
-    load();
-  }, []);
 
-  if (loading || !data) {
+    load();
+  }, [range]);
+
+  /* -----------------------------
+     Loading state
+  ------------------------------ */
+  if (loading) {
     return (
-      <div className="bg-white rounded-lg px-3 py-2 border border-gray-200 text-sm text-gray-500">Loading...</div>
+      <div className="rounded-xl p-6 w-full h-full animate-pulse bg-gradient-to-r from-indigo-100 via-blue-100 to-cyan-100">
+        <div className="h-20 bg-white/40 rounded-md" />
+      </div>
     );
   }
 
-  const totalSales = data.sales?.total || 0;
-  const growth = data.sales?.growth || 0;
-  const isPositive = growth >= 0;
+  /* -----------------------------
+     Total Sales (CORRECT)
+  ------------------------------ */
+  const totalSales = trend.reduce(
+    (sum, item) => sum + (item.sales || 0),
+    0
+  );
 
+  /* -----------------------------
+     UI
+  ------------------------------ */
   return (
-    <div className="bg-white rounded-lg px-4 py-3 border border-gray-200 flex items-center gap-3">
-      <div>
-        <p className="text-xs text-gray-500">Total Sales</p>
-        <p className="text-lg font-bold text-gray-900">₹{totalSales.toLocaleString()}</p>
+    <div
+      className="rounded-xl p-6 w-full h-full
+      bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500
+      text-white shadow-lg relative flex flex-col"
+    >
+      {/* Header */}
+      <div className="absolute left-6 top-4 text-xs uppercase opacity-90 tracking-wider">
+        Total Sales
       </div>
 
-      <div className="flex items-center gap-1 text-sm font-semibold">
-        {isPositive ? (
-          <ArrowUp size={16} className="text-green-600" />
-        ) : (
-          <ArrowDown size={16} className="text-red-600" />
-        )}
-        <span className={isPositive ? "text-green-600" : "text-red-600"}>{Math.abs(growth)}%</span>
-        <span className="text-gray-400 text-xs">vs last {data.sales?.periodDays} days</span>
+      {/* Centered Total */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-5xl md:text-6xl font-extrabold leading-none">
+            ₹{new Intl.NumberFormat("en-IN").format(totalSales)}
+          </div>
+
+          {/* Range text */}
+          <div className="text-xs opacity-90 mt-2">
+            vs {RANGE_LABELS[range]}
+          </div>
+        </div>
       </div>
     </div>
   );

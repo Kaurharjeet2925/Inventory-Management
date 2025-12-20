@@ -53,4 +53,17 @@ socket.on("connect_error", (err) => {
 // Auto-connect at startup if token exists
 if (token) socket.connect();
 
+// Notify app on successful connect so components can resync
+socket.on('connect', () => {
+  console.log('⚡ Socket connected (client):', socket.id);
+  try {
+    window.dispatchEvent(new CustomEvent('socket:connected', { detail: { socketId: socket.id } }));
+  } catch (e) {
+    // older browsers may not support CustomEvent constructor in same way
+    const evt = document.createEvent('Event');
+    evt.initEvent('socket:connected', true, true);
+    window.dispatchEvent(evt);
+  }
+});
+
 export default socket;

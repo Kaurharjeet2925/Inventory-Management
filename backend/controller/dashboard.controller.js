@@ -1,37 +1,38 @@
 const Order = require("../models/orders.model");
-
+const User = require("../models/user.model");
+const Client = require("../models/client.model");
 exports.getPaymentStatusPie = async (req, res) => {
   try {
     const orders = await Order.find({ status: "completed" });
 
+    let totalAmount = 0;
     let paidAmount = 0;
-    let pendingAmount = 0;
 
     orders.forEach(order => {
-      const items = order.items || [];
+      const orderTotal =
+        Number(order.paymentDetails?.totalAmount) || 0;
 
-      const total =
-        order.paymentDetails?.totalAmount ||
-        items.reduce(
-          (sum, i) => sum + (i.price || 0) * (i.quantity || 0),
-          0
-        );
+      const orderPaid =
+        Number(order.paymentDetails?.paidAmount) || 0;
 
-      const paid = order.paymentDetails?.paidAmount || 0;
-
-      paidAmount += paid;
-      pendingAmount += Math.max(total - paid, 0);
+      totalAmount += orderTotal;
+      paidAmount += orderPaid;
     });
+
+    const pendingAmount = Math.max(totalAmount - paidAmount, 0);
 
     res.json([
       { name: "Paid", value: paidAmount },
-      { name: "Pending", value: pendingAmount }
+      { name: "Pending", value: pendingAmount },
+      {name : "TotalAmount", value: totalAmount}
     ]);
   } catch (err) {
     console.error("Payment Pie Error:", err);
     res.status(500).json({ message: "Failed to load payment summary" });
   }
 };
+
+
 exports.getTopProducts = async (req, res) => {
   try {
     const limit = Number(req.query.limit || 5);
@@ -180,3 +181,32 @@ exports.getDashboardSummary = async (req, res) => {
     res.status(500).json({ message: 'Failed to load dashboard summary' });
   }
 };
+
+
+
+exports.getUserStatsForDashboard = async (req, res) => {
+  try {
+    // 1️⃣ Clients count (from Client collection)
+    const clientsCount = await Client.countDocuments();
+
+    // 2️⃣ Admins count (admin + superAdmin)
+    const adminsCount = await User.countDocuments({
+      role: { $in: ["admin", "superAdmin"] }
+    });
+
+    // 3️⃣ Delivery partners count
+    const deliveryCount = await User.countDocuments({
+      role: "delivery-boy"
+    });
+
+    res.json({
+      clients: clientsCount,
+      admins: adminsCount,
+      delivery: deliveryCount
+    });
+  } catch (err) {
+    console.error("Dashboard User Stats Error:", err);
+    res.status(500).json({ message: "Failed to load dashboard user stats" });
+  }
+};
+

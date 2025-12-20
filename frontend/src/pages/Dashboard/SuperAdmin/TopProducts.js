@@ -25,8 +25,7 @@ const TopProducts = () => {
   }, [period]);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-
+<div className="bg-white rounded-xl p-4 border border-gray-200 w-full h-64 flex flex-col">
       {/* HEADER */}
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-semibold text-gray-700">

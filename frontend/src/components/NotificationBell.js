@@ -1,16 +1,31 @@
 import React, { useContext, useState } from "react";
 import { Bell, X } from "lucide-react";
 import { NotificationContext } from "../context/NotificationContext";
+import { apiClient } from "../apiclient/apiclient";
 
 const NotificationBell = () => {
   const { notifications, setNotifications } = useContext(NotificationContext);
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
+    try {
+      await apiClient.put('/notifications/mark-all-read');
+    } catch (err) {
+      console.error('Failed to mark all read', err);
+    }
     setNotifications([]);
   };
+  
+  const handleRemoveNotification = async (index) => {
+    try {
+      const notif = notifications[index];
+      if (notif && notif._id) {
+        await apiClient.put(`/notifications/${notif._id}/read`);
+      }
+    } catch (err) {
+      console.error('Failed to mark notification read', err);
+    }
 
-  const handleRemoveNotification = (index) => {
     setNotifications((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -65,7 +80,7 @@ const NotificationBell = () => {
                     <p className="text-sm text-gray-800 break-words">
                       {notif.message}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">{notif.time}</p>
+                    <p className="text-xs text-gray-500 mt-1">{notif.time || (notif.createdAt ? new Date(notif.createdAt).toLocaleString() : '')}</p>
                   </div>
                   <button
                     onClick={() => handleRemoveNotification(idx)}

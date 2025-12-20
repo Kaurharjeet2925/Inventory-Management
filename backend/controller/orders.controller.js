@@ -3,6 +3,7 @@ const Product = require("../models/product.model");
 const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
 const io = require("../server").io;
+const { createNotification } = require("./notification.controller");
 // Helper to generate orderId like STN00001
 const generateOrderId = async () => {
   // Find all orders and get the highest number
@@ -163,6 +164,10 @@ const finalPaymentDetails = {
     if (dpId) {
       io.to(dpId).emit("order_created", populatedOrder);
       console.log("🔥 SENT order_created to delivery boy room:", dpId);
+      // persist notification for the delivery person
+      try {
+        await createNotification({ io, message: `New order ${orderId} assigned to you`, targetUser: dpId, data: { orderId: populatedOrder._id } });
+      } catch (e) { console.error('notify dp failed', e); }
     } else {
       console.log("⚠️ deliveryPersonId EMPTY or INVALID → cannot emit");
     }
@@ -171,7 +176,15 @@ const finalPaymentDetails = {
     // Notify the specific admin who assigned this order
     if (assignedBy) {
       io.to(`admin_${assignedBy.toString()}`).emit("order_created", populatedOrder);
+      try {
+        await createNotification({ io, message: `You created a new order ${orderId}`, targetUser: assignedBy, data: { orderId: populatedOrder._id } });
+      } catch (e) { console.error('notify assigned admin failed', e); }
     }
+
+    // Notify all admins
+    try {
+      await createNotification({ io, message: `New order ${orderId} created`, targetRole: 'admins', data: { orderId: populatedOrder._id } });
+    } catch (e) { console.error('notify admins failed', e); }
 
     io.emit("order_created_global", populatedOrder);
   console.log("FINAL PAYMENT DETAILS =>", finalPaymentDetails);
@@ -376,11 +389,13 @@ exports.updateOrderPayment = async (req, res) => {
     // 🔔 Notify admin
     if (order.assignedBy) {
       io.to(`admin_${order.assignedBy._id}`).emit("order_updated", order);
+      try { await createNotification({ io, message: `Payment updated for ${order.orderId}`, targetUser: order.assignedBy._id, data: { orderId: order._id } }); } catch(e){console.error('notify admin failed', e);}
     }
 
     // 🔔 Notify delivery boy
     if (order.deliveryPersonId) {
       io.to(order.deliveryPersonId._id.toString()).emit("order_updated", order);
+      try { await createNotification({ io, message: `Payment updated for ${order.orderId}`, targetUser: order.deliveryPersonId._id, data: { orderId: order._id } }); } catch(e){console.error('notify dp failed', e);}
     }
 
     return res.json({
@@ -425,6 +440,7 @@ exports.collectOrder = async (req, res) => {
     // Emit populated order to the admin who assigned it
     if (updatedOrder.assignedBy) {
       io.to(`admin_${updatedOrder.assignedBy._id.toString()}`).emit("order_collected", updatedOrder);
+      try { await createNotification({ io, message: `An item was collected for ${updatedOrder.orderId}`, targetUser: updatedOrder.assignedBy._id, data: { orderId: updatedOrder._id } }); } catch(e){console.error('notify admin failed', e);}
     }
 
     res.json({
@@ -505,12 +521,14 @@ exports.updateOrderStatus = async (req, res) => {
     // Notify the specific admin who assigned this order
     if (updatedOrder.assignedBy) {
       io.to(`admin_${updatedOrder.assignedBy._id.toString()}`).emit("order_status_updated", updatedOrder);
+      try { await createNotification({ io, message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`, targetUser: updatedOrder.assignedBy._id, data: { orderId: updatedOrder._id } }); } catch(e){console.error('notify admin failed', e);}
     }
 
     // Notify delivery boy assigned to this order
     if (updatedOrder.deliveryPersonId) {
       io.to(updatedOrder.deliveryPersonId.toString())
         .emit("order_status_updated", updatedOrder);
+      try { await createNotification({ io, message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`, targetUser: updatedOrder.deliveryPersonId, data: { orderId: updatedOrder._id } }); } catch(e){console.error('notify dp failed', e);}
     }
 
     // // Optional global event
@@ -564,6 +582,7 @@ exports.deleteOrder = async (req, res) => {
     // STEP 3: Delete the order after stock is restored
     await Order.findByIdAndDelete(id);
     io.emit("order_deleted", { orderId: id });
+    try { await createNotification({ io, message: `Order ${order.orderId} has been deleted`, targetRole: 'admins', data: { orderId: id } }); } catch(e){console.error('notify admins failed', e);}
     return res.json({ message: "Order deleted successfully" });
 
 

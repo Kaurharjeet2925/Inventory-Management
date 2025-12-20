@@ -455,6 +455,31 @@ exports.getSalesTrend = async (req, res) => {
           createdAt: { $gte: startDate }
         }
       },
+      // Compute orderAmount using paymentDetails.totalAmount OR fallback to summing items (price * quantity)
+      {
+        $project: {
+          createdAt: 1,
+          orderAmount: {
+            $ifNull: [
+              "$paymentDetails.totalAmount",
+              {
+                $sum: {
+                  $map: {
+                    input: { $ifNull: ["$items", []] },
+                    as: "it",
+                    in: {
+                      $multiply: [
+                        { $ifNull: ["$$it.price", 0] },
+                        { $ifNull: ["$$it.quantity", 0] }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
       {
         $group: {
           _id: {
@@ -463,20 +488,18 @@ exports.getSalesTrend = async (req, res) => {
               date: "$createdAt"
             }
           },
-          sales: {
-            $sum: {
-              $ifNull: ["$paymentDetails.totalAmount", 0]
-            }
-          }
+          sales: { $sum: "$orderAmount" },
+          orders: { $sum: 1 }
         }
       },
       { $sort: { _id: 1 } }
     ]);
 
-    // 🔹 Final format for chart
+    // 🔹 Final format for chart (return both sales and orders)
     const formatted = result.map(r => ({
       label: r._id,
-      sales: r.sales
+      sales: r.sales,
+      orders: r.orders
     }));
 
     res.json(formatted);

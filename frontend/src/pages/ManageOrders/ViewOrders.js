@@ -67,14 +67,23 @@ const ViewOrders = () => {
       setOrders(prev => [newOrder, ...prev]);
     });
 
+    // When socket reconnects, reload current page and counts
+    const onConnect = () => {
+      console.log('Socket reconnected - refreshing orders and counts');
+      // reset to first page to ensure fresh data
+      loadOrders(1, limit, activeTab);
+    };
+    socket.on('connect', onConnect);
+
     return () => {
       socket.off("order_collected");
       socket.off("order_status_updated");
       socket.off("order_updated");
       socket.off("order_deleted");
       socket.off("order_created");
+      socket.off('connect', onConnect);
     };
-  }, []);
+  }, [activeTab]);
 
   const loadOrders = async (page = 1, lim = limit, status = null) => {
     try {

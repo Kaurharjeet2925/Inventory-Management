@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { UserCircle, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
 const Header = () => {
