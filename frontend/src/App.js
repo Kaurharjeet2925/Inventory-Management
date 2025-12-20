@@ -3,6 +3,8 @@ import Login from './pages/Login.js';
 import { Routes, Route } from "react-router-dom";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import "react-date-range/dist/styles.css";
+import "react-date-range/dist/theme/default.css";
 import Dashboard from './pages/Dashboard/Dasboard.js';
 import Profile from './pages/Profile.js';
 import EditProfile from './pages/EditProfile.js';

@@ -1,67 +1,82 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../../apiclient/apiclient";
-import socket from "../../../socket/socketClient"; 
+import socket from "../../../socket/socketClient";
 import { Clock, Truck, PackageCheck, CheckCircle } from "lucide-react";
 
 const AgentDashboard = () => {
   const navigate = useNavigate();
-  const [orders, setOrders] = useState([]);
   const user = JSON.parse(localStorage.getItem("agent"));
 
-  // 1️⃣ Load orders for this delivery boy
-  const loadOrders = async () => {
+  const [statusCounts, setStatusCounts] = useState({
+    pending: 0,
+    shipped: 0,
+    delivered: 0,
+    completed: 0,
+  });
+
+  /* ------------------------------
+     SAFE DELIVERY PERSON ID
+  ------------------------------ */
+  const getDeliveryPersonId = (order) => {
+    if (!order?.deliveryPersonId) return null;
+
+    return typeof order.deliveryPersonId === "string"
+      ? order.deliveryPersonId
+      : order.deliveryPersonId._id;
+  };
+
+  /* ------------------------------
+     LOAD COUNTS
+  ------------------------------ */
+  const loadDashboardData = async () => {
     try {
-      const res = await apiClient.get(`/orders`);
-      console.log("📦 Loaded orders:", res.data.data);
-      setOrders(res.data.data || []);
+      const res = await apiClient.get("/orders");
+      setStatusCounts(res.data.statusCounts || {});
     } catch (err) {
-      console.error("Failed to load orders", err);
+      console.error("Failed to load dashboard data", err);
     }
   };
 
+  /* ------------------------------
+     SOCKET + INITIAL LOAD
+  ------------------------------ */
   useEffect(() => {
-    loadOrders(); // Initial load
-  
-    // listen for order assigned to this delivery boy
-    socket.on("deliver_order", (data) => {
-      console.log("📦 Delivery boy RECEIVED ORDER:", data);
-  
-      if (data.order.deliveryPersonId === user._id) {
-        setOrders((prev) => [data.order, ...prev]);
+    loadDashboardData();
+
+    socket.on("order_created", (order) => {
+      const dpId = getDeliveryPersonId(order);
+      if (dpId === user?._id) {
+        loadDashboardData();
       }
     });
-  
-    // Order status update stays same
-    socket.on("order_status_updated", (updatedOrder) => {
-      if (updatedOrder.deliveryPersonId !== user._id) return;
-  
-      setOrders((prev) => {
-        const others = prev.filter((o) => o._id !== updatedOrder._id);
-        return [updatedOrder, ...others];
-      });
+
+    socket.on("order_status_updated", (order) => {
+      const dpId = getDeliveryPersonId(order);
+      if (dpId === user?._id) {
+        loadDashboardData();
+      }
     });
-  
+
+    socket.on("order_deleted", () => {
+      loadDashboardData();
+    });
+
     return () => {
-      socket.off("deliver_order");
+      socket.off("order_created");
       socket.off("order_status_updated");
+      socket.off("order_deleted");
     };
   }, []);
-  
 
-  // COUNT ORDERS BY STATUS
-  const stats = {
-    pending: orders.filter((o) => o.status === "pending").length,
-    shipped: orders.filter((o) => o.status === "shipped").length,
-    delivered: orders.filter((o) => o.status === "delivered").length,
-    completed: orders.filter((o) => o.status === "completed").length,
-  };
-
+  /* ------------------------------
+     TABS
+  ------------------------------ */
   const tabs = [
     {
       key: "pending",
       label: "Pending",
-      count: stats.pending,
+      count: statusCounts.pending || 0,
       icon: <Clock className="w-6 h-6 text-orange-600" />,
       color: "bg-orange-50 border-orange-300",
       path: "/agent/deliveries/pending",
@@ -69,7 +84,7 @@ const AgentDashboard = () => {
     {
       key: "shipped",
       label: "Shipped",
-      count: stats.shipped,
+      count: statusCounts.shipped || 0,
       icon: <Truck className="w-6 h-6 text-blue-600" />,
       color: "bg-blue-50 border-blue-300",
       path: "/agent/deliveries/shipped",
@@ -77,7 +92,7 @@ const AgentDashboard = () => {
     {
       key: "delivered",
       label: "Delivered",
-      count: stats.delivered,
+      count: statusCounts.delivered || 0,
       icon: <PackageCheck className="w-6 h-6 text-purple-600" />,
       color: "bg-purple-50 border-purple-300",
       path: "/agent/deliveries/delivered",
@@ -85,7 +100,7 @@ const AgentDashboard = () => {
     {
       key: "completed",
       label: "Completed",
-      count: stats.completed,
+      count: statusCounts.completed || 0,
       icon: <CheckCircle className="w-6 h-6 text-green-600" />,
       color: "bg-green-50 border-green-300",
       path: "/agent/deliveries/completed",
@@ -101,13 +116,13 @@ const AgentDashboard = () => {
           <div
             key={tab.key}
             onClick={() => navigate(tab.path)}
-            className={`p-4 rounded-lg shadow cursor-pointer border ${tab.color}`}
+            className={`p-4 rounded-xl shadow-sm cursor-pointer border transition hover:shadow-md ${tab.color}`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {tab.icon}
               <div>
-                <p className="font-semibold">{tab.label}</p>
-                <p className="text-md font-bold text-gray-700">
+                <p className="font-semibold text-gray-800">{tab.label}</p>
+                <p className="text-lg font-bold text-gray-700">
                   {tab.count} Orders
                 </p>
               </div>

@@ -36,58 +36,92 @@ exports.getPaymentStatusPie = async (req, res) => {
 exports.getTopProducts = async (req, res) => {
   try {
     const limit = Number(req.query.limit || 5);
+    const period = req.query.period || "year";
 
-    // Aggregate sales by productId so we can lookup product metadata (name, thumbnail)
+    const now = new Date();
+    let startDate = null;
+
+    // ⏱ PERIOD FILTER
+    if (period === "week") {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 7);
+    } else if (period === "month") {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 30);
+    } else if (period === "year") {
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 365);
+    }
+
+    const matchStage = {
+      status: "completed",
+      ...(startDate && { createdAt: { $gte: startDate } }),
+    };
+
     const result = await Order.aggregate([
-      { $match: { status: "completed" } },
+      // ✅ FILTER BY STATUS + DATE
+      { $match: matchStage },
+
+      // ✅ BREAK ORDER ITEMS
       { $unwind: "$items" },
-      { $group: { _id: "$items.productId", totalQty: { $sum: "$items.quantity" }, sampleName: { $first: "$items.productName" } } },
+
+      // ✅ GROUP BY PRODUCT
+      {
+        $group: {
+          _id: "$items.productId",
+          totalQty: { $sum: "$items.quantity" },
+          sampleName: { $first: "$items.productName" },
+        },
+      },
+
+      // ✅ SORT BY MOST SOLD
       { $sort: { totalQty: -1 } },
+
+      // ✅ LIMIT
       { $limit: limit },
-      // lookup product details
+
+      // ✅ LOOKUP PRODUCT DETAILS
       {
         $lookup: {
           from: "products",
           localField: "_id",
           foreignField: "_id",
           as: "product",
-        }
+        },
       },
+
       { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
+
+      // ✅ FINAL SHAPE
       {
         $project: {
           _id: 1,
           totalQty: 1,
-          // Prefer product document name, then fallback to the name stored on the order item, otherwise mark Unknown
-          productName: { $ifNull: ["$product.name", "$sampleName", "Unknown product"] },
+          productName: {
+            $ifNull: ["$product.name", "$sampleName", "Unknown product"],
+          },
           image: {
             $cond: [
               { $ifNull: ["$product.thumbnail", false] },
               { $concat: ["/uploads/", "$product.thumbnail"] },
-              { $arrayElemAt: ["$product.images", 0] }
-            ]
-          }
-        }
-      }
+              { $arrayElemAt: ["$product.images", 0] },
+            ],
+          },
+        },
+      },
     ]);
 
-    // 🔹 normalize image paths and format response
+    // 🔹 Normalize image paths
     const normalizeImage = (img) => {
       if (!img) return null;
-      // If already absolute URL, keep it
-      if (typeof img === 'string' && img.startsWith('http')) return img;
+      if (typeof img === "string" && img.startsWith("http")) return img;
 
       let out = img;
-      // If stored like 'uploads/...' -> make '/uploads/...'
-      if (out.startsWith('uploads/')) out = '/' + out;
-      // If stored like '/uploads/uploads/...' -> collapse to '/uploads/...'
-      out = out.replace(/\/uploads\/uploads\//g, '/uploads/');
-      // If it's just a filename (no 'uploads' prefix), ensure '/uploads/filename'
-      if (!out.startsWith('/uploads/')) {
-        if (out.startsWith('/')) out = '/uploads' + out;
-        else out = '/uploads/' + out;
+      if (out.startsWith("uploads/")) out = "/" + out;
+      out = out.replace(/\/uploads\/uploads\//g, "/uploads/");
+      if (!out.startsWith("/uploads/")) {
+        out = out.startsWith("/") ? "/uploads" + out : "/uploads/" + out;
       }
-
       return out;
     };
 
@@ -95,7 +129,7 @@ exports.getTopProducts = async (req, res) => {
       rank: index + 1,
       productId: p._id,
       productName: p.productName,
-      quantitySold: p.totalQty,
+      quantitySold: p.totalQty, // ✅ THIS IS FILTERED BY PERIOD
       image: normalizeImage(p.image),
     }));
 
@@ -105,6 +139,8 @@ exports.getTopProducts = async (req, res) => {
     res.status(500).json({ message: "Failed to load top products" });
   }
 };
+
+
 
 // Dashboard summary: order counts, sales totals and growth, inventory overview
 exports.getDashboardSummary = async (req, res) => {

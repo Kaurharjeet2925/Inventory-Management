@@ -6,8 +6,9 @@
     const [orders, setOrders] = useState([]);
 
     const loadOrders = async () => {
-      const res = await apiClient.get("/orders");
-      setOrders(res.data.data.filter(o => o.status === "pending"));
+     const res = await apiClient.get("/all-order?status=pending");
+     setOrders(res.data.data);
+
     };
 
     useEffect(() => { loadOrders(); }, []);

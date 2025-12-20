@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Eye, Edit2, Trash2, X } from 'lucide-react';
-import { apiClient } from '../../apiclient/apiclient';
-import EditOrderModal from './EditOrderModel';
+import React, { useState, useEffect } from "react";
+import { Eye, Edit2, Trash2, X } from "lucide-react";
+import { apiClient } from "../../apiclient/apiclient";
+import EditOrderModal from "./EditOrderModel";
 import socket from "../../socket/socketClient";
-import Pagination from '../../components/Pagination';
-import { FaFileInvoice } from 'react-icons/fa';
+import Pagination from "../../components/Pagination";
+import { FaFileInvoice } from "react-icons/fa";
+import OrderDateFilter from "../../components/OrderDateFilter";
+/* ================= HELPERS ================= */
 
 const getPaymentBadge = (status) => {
   const styles = {
@@ -21,103 +23,131 @@ const formatPaymentStatus = (status) => {
   return status.toUpperCase();
 };
 
+const getStatusBadge = (status) => {
+  const styles = {
+    pending: "bg-yellow-100 text-yellow-700",
+    processing: "bg-blue-100 text-blue-700",
+    shipped: "bg-blue-100 text-blue-700",
+    delivered: "bg-purple-100 text-purple-700",
+    completed: "bg-green-100 text-green-700",
+    cancelled: "bg-red-100 text-red-700",
+  };
+  return styles[status?.toLowerCase()] || "bg-gray-100 text-gray-700";
+};
+
+const formatStatus = (status) => {
+  if (!status) return "";
+  if (status === "processing" || status === "shipped") return "Shipped";
+  return status[0].toUpperCase() + status.slice(1);
+};
+
+/* ================= COMPONENT ================= */
+
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
+  const [statusCounts, setStatusCounts] = useState({
+    pending: 0,
+    shipped: 0,
+    delivered: 0,
+    completed: 0,
+  });
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('pending'); // 'pending'|'shipped'|'delivered'|'completed'
-  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState("pending");
+  const [search, setSearch] = useState("");
+
   const [viewModal, setViewModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
+
   const [products, setProducts] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const limit = 8;
-  
-  useEffect(() => {
-    loadOrders(currentPage, limit);
-  }, [currentPage]);
+  const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
+const [month, setMonth] = useState("");
+const [year, setYear] = useState("");
+const [collected, setCollected] = useState("");
+const handleDateApply = (from, to) => {
+  setFromDate(from);
+  setToDate(to);
+  setCurrentPage(1);
+};
 
-  // Reload when active tab changes (reset to page 1)
+
+  const limit = 8;
+
+  /* ================= LOAD ORDERS ================= */
+
+const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
+  try {
+    setLoading(true);
+
+    let url = `/orders?page=${page}&limit=${lim}`;
+
+    if (status) url += `&status=${status}`;
+    if (fromDate) url += `&from=${fromDate}`;
+    if (toDate) url += `&to=${toDate}`;
+
+    const res = await apiClient.get(url);
+
+    setOrders(res.data.data || []);
+    setTotalPages(res.data.totalPages || 1);
+    setCurrentPage(res.data.page || 1);
+
+    if (res.data.statusCounts) {
+      setStatusCounts(res.data.statusCounts);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+  /* ================= EFFECTS ================= */
+
+  // tab change
   useEffect(() => {
     setCurrentPage(1);
     loadOrders(1, limit, activeTab);
   }, [activeTab]);
-  
 
+  // page change
   useEffect(() => {
-    // socket listeners
-    socket.on("order_collected", (updatedOrder) => {
-      setOrders(prev => prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o)));
-    });
+    loadOrders(currentPage, limit, activeTab);
+  }, [currentPage]);
 
-    socket.on("order_status_updated", (updatedOrder) => {
-      setOrders(prev => prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o)));
-    });
+  // socket realtime
+  useEffect(() => {
+    const refresh = () => loadOrders(currentPage, limit, activeTab);
 
-    socket.on("order_updated", (updatedOrder) => {
-      setOrders(prev => prev.map(o => (o._id === updatedOrder._id ? updatedOrder : o)));
-    });
-
-    socket.on("order_deleted", ({ orderId }) => {
-      setOrders(prev => prev.filter(o => o._id !== orderId));
-    });
-
-    socket.on("order_created", (newOrder) => {
-      setOrders(prev => [newOrder, ...prev]);
-    });
-
-    // When socket reconnects, reload current page and counts
-    const onConnect = () => {
-      console.log('Socket reconnected - refreshing orders and counts');
-      // reset to first page to ensure fresh data
-      loadOrders(1, limit, activeTab);
-    };
-    socket.on('connect', onConnect);
+    socket.on("order_created", refresh);
+    socket.on("order_deleted", refresh);
+    socket.on("order_updated", refresh);
+    socket.on("order_status_updated", refresh);
+    socket.on("connect", () => loadOrders(1, limit, activeTab));
 
     return () => {
-      socket.off("order_collected");
-      socket.off("order_status_updated");
-      socket.off("order_updated");
-      socket.off("order_deleted");
-      socket.off("order_created");
-      socket.off('connect', onConnect);
+      socket.off("order_created", refresh);
+      socket.off("order_deleted", refresh);
+      socket.off("order_updated", refresh);
+      socket.off("order_status_updated", refresh);
+      socket.off("connect");
     };
-  }, [activeTab]);
+  }, [currentPage, activeTab]);
 
-  const loadOrders = async (page = 1, lim = limit, status = null) => {
-    try {
-      setLoading(true);
-      let url = `/orders?page=${page}&limit=${lim}`;
-      if (status) url += `&status=${encodeURIComponent(status)}`;
-      const res = await apiClient.get(url);
-  
-      console.log("ORDER ITEMS --->", res.data.data[0]?.items); // 🔥 ADD THIS
-  
-      setOrders(res.data.data || []);
-      setTotalPages(res.data.totalPages);
-      setCurrentPage(res.data.page);
-    } catch (err) {
-      console.error("Failed to load orders", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  
-  
-
+  // products
   useEffect(() => {
     const loadProducts = async () => {
       try {
         const res = await apiClient.get("/products");
-        const formatted = res.data.map((p) => ({
-          _id: p._id,
-          productName: `${p.name} – ${p.quantityValue}${p.quantityUnit}`,
-          // unitType: p.quantityUnit,
-          // quantityValue: p.quantityValue,
-        }));
-        setProducts(formatted);
+        setProducts(
+          res.data.map((p) => ({
+            _id: p._id,
+            productName: `${p.name} – ${p.quantityValue}${p.quantityUnit}`,
+          }))
+        );
       } catch (err) {
         console.error("Failed to load products", err);
       }
@@ -125,100 +155,102 @@ const ViewOrders = () => {
     loadProducts();
   }, []);
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      pending: 'bg-yellow-100 text-yellow-700',
-      processing: 'bg-blue-100 text-blue-700', // shipped
-      shipped: 'bg-blue-100 text-blue-700',
-      delivered: 'bg-purple-100 text-purple-700',
-      completed: 'bg-green-100 text-green-700',
-      cancelled: 'bg-red-100 text-red-700',
-    };
-    return styles[status?.toLowerCase()] || 'bg-gray-100 text-gray-700';
-  };
-
-  const formatStatus = (status) => {
-    if (!status) return '';
-    if (status === 'processing' || status === 'shipped') return 'Shipped';
-    return status[0].toUpperCase() + status.slice(1);
-  };
+  /* ================= DELETE ================= */
 
   const handleConfirmDelete = async () => {
     try {
       await apiClient.delete(`/orders/${deleteModal._id}`);
-      alert('Order deleted successfully');
       setDeleteModal(null);
-      // server emits order_deleted — but also reload to be safe
-      loadOrders();
+      loadOrders(currentPage, limit, activeTab);
     } catch (err) {
-      alert('Failed to delete order');
-      console.error(err);
+      alert("Failed to delete order");
     }
   };
 
+  /* ================= SEARCH ================= */
+
+  const filteredOrders = orders.filter((order) => {
+    const q = search.trim().toLowerCase();
+    return (
+      !q ||
+      order.orderId?.toLowerCase().includes(q) ||
+      order.clientId?.name?.toLowerCase().includes(q)
+    );
+  });
+
   if (loading) {
-    return <div className="ml-64 mt-12 p-6 text-gray-600">Loading orders...</div>;
+    return (
+      <div className="ml-64 mt-12 p-6 text-gray-600">
+        Loading orders...
+      </div>
+    );
   }
 
-  // Filter orders by active tab and search (client-side safety fallback)
-  const filteredOrders = orders.filter((order) => {
-    let matchesTab = true;
-    if (activeTab === 'pending') matchesTab = order.status === 'pending';
-    else if (activeTab === 'shipped') matchesTab = order.status === 'processing' || order.status === 'shipped';
-    else if (activeTab === 'delivered') matchesTab = order.status === 'delivered';
-    else if (activeTab === 'completed') matchesTab = order.status === 'completed';
-
-    const q = search.trim().toLowerCase();
-    const matchesSearch = !q || (order.orderId || '').toLowerCase().includes(q) || (order.clientId?.name || '').toLowerCase().includes(q);
-    return matchesTab && matchesSearch;
-  });
+  /* ================= UI ================= */
 
   return (
     <div className="ml-64 mt-12 p-6">
       <h1 className="text-3xl font-bold mb-2">View Orders</h1>
       <p className="text-gray-600 mb-6">All orders and their statuses</p>
 
-      {/* Tabs + Search */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-4">
-        <div className="flex gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-yellow-50 text-yellow-700'}`}
-          >
-            Pending ({orders.filter(o => o.status === 'pending').length})
-          </button>
-          <button
-            onClick={() => setActiveTab('shipped')}
-            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'shipped' ? 'bg-blue-100 text-blue-800' : 'bg-blue-50 text-blue-700'}`}
-          >
-            Shipped ({orders.filter(o => o.status === 'processing' || o.status === 'shipped').length})
-          </button>
-          <button
-            onClick={() => setActiveTab('delivered')}
-            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'delivered' ? 'bg-purple-100 text-purple-800' : 'bg-purple-50 text-purple-700'}`}
-          >
-            Delivered ({orders.filter(o => o.status === 'delivered').length})
-          </button>
-          <button
-            onClick={() => setActiveTab('completed')}
-            className={`px-4 py-2 rounded-lg font-medium ${activeTab === 'completed' ? 'bg-green-100 text-green-800' : 'bg-green-50 text-green-700'}`}
-          >
-            Completed ({orders.filter(o => o.status === 'completed').length})
-          </button>
-        </div>
+  {/* ================= TABS ================= */}
+<div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
+  
+  {/* LEFT: STATUS TABS */}
+  <div className="flex flex-wrap gap-2">
+    <button
+      onClick={() => setActiveTab("pending")}
+      className={`px-4 py-2 rounded-lg font-medium ${
+        activeTab === "pending"
+          ? "bg-yellow-100 text-yellow-800"
+          : "bg-yellow-50 text-yellow-700"
+      }`}
+    >
+      Pending ({statusCounts.pending})
+    </button>
 
-        <div className="ml-auto w-full sm:w-64">
-          <input
-            type="text"
-            placeholder="Search by order id or client name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border rounded px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
+    <button
+      onClick={() => setActiveTab("shipped")}
+      className={`px-4 py-2 rounded-lg font-medium ${
+        activeTab === "shipped"
+          ? "bg-blue-100 text-blue-800"
+          : "bg-blue-50 text-blue-700"
+      }`}
+    >
+      Shipped ({statusCounts.shipped})
+    </button>
 
-      <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mt-4">
+    <button
+      onClick={() => setActiveTab("delivered")}
+      className={`px-4 py-2 rounded-lg font-medium ${
+        activeTab === "delivered"
+          ? "bg-purple-100 text-purple-800"
+          : "bg-purple-50 text-purple-700"
+      }`}
+    >
+      Delivered ({statusCounts.delivered})
+    </button>
+
+    <button
+      onClick={() => setActiveTab("completed")}
+      className={`px-4 py-2 rounded-lg font-medium ${
+        activeTab === "completed"
+          ? "bg-green-100 text-green-800"
+          : "bg-green-50 text-green-700"
+      }`}
+    >
+      Completed ({statusCounts.completed})
+    </button>
+  </div>
+
+  {/* RIGHT: DATE RANGE FILTER */}
+  <div className="lg:ml-auto">
+  <OrderDateFilter onApply={handleDateApply} />
+  </div>
+</div>
+
+      {/* ================= TABLE ================= */}
+     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mt-4">
 
 {/* Table Header */}
 <div className="overflow-x-auto">
@@ -414,14 +446,21 @@ const paymentStatus =
         />
       </div> 
 </div>
+      {/* Pagination
+      <div className="mt-6">
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+        />
+      </div> */}
 
-      
+      {/* ================= MODALS (UNCHANGED) ================= */}
       {viewModal && (
         <EditOrderModal
           order={viewModal}
-          viewOnly={true}
+          viewOnly
           onClose={() => setViewModal(null)}
-          onSave={() => {}}
         />
       )}
 
@@ -431,36 +470,24 @@ const paymentStatus =
           products={products}
           onClose={() => setEditModal(null)}
           onSave={async (payload) => {
-            try {
-              // payload will contain only status if original order not pending,
-              // or items+payment if order was pending
-              await apiClient.put(`/orders/${payload._id}`, payload);
-              alert("Order updated successfully");
-              setEditModal(null);
-              // loadOrders() not strictly required because sockets update UI — but fetch to refresh immediate state
-              loadOrders();
-            } catch (err) {
-              console.error(err);
-              alert(err?.response?.data?.message || "Failed to update order");
-            }
+            await apiClient.put(`/orders/${payload._id}`, payload);
+            setEditModal(null);
+            loadOrders(currentPage, limit, activeTab);
           }}
         />
       )}
 
       {deleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex justify-between mb-4">
               <h2 className="text-2xl font-bold">Delete Order</h2>
-              <button onClick={() => setDeleteModal(null)} className="text-gray-500 hover:text-gray-700"><X size={24} /></button>
+              <X onClick={() => setDeleteModal(null)} />
             </div>
-
-            <p className="text-gray-600 mb-2">Are you sure you want to delete this order?</p>
-            <p className="text-lg font-semibold mb-6">{deleteModal.orderId}</p>
-
+            <p className="mb-6">{deleteModal.orderId}</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteModal(null)} className="flex-1 bg-gray-300 text-gray-800 py-2 rounded hover:bg-gray-400">Cancel</button>
-              <button onClick={handleConfirmDelete} className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600">Delete</button>
+              <button onClick={() => setDeleteModal(null)}>Cancel</button>
+              <button onClick={handleConfirmDelete}>Delete</button>
             </div>
           </div>
         </div>

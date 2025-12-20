@@ -6,8 +6,9 @@ const CompletedOrders = () => {
   const [orders, setOrders] = useState([]);
 
   const load = async () => {
-    const res = await apiClient.get("/orders");
-    setOrders(res.data.data.filter(o => o.status === "completed"));
+   const res = await apiClient.get("/all-order?status=completed");
+    setOrders(res.data.data);
+
   };
 
   useEffect(() => { load(); }, []);

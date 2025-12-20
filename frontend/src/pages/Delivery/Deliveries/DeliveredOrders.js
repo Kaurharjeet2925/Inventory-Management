@@ -6,8 +6,9 @@ const DeliveredOrders = () => {
   const [orders, setOrders] = useState([]);
 
   const loadOrders = async () => {
-    const res = await apiClient.get("/orders");
-    setOrders(res.data.data.filter(o => o.status === "delivered"));
+    const res = await apiClient.get("/all-order?status=delivered");
+setOrders(res.data.data);
+
   };
 
   useEffect(() => { loadOrders(); }, []);

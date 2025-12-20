@@ -2,6 +2,8 @@ const Order = require("../models/orders.model");
 const Product = require("../models/product.model");
 const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
+
+const mongoose = require("mongoose")
 const io = require("../server").io;
 const { createNotification } = require("./notification.controller");
 // Helper to generate orderId like STN00001
@@ -199,25 +201,64 @@ const finalPaymentDetails = {
   }
 };
 
+
 exports.getOrders = async (req, res) => {
   try {
     const user = req.user;
-    const userId = user._id.toString();
-    const filter = {};
 
-    // Delivery boy gets only his orders
-    if (user?.role === "delivery-boy") {
-      filter.deliveryPersonId = userId;
-    }
-    // Admin/SuperAdmin gets only orders they assigned
-    else if (user?.role === "admin" || user?.role === "superAdmin") {
-      filter.assignedBy = userId;
+    /* ---------------- BASE FILTER (ROLE) ---------------- */
+    const baseFilter = { deleted: { $ne: true } };
+
+    if (user.role === "delivery-boy") {
+      baseFilter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
     }
 
-    // Apply pagination using reusable function
+    if (user.role === "admin" || user.role === "superAdmin") {
+      baseFilter.assignedBy = new mongoose.Types.ObjectId(user._id);
+    }
+
+    /* ---------------- LIST FILTER ---------------- */
+    const listFilter = { ...baseFilter };
+
+    /* STATUS */
+    if (req.query.status) {
+      if (req.query.status === "shipped") {
+        listFilter.status = { $in: ["processing", "shipped"] };
+      } else {
+        listFilter.status = req.query.status;
+      }
+    }
+
+    /* ---------------- DATE FILTER (FROM–TO) ---------------- */
+    if (req.query.from || req.query.to) {
+      listFilter.createdAt = {};
+      if (req.query.from) {
+        listFilter.createdAt.$gte = new Date(req.query.from);
+      }
+      if (req.query.to) {
+        listFilter.createdAt.$lte = new Date(req.query.to + "T23:59:59");
+      }
+    }
+
+    /* ---------------- MONTH + YEAR FILTER ---------------- */
+    if (req.query.month && req.query.year) {
+      const start = new Date(req.query.year, req.query.month - 1, 1);
+      const end = new Date(req.query.year, req.query.month, 0, 23, 59, 59);
+      listFilter.createdAt = { $gte: start, $lte: end };
+    }
+
+    /* ---------------- COLLECTED FILTER ---------------- */
+    if (req.query.collected === "true") {
+      listFilter["items.collected"] = true;
+    }
+    if (req.query.collected === "false") {
+      listFilter["items.collected"] = false;
+    }
+
+    /* ---------------- PAGINATION ---------------- */
     const result = await paginate(
       Order,
-      filter,
+      listFilter,
       req,
       [
         { path: "clientId", select: "name phone address" },
@@ -226,19 +267,36 @@ exports.getOrders = async (req, res) => {
       ]
     );
 
+    /* ---------------- STATUS COUNTS (ROLE ONLY) ---------------- */
+    const counts = await Order.aggregate([
+      { $match: baseFilter },
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+
+    const statusCounts = { pending: 0, shipped: 0, delivered: 0, completed: 0 };
+
+    counts.forEach(c => {
+      if (c._id === "processing" || c._id === "shipped") {
+        statusCounts.shipped += c.count;
+      } else if (statusCounts[c._id] !== undefined) {
+        statusCounts[c._id] = c.count;
+      }
+    });
+
     return res.json({
       role: user.role,
+      statusCounts,
       ...result
     });
 
-  } catch (error) {
-    console.error("GetOrders Error:", error);
-    return res.status(500).json({ 
-      message: "Failed to retrieve orders", 
-      error: error.message 
-    });
+  } catch (err) {
+    console.error("GetOrders Error:", err);
+    res.status(500).json({ message: "Failed to retrieve orders" });
   }
 };
+
+
+
 
 exports.updateOrder = async (req, res) => {
   try {
@@ -742,3 +800,81 @@ doc.fontSize(20).text(
 };
 
 
+// GET /api/orders/delivery-summary
+exports.deliverySummary = async (req, res) => {
+  const adminId = new mongoose.Types.ObjectId(req.user._id);
+
+  const data = await Order.aggregate([
+    {
+      $match: { assignedBy: adminId }
+    },
+    {
+      $group: {
+        _id: "$deliveryPersonId",
+        totalOrders: { $sum: 1 },
+        pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+        shipped: { $sum: { $cond: [{ $in: ["$status", ["processing", "shipped"]] }, 1, 0] } },
+        delivered: { $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] } },
+        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } }
+      }
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "_id",
+        foreignField: "_id",
+        as: "deliveryBoy"
+      }
+    },
+    { $unwind: "$deliveryBoy" },
+    {
+      $project: {
+        _id: 0,
+        deliveryBoyId: "$deliveryBoy._id",
+        deliveryBoyName: "$deliveryBoy.name",
+        totalOrders: 1,
+        pending: 1,
+        shipped: 1,
+        delivered: 1,
+        completed: 1
+      }
+    }
+  ]);
+
+  res.json(data);
+};
+
+// GET /orders/all
+exports.getAllOrders = async (req, res) => {
+  try {
+    const user = req.user;
+    const filter = {};
+
+    if (user.role === "delivery-boy") {
+      filter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
+    }
+
+    if (user.role === "admin" || user.role === "superAdmin") {
+      filter.assignedBy = new mongoose.Types.ObjectId(user._id);
+    }
+
+    if (req.query.status) {
+      if (req.query.status === "shipped") {
+        filter.status = { $in: ["processing", "shipped"] };
+      } else {
+        filter.status = req.query.status;
+      }
+    }
+
+    const orders = await Order.find(filter)
+      .populate("clientId", "name phone address")
+      .populate("deliveryPersonId", "name phone email")
+      .populate("assignedBy", "name role")
+      .sort({ createdAt: -1 });
+
+    res.json({ data: orders });
+  } catch (err) {
+    console.error("getAllOrders error:", err);
+    res.status(500).json({ message: "Failed to fetch orders" });
+  }
+};
