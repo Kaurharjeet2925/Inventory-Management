@@ -74,6 +74,12 @@ const handleDateApply = (from, to) => {
   setCurrentPage(1);
 };
 
+const handleDateClear = () => {
+  setFromDate("");
+  setToDate("");
+  setCurrentPage(1);
+  loadOrders(1, limit, activeTab);
+};
 
   const limit = 8;
 
@@ -112,6 +118,11 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
     setCurrentPage(1);
     loadOrders(1, limit, activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+  setCurrentPage(1);
+  loadOrders(1, limit, activeTab);
+}, [fromDate, toDate]);
 
   // page change
   useEffect(() => {
@@ -169,14 +180,34 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
 
   /* ================= SEARCH ================= */
 
-  const filteredOrders = orders.filter((order) => {
-    const q = search.trim().toLowerCase();
-    return (
-      !q ||
-      order.orderId?.toLowerCase().includes(q) ||
-      order.clientId?.name?.toLowerCase().includes(q)
-    );
-  });
+ const filteredOrders = orders.filter((order) => {
+  const q = search.trim().toLowerCase();
+  if (!q) return true;
+
+  // Order ID
+  if (order.orderId?.toLowerCase().includes(q)) return true;
+
+  // Client name
+  if (order.clientId?.name?.toLowerCase().includes(q)) return true;
+
+  // Products
+  const productMatch = order.items?.some((item) =>
+    item.productName?.toLowerCase().includes(q)
+  );
+  if (productMatch) return true;
+
+  // Collected / Not Collected
+  if (q === "collected") {
+    return order.items?.some((item) => item.collected === true);
+  }
+
+  if (q === "not collected" || q === "notcollected") {
+    return order.items?.some((item) => item.collected === false);
+  }
+
+  return false;
+});
+
 
   if (loading) {
     return (
@@ -194,10 +225,11 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
       <p className="text-gray-600 mb-6">All orders and their statuses</p>
 
   {/* ================= TABS ================= */}
-<div className="flex flex-col lg:flex-row lg:items-center gap-4 mb-4">
-  
+
+<div className="flex items-center gap-4 w-full">
+
   {/* LEFT: STATUS TABS */}
-  <div className="flex flex-wrap gap-2">
+  <div className="flex gap-2">
     <button
       onClick={() => setActiveTab("pending")}
       className={`px-4 py-2 rounded-lg font-medium ${
@@ -243,14 +275,30 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
     </button>
   </div>
 
-  {/* RIGHT: DATE RANGE FILTER */}
-  <div className="lg:ml-auto">
-  <OrderDateFilter onApply={handleDateApply} />
+  {/* RIGHT: SEARCH + DATE */}
+  <div className="flex items-center gap-3 ml-auto">
+    <input
+      type="text"
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      placeholder="Search orders..."
+      className="h-10 w-72 px-4 rounded-full border text-sm
+                 focus:ring-2 focus:ring-blue-500 outline-none"
+    />
+
+    <OrderDateFilter
+      fromDate={fromDate}
+      toDate={toDate}
+      onApply={handleDateApply}
+      onClear={handleDateClear}
+    />
   </div>
 </div>
+`
+
 
       {/* ================= TABLE ================= */}
-     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 mt-4">
+     <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
 
 {/* Table Header */}
 <div className="overflow-x-auto">

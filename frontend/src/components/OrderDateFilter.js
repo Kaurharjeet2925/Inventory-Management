@@ -1,11 +1,12 @@
 import { DateRange } from "react-date-range";
 import { format } from "date-fns";
 import { useState, useRef, useEffect } from "react";
+import { Calendar } from "lucide-react";
 
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 
-const OrderDateFilter = ({ onApply }) => {
+const OrderDateFilter = ({ fromDate, toDate, onApply, onClear }) => {
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
 
@@ -24,7 +25,6 @@ const OrderDateFilter = ({ onApply }) => {
         setOpen(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () =>
       document.removeEventListener("mousedown", handleClickOutside);
@@ -32,52 +32,86 @@ const OrderDateFilter = ({ onApply }) => {
 
   /* ---------------- APPLY ---------------- */
   const handleApply = () => {
-    const start = format(range[0].startDate, "yyyy-MM-dd");
-    const end = format(range[0].endDate, "yyyy-MM-dd");
+    onApply(
+      format(range[0].startDate, "yyyy-MM-dd"),
+      format(range[0].endDate, "yyyy-MM-dd")
+    );
+    setOpen(false);
+  };
 
-    onApply(start, end);
-    setOpen(false); // ✅ CLOSE AFTER APPLY
+  /* ---------------- CLEAR ---------------- */
+  const handleClear = () => {
+    onClear();
+    setOpen(false);
   };
 
   /* ---------------- INPUT LABEL ---------------- */
-  const label =
-    format(range[0].startDate, "dd MMM yyyy") +
-    (range[0].endDate &&
-    range[0].endDate.toDateString() !==
-      range[0].startDate.toDateString()
-      ? " - " + format(range[0].endDate, "dd MMM yyyy")
-      : "");
+
+ let label = "Select dates";
+
+if (fromDate && toDate) {
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+
+  const sameDay = start.toDateString() === end.toDateString();
+  const sameYear = start.getFullYear() === end.getFullYear();
+
+  if (sameDay) {
+    label = format(start, "dd MMM yyyy");
+  } else if (sameYear) {
+    label = `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
+  } else {
+    label = `${format(start, "dd MMM yyyy")} – ${format(end, "dd MMM yyyy")}`;
+  }
+}
+
+
+
 
   return (
     <div className="relative" ref={wrapperRef}>
       {/* INPUT */}
-      <input
-        readOnly
-        value={label}
-        onClick={() => setOpen(!open)}
-        placeholder="Select date"
-        className="border px-4 py-2 rounded-lg text-sm cursor-pointer w-[230px] bg-white"
-      />
+   <button
+  onClick={() => setOpen(!open)}
+  className="flex items-center gap-2 px-4 py-2 rounded-full border bg-white shadow-sm
+             hover:bg-gray-50 text-sm font-medium text-gray-700"
+>
+  <Calendar size={16} className="text-gray-500" />
+  <span>{label}</span>
+</button>
+
 
       {/* CALENDAR */}
       {open && (
-        <div className="absolute z-50 mt-2 bg-white shadow-xl rounded-xl">
-          <div className="p-3">
+        <div className="absolute right-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border w-[340px]">
+          {/* Calendar body */}
+          <div className="p-3 max-h-[420px] overflow-y-auto">
             <DateRange
               ranges={range}
               onChange={(item) => setRange([item.selection])}
               moveRangeOnFirstSelection={false}
-              editableDateInputs={true}
+              editableDateInputs={false}
               months={1}
-              direction="vertical"
+              direction="horizontal"
               showDateDisplay={false}
+              rangeColors={["#2563eb"]}
             />
+          </div>
 
+          {/* Footer buttons */}
+          <div className="flex gap-2 p-3 border-t bg-gray-50 rounded-b-xl">
             <button
               onClick={handleApply}
-              className="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium"
             >
               Apply
+            </button>
+
+            <button
+              onClick={handleClear}
+              className="flex-1 bg-white border hover:bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium"
+            >
+              Clear
             </button>
           </div>
         </div>
