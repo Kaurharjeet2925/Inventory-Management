@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { apiClient } from '../apiclient/apiclient';
+import { apiClient } from '../../apiclient/apiclient';
 import { useNavigate } from 'react-router-dom';
 
 export default function Login({ onSwitch }) {
@@ -50,9 +50,20 @@ export default function Login({ onSwitch }) {
     logoutTimerRef.current = setTimeout(() => {
       clearAuth();
       toast.info('Your session has expired. Please log in again.');
-      navigate('/login');
+      navigate('/');
     }, ms);
   }, [navigate]);
+ 
+  useEffect(() => {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (user) {
+    if (user.role === "delivery-boy") {
+      navigate("/agent/agent-dashboard");
+    } else {
+      navigate("/dashboard");
+    }
+  }
+}, [navigate]);
 
   // Check for existing token on mount and schedule logout if present
   useEffect(() => {
@@ -118,9 +129,20 @@ export default function Login({ onSwitch }) {
         }
         
         toast.success(`Login successful! Welcome ${data.user.name}`);
-        setEmail("");
-        setPassword("");
-        navigate("/dashboard");
+setEmail("");
+setPassword("");
+
+// 🔑 ROLE-BASED REDIRECT
+if (data.user.role === "superAdmin") {
+  navigate("/dashboard"); // SuperAdmin dashboard
+} else if (data.user.role === "admin") {
+  navigate("/dashboard"); // Admin dashboard (same page)
+} else if (data.user.role === "delivery-boy") {
+  navigate("/agent/agent-dashboard"); // Agent dashboard
+} else {
+  navigate("/"); // fallback
+}
+
       } else {
         toast.error(data?.message || "Login failed");
       }

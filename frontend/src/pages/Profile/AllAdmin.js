@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Phone, Mail, Eye, Trash2 } from "lucide-react";
-import { apiClient } from "../apiclient/apiclient";
+import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
 
 const AllAdmins = () => {

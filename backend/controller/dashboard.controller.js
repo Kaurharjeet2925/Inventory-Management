@@ -1,6 +1,21 @@
 const Order = require("../models/orders.model");
 const User = require("../models/user.model");
 const Client = require("../models/client.model");
+
+const getOrderScopeFilter = (user) => {
+  if (!user || !user.role) {
+    return { _id: null }; // fail-safe
+  }
+
+  // 🔒 Admin → only their own orders
+  if (user.role === "admin") {
+    return { assignedBy: user._id };
+  }
+
+  // 👑 SuperAdmin → ALL orders
+  return {};
+};
+
 exports.getPaymentStatusPie = async (req, res) => {
   try {
     const orders = await Order.find({ status: "completed" });

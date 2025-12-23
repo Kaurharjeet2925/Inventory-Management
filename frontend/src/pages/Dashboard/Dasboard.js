@@ -9,23 +9,40 @@ import SalesTrendChart from "./SuperAdmin/SalesTrendChart";
 import PaymentPieChart from "./SuperAdmin/PaymentPieChart";
 import SalesSummary from "./SuperAdmin/SalesSummary";
 import StackedCountCard from "./SuperAdmin/StackedCountCard";
-
+import MobileNavbar from "../../components/MobileNavbar";
 const Dashboard = () => {
   /* --------------------------------
      🔑 SINGLE SOURCE OF TRUTH (RANGE)
   ---------------------------------- */
   const [range, setRange] = useState("7days");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
+    
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+
+      {/* MOBILE NAVBAR */}
+    <MobileNavbar
+        title="Dashboard"
+        onMenuClick={() => setSidebarOpen(prev => !prev)}
+      />
+
       {/* SIDEBAR */}
-      <Sidebar />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col">
-        <Header />
+      {/* HEADER (DESKTOP ONLY VISUALLY) */}
+     <Header onMenuClick={() => setSidebarOpen(prev => !prev)} />
 
-        <main className="p-6 ml-64 mt-12">
+
+
+        <main className=" mt-14 md:ml-64">
+
           {/* PAGE HEADER */}
           <div className="bg-white rounded-xl shadow p-6">
             <h1 className="text-2xl font-bold text-gray-800">

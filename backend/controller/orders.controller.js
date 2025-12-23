@@ -209,18 +209,22 @@ exports.getOrders = async (req, res) => {
     /* ---------------- BASE FILTER (ROLE) ---------------- */
     const baseFilter = { deleted: { $ne: true } };
 
+    // 🚚 Delivery boy → only his deliveries
     if (user.role === "delivery-boy") {
       baseFilter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
     }
 
-    if (user.role === "admin" || user.role === "superAdmin") {
+    // 🧑‍💼 Admin → only orders created by him
+    if (user.role === "admin") {
       baseFilter.assignedBy = new mongoose.Types.ObjectId(user._id);
     }
+
+    // 👑 SuperAdmin → NO FILTER (see all orders)
 
     /* ---------------- LIST FILTER ---------------- */
     const listFilter = { ...baseFilter };
 
-    /* STATUS */
+    /* STATUS FILTER */
     if (req.query.status) {
       if (req.query.status === "shipped") {
         listFilter.status = { $in: ["processing", "shipped"] };
@@ -267,7 +271,7 @@ exports.getOrders = async (req, res) => {
       ]
     );
 
-    /* ---------------- STATUS COUNTS (ROLE ONLY) ---------------- */
+    /* ---------------- STATUS COUNTS (ROLE-BASED) ---------------- */
     const counts = await Order.aggregate([
       { $match: baseFilter },
       { $group: { _id: "$status", count: { $sum: 1 } } }
@@ -294,6 +298,7 @@ exports.getOrders = async (req, res) => {
     res.status(500).json({ message: "Failed to retrieve orders" });
   }
 };
+
 
 
 

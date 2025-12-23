@@ -115,16 +115,16 @@ exports.getAllUsers = async (req, res) => {
 
 // Get user by ID
 exports.getUserById = async (req, res) => {
-  try {
+   try {
     const { id } = req.params;
+
     const user = await User.findById(id).select("-password");
-    
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
     res.json({
-      message: "User retrieved successfully",
+      message: "User profile retrieved",
       user,
     });
   } catch (error) {
@@ -171,6 +171,23 @@ exports.updateUser = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error updating user", error: error.message });
+  }
+};
+// GET LOGGED-IN USER PROFILE
+exports.getMyProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      message: "Profile retrieved successfully",
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching profile", error: error.message });
   }
 };
 

@@ -1,15 +1,15 @@
 import './App.css';
-import Login from './pages/Login.js';
+import Login from './pages/Profile/Login.js';
 import { Routes, Route } from "react-router-dom";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import Dashboard from './pages/Dashboard/Dasboard.js';
-import Profile from './pages/Profile.js';
-import EditProfile from './pages/EditProfile.js';
-import AllAdmin from './pages/AllAdmin.js';
-import ViewProfile from './pages/ViewProfile.js';
+import Profile from './pages/Profile/Profile.js';
+import EditProfile from './pages/Profile/EditProfile.js';
+import AllAdmin from './pages/Profile/AllAdmin.js';
+import ViewProfile from './pages/Profile/ViewProfile.js';
 import Product from './pages/ManageProduct/Product.js';
 import Brands from './pages/ManageProduct/Brands.js';
 import ManageProducts from './pages/ManageProduct/ManageProducts.js';
@@ -35,7 +35,7 @@ import InventoryReports from './pages/Reports/InventoryReports.js';
 import { NotificationProvider } from "./context/NotificationContext";
 import Reports from './pages/Reports/Reports.js';
 import DeliveryList from './pages/Delivery/DeliveriesList.js';
-
+import MyProfile from './pages/Profile/MyProfile.js';
 function App() {
   useEffect(() => {
     socket.on("connect", () => {
@@ -59,13 +59,16 @@ function App() {
         draggable 
         pauseOnHover 
       />
+      <div className='bg-slate-50'>
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
-
         <Route path="/profile" element={<Profile />}>
-          <Route path="edit" element={<EditProfile />} />
+          
+          <Route path="add" element={<EditProfile />} />
+          <Route path="edit/:id" element={<EditProfile />} />
           <Route path="alladmin" element={<AllAdmin />} />
+          <Route index element={<MyProfile />} />
           <Route path="view/:id" element={<ViewProfile />} />
         </Route>
 
@@ -102,6 +105,7 @@ function App() {
           <Route path="deliveries-history" element={<DeliveryList />} />
         </Route>
       </Routes>
+      </div>
     </NotificationProvider>
   );
 }

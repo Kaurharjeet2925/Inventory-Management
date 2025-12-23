@@ -110,7 +110,7 @@ const paginatedTable = filteredTable.slice(
   
 
   return (
-    <div className="ml-64 mt-12 p-6 bg-slate-50 min-h-screen">
+    <div className="ml-64 mt-12  min-h-screen">
 
       {/* ================= HEADER ================= */}
       <div className="mb-8">

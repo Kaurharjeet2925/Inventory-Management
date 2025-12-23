@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
@@ -88,15 +88,33 @@ const Sidebar = () => {
       setDeliveryOpen(false);
     }
   };
+const user = JSON.parse(localStorage.getItem("user"));
+const isSuperAdmin = user?.role === "superAdmin";
+
+
 
   return (
     <>
       {/* FIX: Sidebar is now FIXED and FULL HEIGHT */}
-      <aside className="hidden md:block md:w-64 md:bg-gray-900 md:text-gray-300 md:fixed md:top-0 md:left-0 md:h-screen md:overflow-y-auto">
-        <div className="text-white text-xl font-bold p-4 border-b border-gray-700">
-          Admin Panel
-        </div>
+       {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+        />
+      )}
 
+      <aside
+        className={`
+          fixed top-0 left-0 h-screen w-64 bg-gray-900 text-gray-300 z-50
+          transform transition-transform duration-300
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0 md:block
+        `}
+      >
+        {/* HEADER */}
+        <div className="text-white text-xl font-bold p-4 border-b border-gray-700">
+          {isSuperAdmin ? "Super Admin Panel" : "Admin Panel"}
+        </div>
         <nav className="p-4 space-y-2">
           <NavLink to="/dashboard" className={linkClass}>
             Dashboard
@@ -218,18 +236,18 @@ const Sidebar = () => {
             </div>
           )}
 
-          <NavLink to="/agent/agent-dashboard" className={linkClass}>
+          {/* <NavLink to="/agent/agent-dashboard" className={linkClass}>
             Agent Dashboard
-          </NavLink>
+          </NavLink> */}
 
         </nav>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
-    <button
+    {/* <button
       onClick={handleLogout}
       className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
     >
       Logout
-    </button>
+    </button> */}
   </div>
       </aside>
     </>

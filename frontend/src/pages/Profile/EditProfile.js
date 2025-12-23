@@ -1,99 +1,125 @@
-import React, { useState, useRef } from 'react';
-import { apiClient } from '../apiclient/apiclient';
-import { toast } from 'react-toastify';
+import React, { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { apiClient } from "../../apiclient/apiclient";
+import { toast } from "react-toastify";
 
 const EditProfile = () => {
-const [form, setForm] = useState({
-  firstName: "",
-  lastName: "",
-  phone: "",
-  email: "",
-  password: "",
-  image: "",
-  gender: "",
-  address: "",
-  dateofbirth: "",
-  role: "",  
-});
+  const { id } = useParams();          // if id exists → EDIT
+  const navigate = useNavigate();
+  const isEditMode = Boolean(id);
 
-  const [imagePreview, setImagePreview] = useState('');
-  // keep the selected file in form.image instead of a separate unused state variable
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    password: "",
+    image: "",
+    gender: "",
+    address: "",
+    dateofbirth: "",
+    role: "",
+  });
+
+  const [imagePreview, setImagePreview] = useState("");
   const fileInputRef = useRef(null);
 
-  const handleImageChange = (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    // store the File object in form.image so it is actually used and available on submit
-    setForm(prev => ({ ...prev, image: file }));
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
-  };
+  /* ================= PREFILL DATA (EDIT MODE) ================= */
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const fetchUser = async () => {
+      try {
+        const res = await apiClient.get(`/user/${id}`);
+        const u = res.data.user;
+
+        const nameArr = (u.name || "").split(" ");
+        const firstName = nameArr[0] || "";
+        const lastName = nameArr.slice(1).join(" ") || "";
+
+        setForm({
+          firstName,
+          lastName,
+          phone: u.phone || "",
+          email: u.email || "",
+          password: "",               // ❌ never prefill password
+          gender: u.gender || "",
+          address: u.address || "",
+          dateofbirth: u.dateofbirth || "",
+          role: u.role || "",
+          image: "",
+        });
+
+        if (u.image) setImagePreview(u.image);
+      } catch (err) {
+        toast.error("Failed to load profile");
+      }
+    };
+
+    fetchUser();
+  }, [id, isEditMode]);
+
+  /* ================= HANDLERS ================= */
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setForm(prev => ({ ...prev, image: file }));
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleCancel = () => {
+    navigate(-1);
+  };
+
+  /* ================= SUBMIT ================= */
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  // Validate required fields
-  if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.password.trim() || !form.role) {
-    toast.error("Please fill in all required fields");
-    return;
-  }
-
-  try {
-    // Create FormData to handle file upload
-    const formData = new FormData();
-    formData.append("firstName", form.firstName);
-    formData.append("lastName", form.lastName);
-    formData.append("email", form.email);
-    formData.append("password", form.password);
-    formData.append("phone", form.phone);
-    formData.append("gender", form.gender);
-    formData.append("address", form.address);
-    formData.append("dateofbirth", form.dateofbirth);
-    formData.append("role", form.role);
-    if (form.image instanceof File) {
-      formData.append("image", form.image);
+    if (!form.firstName || !form.lastName || !form.email || !form.role) {
+      toast.error("Please fill all required fields");
+      return;
     }
 
-    // Call the API
-    const response = await apiClient.post("/superadmin/create-user", formData, {
-      headers: { "Content-Type": "multipart/form-data" }
-    });
+    if (!isEditMode && !form.password) {
+      toast.error("Password is required for new user");
+      return;
+    }
 
-    toast.success(response.data?.message || `${form.role} created successfully!`);
-    handleCancel();
-  } catch (error) {
-    const errorMessage = error.response?.data?.message || error.message || "Failed to create user";
-    toast.error(errorMessage);
-    console.error(error);
-  }
-};
+    try {
+      const formData = new FormData();
+      Object.entries(form).forEach(([key, value]) => {
+        if (value) formData.append(key, value);
+      });
 
-const handleCancel = () => {
-  setForm({
-    firstName: "",
-    lastName: "",
-    gender: "",
-    phone: "",
-    email: "",
-    password: "",
-    address: "",
-    dateOfBirth: "",
-    image: "",
-    role: "admin",  // default role
-  });
-  // clear image preview and reset fw-full min-h-screen p-6ile input element
-  setImagePreview('');
-  if (fileInputRef && fileInputRef.current) fileInputRef.current.value = '';
-};
+      if (isEditMode) {
+        // ✏️ UPDATE
+        await apiClient.put(`/user/${id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        toast.success("Profile updated successfully");
+      } else {
+        // ➕ ADD
+        await apiClient.post("/superadmin/create-user", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        toast.success("User created successfully");
+      }
 
+      navigate(-1);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Operation failed");
+    }
+  };
 
   return (
-	 <div className="ml-64 mt-12 p-2">
+	 <div className="ml-64 mt-12">
       <div className="w-full bg-white shadow-md p-10 rounded-xl min-h-screen">
-        <h1 className="text-3xl lg:text-4xl font-semibold mb-8">Add New Admin</h1>
+        <h1 className="text-3xl lg:text-4xl font-semibold mb-8"> {isEditMode ? "Edit Profile" : "Add New User"}</h1>
 
         <form
           onSubmit={handleSubmit}
@@ -256,7 +282,7 @@ const handleCancel = () => {
               type="submit"
               className="px-6 py-2 bg-blue-600 text-white rounded-md"
             >
-              Add Admin
+              {isEditMode ? "Update Profile" : "Add User"}
             </button>
           </div>
         </form>
