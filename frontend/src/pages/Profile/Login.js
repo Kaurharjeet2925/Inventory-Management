@@ -54,16 +54,16 @@ export default function Login({ onSwitch }) {
     }, ms);
   }, [navigate]);
  
-  useEffect(() => {
-  const user = JSON.parse(localStorage.getItem("user"));
-  if (user) {
-    if (user.role === "delivery-boy") {
-      navigate("/agent/agent-dashboard");
-    } else {
-      navigate("/dashboard");
-    }
-  }
-}, [navigate]);
+//   useEffect(() => {
+//   const user = JSON.parse(localStorage.getItem("user"));
+//   if (user) {
+//     if (user.role === "delivery-boy") {
+//       navigate("/agent/agent-dashboard");
+//     } else {
+//       navigate("/dashboard");
+//     }
+//   }
+// }, [navigate]);
 
   // Check for existing token on mount and schedule logout if present
   useEffect(() => {

@@ -40,7 +40,7 @@ socket.on("connect_error", (err) => {
     localStorage.removeItem('user');
     toast.error('Socket authentication failed: please sign in again.');
     // Redirect to login (allow UI to react)
-    try { window.location.href = '/login'; } catch(e){}
+    try { window.location.href = '/'; } catch(e){}
     return; // don't retry connect
   }
 
