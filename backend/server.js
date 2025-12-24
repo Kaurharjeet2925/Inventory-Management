@@ -109,15 +109,20 @@ io.use(async (socket, next) => {
 io.on("connection", (socket) => {
   console.log("⚡ Socket connected:", socket.id, "User:", socket.user?.name);
 
-  // Auto join room by user id (delivery boy and admin)
+  // 🔹 Personal room (delivery boy / admin specific)
   socket.join(socket.user._id.toString());
-  console.log(`➡️ Joined room: ${socket.user._id}`);
+  console.log(`➡️ Joined personal room: ${socket.user._id}`);
 
-  // Admin rooms
-  if (socket.user.role === "admin" || socket.user.role === "superAdmin") {
-    socket.join("admins");
+  // 🔹 Admin personal room
+  if (socket.user.role === "admin") {
     socket.join(`admin_${socket.user._id.toString()}`);
-    console.log(`👑 Joined admins room and admin_${socket.user._id.toString()}`);
+    console.log(`🧑‍💼 Joined admin room: admin_${socket.user._id}`);
+  }
+
+  // 🔹 SuperAdmin GLOBAL room (IMPORTANT)
+  if (socket.user.role === "superAdmin") {
+    socket.join("superadmins");
+    console.log(`👑 Joined superadmins room`);
   }
 
   socket.on("disconnect", () => {

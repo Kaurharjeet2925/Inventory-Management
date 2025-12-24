@@ -1,12 +1,15 @@
-import { useEffect, useContext } from "react";
+import {useRef, useEffect, useContext } from "react";
 import socket from "../socket/socketClient";
 import { toast } from "react-toastify";
 import { NotificationContext } from "../context/NotificationContext";
 
 const NotificationHandler = () => {
   const { setNotifications } = useContext(NotificationContext);
+  const initialized = useRef(false);
 
   useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
     const audio = new Audio("/notification_sound.mp3");
     const user = JSON.parse(localStorage.getItem("agent") || localStorage.getItem("user") || localStorage.getItem("auth") || "{}");
     const userId = user?._id || user?.id || user?.userId || "";

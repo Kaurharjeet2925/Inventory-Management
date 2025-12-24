@@ -1,62 +1,75 @@
 const Order = require("../models/orders.model");
 const User = require("../models/user.model");
 const Client = require("../models/client.model");
+const mongoose = require("mongoose");
 
 const getOrderScopeFilter = (user) => {
-  if (!user || !user.role) {
-    return { _id: null }; // fail-safe
-  }
+  if (!user || !user.role) return null;
 
-  // 🔒 Admin → only their own orders
   if (user.role === "admin") {
-    return { assignedBy: user._id };
+    return {
+      assignedBy: new mongoose.Types.ObjectId(user.id)
+    };
   }
 
-  // 👑 SuperAdmin → ALL orders
-  return {};
+  if (user.role === "superAdmin") {
+    return {}; // 👑 all orders
+  }
+
+  return null;
 };
+
 
 exports.getPaymentStatusPie = async (req, res) => {
   try {
-    const orders = await Order.find({ status: "completed" });
+    const scope = getOrderScopeFilter(req.user);
+   
+    if (scope === null) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const orders = await Order.find({
+  status: "completed",
+  "paymentDetails.totalAmount": { $gt: 0 },
+  ...scope
+});
+
 
     let totalAmount = 0;
     let paidAmount = 0;
 
-    orders.forEach(order => {
-      const orderTotal =
-        Number(order.paymentDetails?.totalAmount) || 0;
-
-      const orderPaid =
-        Number(order.paymentDetails?.paidAmount) || 0;
-
-      totalAmount += orderTotal;
-      paidAmount += orderPaid;
+    orders.forEach((order, index) => {
+      const total = Number(order.paymentDetails.totalAmount) || 0;
+      const paid = Number(order.paymentDetails.paidAmount) || 0;
+      totalAmount += total;
+      paidAmount += paid;
     });
 
     const pendingAmount = Math.max(totalAmount - paidAmount, 0);
-
     res.json([
       { name: "Paid", value: paidAmount },
       { name: "Pending", value: pendingAmount },
-      {name : "TotalAmount", value: totalAmount}
+      { name: "TotalAmount", value: totalAmount }
     ]);
   } catch (err) {
-    console.error("Payment Pie Error:", err);
+    console.error("❌ Payment Pie Error:", err);
     res.status(500).json({ message: "Failed to load payment summary" });
   }
 };
 
-
 exports.getTopProducts = async (req, res) => {
   try {
+    const scope = getOrderScopeFilter(req.user);
+    if (!scope) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
     const limit = Number(req.query.limit || 5);
     const period = req.query.period || "year";
 
     const now = new Date();
     let startDate = null;
 
-    // ⏱ PERIOD FILTER
     if (period === "week") {
       startDate = new Date(now);
       startDate.setDate(now.getDate() - 7);
@@ -70,17 +83,13 @@ exports.getTopProducts = async (req, res) => {
 
     const matchStage = {
       status: "completed",
+      ...scope,
       ...(startDate && { createdAt: { $gte: startDate } }),
     };
 
     const result = await Order.aggregate([
-      // ✅ FILTER BY STATUS + DATE
       { $match: matchStage },
-
-      // ✅ BREAK ORDER ITEMS
       { $unwind: "$items" },
-
-      // ✅ GROUP BY PRODUCT
       {
         $group: {
           _id: "$items.productId",
@@ -88,14 +97,8 @@ exports.getTopProducts = async (req, res) => {
           sampleName: { $first: "$items.productName" },
         },
       },
-
-      // ✅ SORT BY MOST SOLD
       { $sort: { totalQty: -1 } },
-
-      // ✅ LIMIT
       { $limit: limit },
-
-      // ✅ LOOKUP PRODUCT DETAILS
       {
         $lookup: {
           from: "products",
@@ -104,10 +107,7 @@ exports.getTopProducts = async (req, res) => {
           as: "product",
         },
       },
-
       { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-
-      // ✅ FINAL SHAPE
       {
         $project: {
           _id: 1,
@@ -126,29 +126,15 @@ exports.getTopProducts = async (req, res) => {
       },
     ]);
 
-    // 🔹 Normalize image paths
-    const normalizeImage = (img) => {
-      if (!img) return null;
-      if (typeof img === "string" && img.startsWith("http")) return img;
-
-      let out = img;
-      if (out.startsWith("uploads/")) out = "/" + out;
-      out = out.replace(/\/uploads\/uploads\//g, "/uploads/");
-      if (!out.startsWith("/uploads/")) {
-        out = out.startsWith("/") ? "/uploads" + out : "/uploads/" + out;
-      }
-      return out;
-    };
-
-    const formatted = result.map((p, index) => ({
-      rank: index + 1,
-      productId: p._id,
-      productName: p.productName,
-      quantitySold: p.totalQty, // ✅ THIS IS FILTERED BY PERIOD
-      image: normalizeImage(p.image),
-    }));
-
-    res.json(formatted);
+    res.json(
+      result.map((p, index) => ({
+        rank: index + 1,
+        productId: p._id,
+        productName: p.productName,
+        quantitySold: p.totalQty,
+        image: p.image,
+      }))
+    );
   } catch (err) {
     console.error("Top Products Error:", err);
     res.status(500).json({ message: "Failed to load top products" });
@@ -157,9 +143,13 @@ exports.getTopProducts = async (req, res) => {
 
 
 
+
 // Dashboard summary: order counts, sales totals and growth, inventory overview
 exports.getDashboardSummary = async (req, res) => {
   try {
+    const scope = getOrderScopeFilter(req.user);
+    if (!scope) return res.status(403).json({ message: "Unauthorized" });
+
     // range in days for sales summary (default: 7 days)
     const rangeDays = Number(req.query.rangeDays || 7);
     const now = new Date();
@@ -168,6 +158,7 @@ exports.getDashboardSummary = async (req, res) => {
 
     // Order counts by normalized status (lowercase + trimmed)
     const countsAgg = await Order.aggregate([
+      { $match: scope },
       { $project: { normStatus: { $toLower: { $trim: { input: { $ifNull: ["$status", ""] } } } }, orderId: 1 } },
       { $group: { _id: "$normStatus", count: { $sum: 1 } } }
     ]);

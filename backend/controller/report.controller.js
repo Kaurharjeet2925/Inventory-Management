@@ -2,6 +2,8 @@ const Order = require("../models/orders.model");
 const ExcelJS = require("exceljs");
 const moment = require("moment");
 const Product = require("../models/product.model");
+const mongoose = require("mongoose");
+
 
 exports.generateDailySalesReport = async (req, res) => {
   try {
@@ -426,36 +428,40 @@ exports.generateInventoryReport = async (req, res) => {
 
 exports.getSalesTrend = async (req, res) => {
   try {
-    const { range } = req.query;
+    const { range, scope = "dashboard" } = req.query;
     let startDate;
     let groupFormat;
 
-    // 🔹 LAST 7 DAYS → DATE-WISE
+    // 🔹 DATE RANGE
     if (!range || range === "7days") {
       startDate = moment().subtract(6, "days").startOf("day").toDate();
       groupFormat = "%d %b";
-    }
-
-    // 🔹 THIS MONTH → DATE-WISE
-    else if (range === "month") {
+    } else if (range === "month") {
       startDate = moment().startOf("month").toDate();
       groupFormat = "%d %b";
-    }
-
-    // 🔹 THIS YEAR → MONTH-WISE
-    else if (range === "year") {
+    } else if (range === "year") {
       startDate = moment().startOf("year").toDate();
       groupFormat = "%b";
+    }
+
+    // 🔐 ROLE-BASED FILTER (ONLY FOR DASHBOARD)
+    let roleFilter = {};
+
+    if (scope === "dashboard") {
+      if (req.user.role === "admin") {
+        roleFilter.assignedBy = new mongoose.Types.ObjectId(req.user._id);
+      }
+      // superAdmin → no filter
     }
 
     const result = await Order.aggregate([
       {
         $match: {
           status: "completed",
-          createdAt: { $gte: startDate }
+          createdAt: { $gte: startDate },
+          ...roleFilter
         }
       },
-      // Compute orderAmount using paymentDetails.totalAmount OR fallback to summing items (price * quantity)
       {
         $project: {
           createdAt: 1,
@@ -495,18 +501,15 @@ exports.getSalesTrend = async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
-    // 🔹 Final format for chart (return both sales and orders)
-    const formatted = result.map(r => ({
-      label: r._id,
-      sales: r.sales,
-      orders: r.orders
-    }));
-
-    res.json(formatted);
+    res.json(
+      result.map(r => ({
+        label: r._id,
+        sales: r.sales,
+        orders: r.orders
+      }))
+    );
   } catch (err) {
     console.error("Sales Trend Error:", err);
     res.status(500).json({ message: "Failed to load sales trend" });
   }
 };
-
-

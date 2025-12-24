@@ -162,33 +162,49 @@ const finalPaymentDetails = {
         ? deliveryPersonId
         : (deliveryPersonId?._id || "").toString();
     
-    // Emit only if ID exists
-    if (dpId) {
-      io.to(dpId).emit("order_created", populatedOrder);
-      console.log("🔥 SENT order_created to delivery boy room:", dpId);
-      // persist notification for the delivery person
-      try {
-        await createNotification({ io, message: `New order ${orderId} assigned to you`, targetUser: dpId, data: { orderId: populatedOrder._id } });
-      } catch (e) { console.error('notify dp failed', e); }
-    } else {
-      console.log("⚠️ deliveryPersonId EMPTY or INVALID → cannot emit");
-    }
-    
+// 🔔 Delivery Boy
+if (dpId) {
+  io.to(dpId).emit("order_created", populatedOrder);
 
-    // Notify the specific admin who assigned this order
-    if (assignedBy) {
-      io.to(`admin_${assignedBy.toString()}`).emit("order_created", populatedOrder);
-      try {
-        await createNotification({ io, message: `You created a new order ${orderId}`, targetUser: assignedBy, data: { orderId: populatedOrder._id } });
-      } catch (e) { console.error('notify assigned admin failed', e); }
-    }
+  await createNotification({
+    io,
+    message: `New order ${orderId} assigned to you`,
+    targetUser: dpId,
+    data: { orderId: populatedOrder._id },
+  });
+}
+
+// 🔔 Assigned Admin
+if (assignedBy) {
+  io.to(`admin_${assignedBy.toString()}`).emit("order_created", populatedOrder);
+
+  await createNotification({
+    io,
+    message: `You created a new order ${orderId}`,
+    targetUser: assignedBy,
+    data: { orderId: populatedOrder._id },
+  });
+}
+
+// 🔔 SuperAdmin (only if creator is NOT superadmin)
+if (req.user.role !== "superAdmin") {
+  io.to("superadmins").emit("order_created", populatedOrder);
+
+  await createNotification({
+    io,
+    message: `New order ${orderId} created`,
+    targetRole: "superadmins",
+    data: { orderId: populatedOrder._id },
+  });
+}
+
 
     // Notify all admins
-    try {
-      await createNotification({ io, message: `New order ${orderId} created`, targetRole: 'admins', data: { orderId: populatedOrder._id } });
-    } catch (e) { console.error('notify admins failed', e); }
+    // try {
+    //   await createNotification({ io, message: `New order ${orderId} created`, targetRole: 'admins', data: { orderId: populatedOrder._id } });
+    // } catch (e) { console.error('notify admins failed', e); }
 
-    io.emit("order_created_global", populatedOrder);
+    // io.emit("order_created_global", populatedOrder);
   console.log("FINAL PAYMENT DETAILS =>", finalPaymentDetails);
     return res.status(201).json({
       message: "Order created successfully",
@@ -369,12 +385,15 @@ exports.updateOrder = async (req, res) => {
           totalAmount,
           paidAmount: paid,
           balanceAmount: balance < 0 ? 0 : balance,
-        paymentStatus:
-  paid === 0
-    ? "cod"
+       paymentStatus:
+  (status === "completed" && paid === 0)
+    ? "unpaid"
     : paid >= totalAmount
     ? "paid"
-    : "partial",
+    : paid > 0
+    ? "partial"
+    : "cod",
+
 
         },
       },
@@ -433,10 +452,11 @@ exports.updateOrderPayment = async (req, res) => {
     const finalPaid = previousPaid + addedPaid;
     const balance = Math.max(totalAmount - finalPaid, 0);
 
-   let paymentStatus = "cod";
+  let paymentStatus = order.status === "completed" ? "unpaid" : "cod";
 
-    if (finalPaid >= totalAmount) paymentStatus = "paid";
-    else if (finalPaid > 0) paymentStatus = "partial";
+   if (finalPaid >= totalAmount) paymentStatus = "paid";
+   else if (finalPaid > 0) paymentStatus = "partial";
+
 
     order.paymentDetails = {
       totalAmount,
@@ -570,6 +590,25 @@ exports.updateOrderStatus = async (req, res) => {
       { status },
       { new: true }
     );
+    // 🔥 PAYMENT STATUS FIX ON COMPLETION
+if (status === "completed") {
+  const total = updatedOrder.paymentDetails?.totalAmount || 0;
+  const paid = updatedOrder.paymentDetails?.paidAmount || 0;
+
+  let paymentStatus = "unpaid";
+
+  if (paid >= total && total > 0) {
+    paymentStatus = "paid";
+  } else if (paid > 0) {
+    paymentStatus = "partial";
+  }
+
+  updatedOrder.paymentDetails.paymentStatus = paymentStatus;
+  updatedOrder.paymentDetails.balanceAmount = Math.max(total - paid, 0);
+
+  await updatedOrder.save();
+}
+
  
     if (!updatedOrder) {
       return res.status(404).json({
