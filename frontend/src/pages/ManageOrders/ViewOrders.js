@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Eye, Edit2, Trash2, X } from "lucide-react";
+import { Eye, Edit2, Trash2, X, Filter } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import EditOrderModal from "./EditOrderModel";
 import socket from "../../socket/socketClient";
 import Pagination from "../../components/Pagination";
 import { FaFileInvoice } from "react-icons/fa";
 import OrderDateFilter from "../../components/OrderDateFilter";
+import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 /* ================= HELPERS ================= */
 
 const getPaymentBadge = (status) => {
@@ -68,6 +69,7 @@ const [toDate, setToDate] = useState("");
 const [month, setMonth] = useState("");
 const [year, setYear] = useState("");
 const [collected, setCollected] = useState("");
+const [collectedFilter, setCollectedFilter] = useState("");
 const handleDateApply = (from, to) => {
   setFromDate(from);
   setToDate(to);
@@ -182,30 +184,63 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
 
  const filteredOrders = orders.filter((order) => {
   const q = search.trim().toLowerCase();
-  if (!q) return true;
+  
+  // Search filter
+  if (q) {
+    // Order ID
+    if (order.orderId?.toLowerCase().includes(q)) {
+      // Apply collected filter if set
+      if (collectedFilter === "collected") {
+        return order.items?.some((item) => item.collected === true);
+      } else if (collectedFilter === "notcollected") {
+        return order.items?.some((item) => item.collected === false);
+      }
+      return true;
+    }
 
-  // Order ID
-  if (order.orderId?.toLowerCase().includes(q)) return true;
+    // Client name
+    if (order.clientId?.name?.toLowerCase().includes(q)) {
+      if (collectedFilter === "collected") {
+        return order.items?.some((item) => item.collected === true);
+      } else if (collectedFilter === "notcollected") {
+        return order.items?.some((item) => item.collected === false);
+      }
+      return true;
+    }
 
-  // Client name
-  if (order.clientId?.name?.toLowerCase().includes(q)) return true;
+    // Products
+    const productMatch = order.items?.some((item) =>
+      item.productName?.toLowerCase().includes(q)
+    );
+    if (productMatch) {
+      if (collectedFilter === "collected") {
+        return order.items?.some((item) => item.collected === true);
+      } else if (collectedFilter === "notcollected") {
+        return order.items?.some((item) => item.collected === false);
+      }
+      return true;
+    }
 
-  // Products
-  const productMatch = order.items?.some((item) =>
-    item.productName?.toLowerCase().includes(q)
-  );
-  if (productMatch) return true;
+    // Collected / Not Collected in search
+    if (q === "collected") {
+      return order.items?.some((item) => item.collected === true);
+    }
 
-  // Collected / Not Collected
-  if (q === "collected") {
-    return order.items?.some((item) => item.collected === true);
+    if (q === "not collected" || q === "notcollected") {
+      return order.items?.some((item) => item.collected === false);
+    }
+
+    return false;
   }
 
-  if (q === "not collected" || q === "notcollected") {
+  // If no search, apply only the collected filter
+  if (collectedFilter === "collected") {
+    return order.items?.some((item) => item.collected === true);
+  } else if (collectedFilter === "notcollected") {
     return order.items?.some((item) => item.collected === false);
   }
 
-  return false;
+  return true;
 });
 
 
@@ -292,6 +327,45 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
       onApply={handleDateApply}
       onClear={handleDateClear}
     />
+
+    {/* Collected Filter Dropdown */}
+    <div className="relative">
+      <button
+        className="h-10 px-4 rounded-full border text-sm bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none flex items-center gap-2"
+        onClick={() => setCollectedFilter(collectedFilter === "open" ? "" : "open")}
+      >
+        <Filter size={16} />
+        {collectedFilter === "" || collectedFilter === "open" ? "All Items" : (collectedFilter === "collected" ? " Collected" : " Not Collected")}
+      </button>
+      {collectedFilter === "open" && (
+        <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-10">
+          <button
+            onClick={() => {
+              setCollectedFilter("");
+            }}
+            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+          >
+            All Items
+          </button>
+          <button
+            onClick={() => {
+              setCollectedFilter("collected");
+            }}
+            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+          >
+             Collected
+          </button>
+          <button
+            onClick={() => {
+              setCollectedFilter("notcollected");
+            }}
+            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+          >
+             Not Collected
+          </button>
+        </div>
+      )}
+    </div>
   </div>
 </div>
 `
@@ -408,7 +482,7 @@ const paymentStatus =
 
 
               <td className="px-6 whitespace-nowrap">
-                {new Date(order.createdAt).toLocaleDateString()}
+                {formatAnyDateToDDMMYYYY(order.createdAt)}
               </td>
 
               <td className="px-6 whitespace-nowrap">

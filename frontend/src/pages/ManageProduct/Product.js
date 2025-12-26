@@ -233,116 +233,129 @@ const handleAddLocationFromProduct = async () => {
   };
 
   return (
-    <div className="ml-64 mt-12 p-6 bg-gray-100 min-h-screen">
+    <main className="pt-16 md:pt-20 md:ml-64 px-4 md:px-6 pb-6">
+  {/* MAIN DASHBOARD WRAPPER (SAME AS DASHBOARD PAGE) */}
+  <div className="bg-white rounded-xl shadow-sm p-6">
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Product Management</h1>
-        <button
-          onClick={openAdd}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" /> Add Product
-        </button>
+    {/* ================= HEADER ================= */}
+    <div className="flex justify-between items-center mb-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-800">
+          Product Management
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Manage products, stock and locations
+        </p>
       </div>
 
-      {/* SEARCH */}
-     
-
-{/* STATS CARDS */}
-<div className="bg-white p-5 rounded-xl shadow mb-6">
-  <div className="grid grid-cols-4 gap-6 ">
-
-    {/* Total Products (Orange) */}
-    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-orange-100 rounded-xl shadow-sm text-center">
-      <div className="p-3 bg-orange-200 text-orange-700 rounded-full">
-        <Package className="w-6 h-6" />
-      </div>
-      <p className="text-sm text-gray-700">Total Products</p>
-      <p className="text-2xl font-bold text-gray-900">{totalProducts}</p>
-    </div>
-
-    {/* Low Stock (Yellow) */}
-    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-yellow-100 rounded-xl shadow-sm text-center">
-      <div className="p-3 bg-yellow-200 text-yellow-700 rounded-full">
-        <AlertTriangle className="w-6 h-6" />
-      </div>
-      <p className="text-sm text-gray-700">Low Stock Products</p>
-      <p className="text-2xl font-bold text-gray-900">{lowStock}</p>
-    </div>
-
-    {/* Out of Stock (Red) */}
-    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-red-100 rounded-xl shadow-sm text-center">
-      <div className="p-3 bg-red-200 text-red-700 rounded-full">
-        <XCircle className="w-6 h-6" />
-      </div>
-      <p className="text-sm text-gray-700">Out of Stock</p>
-      <p className="text-2xl font-bold text-gray-900">{outOfStock}</p>
-    </div>
-
-    {/* Most Stock Product (Green) */}
-    <div className="flex flex-col items-center justify-center gap-3 p-4 bg-green-100 rounded-xl shadow-sm text-center">
-      <div className="p-3 bg-green-200 text-green-700 rounded-full">
-        <BarChart3 className="w-6 h-6" />
-      </div>
-      <p className="text-sm text-gray-700">Most Stock Product</p>
-      <p className="text-2xl font-bold text-gray-900">{mostStockProduct}</p>
-    </div>
-
-  </div>
-</div>
- {/* FILTER BAR */}
-<div className="bg-white p-4 rounded-xl shadow mb-6">
-  <div className="flex items-center justify-between gap-4">
-
-    {/* LEFT: Search Bar */}
-    <div className="flex items-center border rounded-lg bg-gray-50 px-3 py-2 w-1/3">
-      <Search className="w-5 h-5 text-gray-500 mr-2" />
-      <input
-        type="text"
-        placeholder="Search product…"
-        className="outline-none w-full text-sm bg-gray-50"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-    </div>
-
-    {/* RIGHT SIDE FILTERS */}
-    <div className="flex items-center gap-3">
-
-      {/* Stock Filter */}
-      <select
-        className="border rounded-lg px-3 py-2 text-sm bg-gray-50"
-        value={filterStock}
-        onChange={(e) => setFilterStock(e.target.value)}
+      <button
+        onClick={openAdd}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
       >
-        <option value="">All Stock</option>
-        <option value="low">Low Stock</option>
-        <option value="out">Out of Stock</option>
-        <option value="most">Most Stock Product</option>
-      </select>
+        <Plus className="w-5 h-5" />
+        Add Product
+      </button>
+    </div>
 
-      {/* Sort by Quantity */}
-      <select
-        className="border rounded-lg px-3 py-2 text-sm bg-gray-50"
-        value={sortBy}
-        onChange={(e) => setSortBy(e.target.value)}
-      >
-        <option value="">Sort Qty</option>
-        <option value="qty-low">Qty: Low → High</option>
-        <option value="qty-high">Qty: High → Low</option>
-      </select>
+    {/* ================= STATS (LIGHT COLORS) ================= */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 flex items-center gap-4">
+        <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
+          <Package className="w-6 h-6" />
+        </div>
+        <div>
+          <p className="text-sm text-slate-600">Total Products</p>
+          <p className="text-2xl font-semibold text-slate-900">
+            {totalProducts}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-yellow-50 border border-yellow-100 rounded-xl p-5 flex items-center gap-4">
+        <div className="p-3 bg-yellow-100 text-yellow-600 rounded-lg">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <div>
+          <p className="text-sm text-slate-600">Low Stock</p>
+          <p className="text-2xl font-semibold text-slate-900">
+            {lowStock}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-red-50 border border-red-100 rounded-xl p-5 flex items-center gap-4">
+        <div className="p-3 bg-red-100 text-red-600 rounded-lg">
+          <XCircle className="w-6 h-6" />
+        </div>
+        <div>
+          <p className="text-sm text-slate-600">Out of Stock</p>
+          <p className="text-2xl font-semibold text-slate-900">
+            {outOfStock}
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-green-50 border border-green-100 rounded-xl p-5 flex items-center gap-4">
+        <div className="p-3 bg-green-100 text-green-600 rounded-lg">
+          <BarChart3 className="w-6 h-6" />
+        </div>
+        <div>
+          <p className="text-sm text-slate-600">Most Stock</p>
+          <p className="text-2xl font-semibold text-slate-900">
+            {mostStockProduct}
+          </p>
+        </div>
+      </div>
 
     </div>
 
-  </div>
-</div>
+    {/* ================= FILTER BAR (LIGHT SECTION) ================= */}
+    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mb-6">
+      <div className="flex items-center justify-between gap-4">
 
-      {/* PRODUCT TABLE */}
-<div className="bg-white shadow-md rounded-xl overflow-hidden mt-6">
-  <table className="min-w-full text-sm">
-    <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
-      <tr>
+        <div className="flex items-center border rounded-lg bg-white px-3 py-2 w-1/3">
+          <Search className="w-5 h-5 text-gray-500 mr-2" />
+          <input
+            type="text"
+            placeholder="Search product…"
+            className="outline-none w-full text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <select
+            className="border rounded-lg px-3 py-2 text-sm bg-white"
+            value={filterStock}
+            onChange={(e) => setFilterStock(e.target.value)}
+          >
+            <option value="">All Stock</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+            <option value="most">Most Stock Product</option>
+          </select>
+
+          <select
+            className="border rounded-lg px-3 py-2 text-sm bg-white"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+          >
+            <option value="">Sort Qty</option>
+            <option value="qty-low">Qty: Low → High</option>
+            <option value="qty-high">Qty: High → Low</option>
+          </select>
+        </div>
+
+      </div>
+    </div>
+
+    {/* ================= TABLE ================= */}
+    <div className="border border-slate-200 rounded-xl overflow-hidden">
+      <table className="min-w-full text-sm">
+        <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
+        <tr>
         <th className="p-4 text-center border">Image</th>
         <th className="p-4 text-left border">Product</th>
         <th className="p-4 text-left border">Brand</th>
@@ -352,9 +365,9 @@ const handleAddLocationFromProduct = async () => {
         <th className="p-4 text-center border">Location</th>
         <th className="p-4 text-center border">Actions</th>
       </tr>
-    </thead>
+        </thead>
 
-    <tbody>
+       <tbody>
       {products
   .filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
@@ -453,13 +466,11 @@ const handleAddLocationFromProduct = async () => {
         </tr>
       )}
     </tbody>
-  </table>
-</div>
+      </table>
+    </div>
 
-
-
-      {/* MODAL */}
-      {showModal && (
+    {/* ================= MODAL (UNCHANGED) ================= */}
+     {showModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-xl shadow-lg w-[70%] max-h-[95vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-6">
@@ -517,7 +528,9 @@ const handleAddLocationFromProduct = async () => {
         </div>
       )}
 
-    </div>
+  </div>
+</main>
+
   );
 };
 

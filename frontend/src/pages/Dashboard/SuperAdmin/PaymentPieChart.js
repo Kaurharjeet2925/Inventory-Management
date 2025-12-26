@@ -43,8 +43,8 @@ const PaymentPieChart = () => {
     activeIndex !== null ? chartData[activeIndex] : null;
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-gray-200 w-full h-64">
-      <h4 className="text-sm font-semibold text-gray-700 mb-3">
+    <div className="bg-white rounded-xl p-4 border border-gray-200 w-full h-64 mb-3 ">
+      <h4 className="text-sm font-semibold text-gray-700">
         Payment Status
       </h4>
 

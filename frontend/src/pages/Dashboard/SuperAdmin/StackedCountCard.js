@@ -1,83 +1,58 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiClient } from "../../../apiclient/apiclient";
 
-const SwipeableLayeredStatsCard = () => {
-  const [cards, setCards] = useState([]);
-  const startX = useRef(0);
-  const dragging = useRef(false);
+const UserStatsRows = () => {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    clients: 0,
+    admins: 0,
+    delivery: 0,
+  });
 
   /* ----------------------------
-     LOAD DATA FROM BACKEND
+     LOAD USER STATS
   ----------------------------- */
   useEffect(() => {
     const loadStats = async () => {
       try {
         const res = await apiClient.get("/user-stats");
 
-        setCards([
-          {
-            id: "clients",
-            title: "Clients",
-            value: res.data.clients || 0,
-            gradient: "from-purple-500 via-indigo-600 to-blue-700",
-          },
-          {
-            id: "admins",
-            title: "Admins",
-            value: res.data.admins || 0,
-            gradient: "from-orange-500 via-amber-600 to-yellow-600",
-          },
-          {
-            id: "delivery",
-            title: "Delivery Partners",
-            value: res.data.delivery || 0,
-            gradient: "from-emerald-500 via-green-600 to-teal-700",
-          },
-        ]);
+        setStats({
+          clients: res.data.clients || 0,
+          admins: res.data.admins || 0,
+          delivery: res.data.delivery || 0,
+        });
       } catch (err) {
         console.error("Failed to load user stats", err);
+      } finally {
+        setLoading(false);
       }
     };
 
     loadStats();
   }, []);
 
-  /* ----------------------------
-     SWIPE LOGIC (UNCHANGED)
-  ----------------------------- */
-  const rotateCards = () => {
-    setCards((prev) => {
-      const [first, ...rest] = prev;
-      return [...rest, first];
-    });
-  };
-
-  const onStart = (x) => {
-    startX.current = x;
-    dragging.current = true;
-  };
-
-  const onMove = (x) => {
-    if (!dragging.current) return;
-    const diff = x - startX.current;
-
-    // ⚡ fast swap
-    if (Math.abs(diff) > 20) {
-      dragging.current = false;
-      rotateCards();
-    }
-  };
-
-  const onEnd = () => {
-    dragging.current = false;
-  };
+  /* ===============================
+     🔹 STAT ROW
+  ================================ */
+  const StatRow = ({ label, value, dot }) => (
+    <div className="flex items-center justify-between bg-white rounded-md px-3 py-2 border border-gray-200 h-10 gap-2">
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full ${dot}`} />
+        <span className="text-xs text-gray-600">{label}</span>
+      </div>
+      <span className="text-sm font-semibold">
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </span>
+    </div>
+  );
 
   /* ----------------------------
-     LOADING STATE
+     LOADING
   ----------------------------- */
-  if (!cards.length) {
+  if (loading) {
     return (
-      <div className="h-64 w-full rounded-xl bg-gray-100 animate-pulse" />
+      <div className="h-40 w-full rounded-xl bg-gray-100 animate-pulse" />
     );
   }
 
@@ -85,52 +60,30 @@ const SwipeableLayeredStatsCard = () => {
      UI
   ----------------------------- */
   return (
-    <div className="relative h-64 w-full select-none">
-      {cards.map((card, index) => (
-        <div
-          key={card.id}
-          onMouseDown={(e) => onStart(e.clientX)}
-          onMouseMove={(e) => onMove(e.clientX)}
-          onMouseUp={onEnd}
-          onMouseLeave={onEnd}
-          onTouchStart={(e) => onStart(e.touches[0].clientX)}
-          onTouchMove={(e) => onMove(e.touches[0].clientX)}
-          onTouchEnd={onEnd}
-          className={`
-            absolute inset-0 rounded-xl
-            bg-gradient-to-br ${card.gradient}
-            text-white p-6 shadow-xl
-            cursor-grab active:cursor-grabbing
-            transition-transform duration-150 ease-out
-          `}
-          style={{
-            transform: `translate(${index * 10}px, ${index * 10}px) scale(${1 - index * 0.04})`,
-            zIndex: cards.length - index,
-            opacity: index === 0 ? 1 : 0.9,
-          }}
-        >
-          {/* Decorative */}
-          <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full border border-white/20" />
-          <div className="absolute top-10 right-10 h-24 w-24 rounded-full border border-white/10" />
+    <div className="bg-indigo-50/40 rounded-xl p-4 border border-indigo-100 h-64">
+      <h4 className="text-sm font-semibold text-indigo-700 mb-5">
+        User Summary
+      </h4>
 
-          <div className="relative z-10 h-full flex flex-col justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider opacity-80">
-                Total
-              </p>
-              <h3 className="mt-3 text-lg font-semibold">
-                {card.title}
-              </h3>
-            </div>
-
-            <div className="text-4xl font-extrabold">
-              {card.value}
-            </div>
-          </div>
-        </div>
-      ))}
+      <div className="space-y-4">
+        <StatRow
+          label="Clients"
+          value={stats.clients}
+          dot="bg-purple-500"
+        />
+        <StatRow
+          label="Admins"
+          value={stats.admins}
+          dot="bg-orange-500"
+        />
+        <StatRow
+          label="Delivery Partners"
+          value={stats.delivery}
+          dot="bg-emerald-500"
+        />
+      </div>
     </div>
   );
 };
-
-export default SwipeableLayeredStatsCard;
+  
+export default UserStatsRows;

@@ -9,7 +9,7 @@ const Profile = () => {
   const isAgent = user?.role === "delivery-boy";
 
   return (
-    <div className="w-full min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="w-full min-h-screen overflow-x-hidden">
 
       {/* ===== ADMIN DESKTOP ===== */}
       {!isAgent && (
@@ -17,9 +17,9 @@ const Profile = () => {
           <Sidebar />
           <div className="flex-1">
             <Header />
-            <main className="px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex-1 bg-gray-100 w-full">
               <Outlet />
-            </main>
+            </div>
           </div>
         </div>
       )}

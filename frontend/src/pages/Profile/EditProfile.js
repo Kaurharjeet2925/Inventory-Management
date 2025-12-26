@@ -2,6 +2,21 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { format, parse } from "date-fns";
+// dd-MM-yyyy -> Date
+const parseDDMMYYYY = (value) => {
+  if (!value) return null;
+  return parse(value, "dd-MM-yyyy", new Date());
+};
+
+// Date -> dd-MM-yyyy
+const formatDDMMYYYY = (date) => {
+  if (!date) return "";
+  return format(date, "dd-MM-yyyy");
+};
+
 
 const EditProfile = () => {
   const { id } = useParams();          // if id exists → EDIT
@@ -24,6 +39,9 @@ const EditProfile = () => {
   const [imagePreview, setImagePreview] = useState("");
   const fileInputRef = useRef(null);
 
+  // We'll use a native date input for actual value (ISO yyyy-mm-dd)
+  // and display dd-mm-yyyy visually via `DateInputOverlay`.
+
   /* ================= PREFILL DATA (EDIT MODE) ================= */
   useEffect(() => {
     if (!isEditMode) return;
@@ -45,12 +63,21 @@ const EditProfile = () => {
           password: "",               // ❌ never prefill password
           gender: u.gender || "",
           address: u.address || "",
-          dateofbirth: u.dateofbirth || "",
+          dateofbirth: u.dateofbirth ? u.dateofbirth.split("T")[0] : "",
           role: u.role || "",
           image: "",
         });
 
-        if (u.image) setImagePreview(u.image);
+        if (u.image) {
+          const base = (
+            process.env.REACT_APP_IMAGE_URL || process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"
+          )
+          
+            .replace(/\/uploads\/?$/i, '')
+            .replace(/\/$/, "");
+
+          setImagePreview(`${base}${u.image.startsWith("/") ? u.image : "/" + u.image}`);
+        }
       } catch (err) {
         toast.error("Failed to load profile");
       }
@@ -93,7 +120,8 @@ const EditProfile = () => {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        if (value) formData.append(key, value);
+        if (!value) return;
+        formData.append(key, value);
       });
 
       if (isEditMode) {
@@ -117,8 +145,8 @@ const EditProfile = () => {
   };
 
   return (
-	 <div className="ml-64 mt-12">
-      <div className="w-full bg-white shadow-md p-10 rounded-xl min-h-screen">
+	 <main className="pt-16 md:pt-20 md:ml-64 px-4 md:px-6 pb-6">
+        <div className="bg-white rounded-xl shadow-sm p-6">
         <h1 className="text-3xl lg:text-4xl font-semibold mb-8"> {isEditMode ? "Edit Profile" : "Add New User"}</h1>
 
         <form
@@ -221,16 +249,27 @@ const EditProfile = () => {
               className="border border-gray-200 p-3 rounded-md w-full"
             />
           </div>
-		    <div className="flex flex-col">
-            <label className="text-sm font-medium mb-2">Date of birth</label>
-            <input
-              type="date"
-              name="dateofbirth"
-              value={form.dateofbirth}
-              onChange={handleChange}
-              className="border border-gray-200 p-3 rounded-md w-full"
-            />
-          </div>
+		   <div className="flex flex-col">
+  <label className="text-sm font-medium mb-2">Date of birth</label>
+
+  <DatePicker
+    selected={parseDDMMYYYY(form.dateofbirth)}
+    onChange={(date) =>
+      setForm((prev) => ({
+        ...prev,
+        dateofbirth: formatDDMMYYYY(date),
+      }))
+    }
+    dateFormat="dd-MM-yyyy"
+    placeholderText="DD-MM-YYYY"
+    showMonthDropdown
+    showYearDropdown
+    dropdownMode="select"
+    maxDate={new Date()}
+    className="border border-gray-200 p-3 rounded-md w-full"
+  />
+</div>
+
  <div className="flex flex-col">
             <label className="text-sm font-medium mb-2">Address</label>
             <textarea
@@ -287,7 +326,7 @@ const EditProfile = () => {
           </div>
         </form>
       </div>
-    </div>
+    </main>
   );
 };
 

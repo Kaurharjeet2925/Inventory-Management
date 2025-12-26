@@ -36,7 +36,7 @@ const AllAdmins = () => {
     }
 
     try {
-      await apiClient.delete(`/${userId}`);
+      await apiClient.delete(`/user/${userId}`);
       toast.success("User deleted successfully");
       setAdmins(admins.filter(admin => admin._id !== userId));
     } catch (error) {
@@ -46,7 +46,8 @@ const AllAdmins = () => {
   };
 
   return (
-    <div className="ml-64 mt-12 p-4 bg-gray-100 min-h-screen">
+  <main className="pt-16 md:pt-20 md:ml-64 px-4 md:px-6 pb-6">
+        <div className="bg-white rounded-xl shadow-sm p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-semibold">All Admins</h1>
 
@@ -88,17 +89,23 @@ const AllAdmins = () => {
                 return (
                   <div
                     key={key}
-                    className="relative group bg-white rounded-2xl shadow-lg border p-6 flex flex-col items-center hover:shadow-xl transition-all"
+                    className="relative group bg-white rounded-2xl border p-6
+flex flex-col items-center
+shadow-md transition-all duration-200
+hover:-translate-y-1 hover:shadow-xl"
                   >
                     {/* Hover overlay with Eye */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex justify-center items-center rounded-2xl transition-all z-20">
+<div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]
+opacity-0 group-hover:opacity-100
+flex justify-center items-center
+rounded-2xl transition z-20">
                       <div className="relative">
                         <button
                           onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })}
                           className="w-10 h-10 flex items-center justify-center"
                           aria-label={`View ${admin.name}`}
                         >
-                          <Eye className="w-8 h-8 text-white" />
+                          <Eye className="w-8 h-8 text-gray-800" />
                         </button>
                       </div>
                     </div>
@@ -137,9 +144,18 @@ const AllAdmins = () => {
                       {admin.name}
                     </h2>
 
-                    <span className="mt-2 text-sm px-3 py-1 rounded-md bg-gray-100 text-gray-700">
-                      {admin.role || "Admin"}
-                    </span>
+                    <span
+  className={`mt-2 text-xs px-3 py-1 rounded-full font-medium
+  ${admin.role === "superAdmin"
+    ? "bg-purple-100 text-purple-700"
+    : admin.role === "admin"
+    ? "bg-blue-100 text-blue-700"
+    : "bg-emerald-100 text-emerald-700"
+  }`}
+>
+  {admin.role || "Admin"}
+</span>
+
 
                     {/* Email */}
                     <div className="mt-4 w-full">
@@ -237,6 +253,7 @@ const AllAdmins = () => {
         </>
       )}
     </div>
+    </main>
   );
 };
 

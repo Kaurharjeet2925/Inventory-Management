@@ -11,7 +11,7 @@ const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-   <div className="min-h-screen bg-gray-50">
+   <div className="min-h-screen bg-gray-100">
 
       {/* MOBILE NAVBAR */}
     <MobileNavbar
@@ -28,7 +28,7 @@ const AdminDashboard = () => {
       {/* HEADER (DESKTOP ONLY VISUALLY) */}
      <Header onMenuClick={() => setSidebarOpen(prev => !prev)} />
 
-      <main className="p-6 mt-14 md:ml-64">
+      <main className="p-6 mt-16 md:ml-64">
       {/* KPI CARDS */}
       <AdminStatsCards />
 

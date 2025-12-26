@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { X, Pencil, Trash2 } from "lucide-react";
 import SearchableSelect from "../../components/SearchableSelect";
 import { apiClient } from "../../apiclient/apiclient";
+import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 
 const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
   const [form, setForm] = useState(null);
@@ -271,7 +272,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           <div>
             <p className="text-gray-600 text-sm">Date</p>
             <p className="font-semibold text-lg">
-              {new Date(form.createdAt).toLocaleDateString()}
+              {formatAnyDateToDDMMYYYY(form.createdAt)}
             </p>
           </div>
         </div>

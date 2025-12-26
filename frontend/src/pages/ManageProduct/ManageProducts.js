@@ -8,7 +8,8 @@ const ManageProducts = () => {
     <div className="flex w-full items-start">
       <Sidebar />
       <Header/>
-      <div className="flex-1 bg-gray-100 p-6 w-full">
+      <div className="flex-1 bg-gray-100 w-full">
+        
         <Outlet />
       </div>
     </div>

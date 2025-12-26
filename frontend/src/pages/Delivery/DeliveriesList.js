@@ -3,6 +3,7 @@ import { apiClient } from "../../apiclient/apiclient";
 import socket from "../../socket/socketClient";
 import OrderCard from "../Delivery/Deliveries/OrderCard";
 import { Eye } from "lucide-react";
+import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 
 /* 🔹 SIMPLE MOBILE MODAL */
 const Modal = ({ children, onClose }) => {
@@ -142,7 +143,7 @@ const loadOrders = async () => {
                   </td>
 
                   <td className="px-3 py-2 text-gray-600">
-                    {new Date(order.createdAt).toLocaleDateString()}
+                    {formatAnyDateToDDMMYYYY(order.createdAt)}
                   </td>
 
                   <td className="px-3 py-2">

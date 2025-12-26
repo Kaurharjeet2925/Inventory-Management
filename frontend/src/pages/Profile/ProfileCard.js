@@ -1,10 +1,23 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 
 const ProfileCard = ({ user, showEdit, onEdit }) => {
     const loggedInUser = JSON.parse(localStorage.getItem("user"));
 const isSuperAdmin = loggedInUser?.role === "superAdmin";
     const navigate = useNavigate();
+    // build image src inline (supports full URL, leading '/uploads/..', or filename)
+    const base = (
+      process.env.REACT_APP_IMAGE_URL || process.env.REACT_APP_BACKEND_URL || "http://localhost:5000"
+    )
+      .replace(/\/uploads\/?$/i, '')
+      .replace(/\/$/, "");
+
+    const profileImgSrc = user?.image
+      ? (user.image.startsWith("http")
+          ? user.image
+          : (user.image.startsWith("/") ? `${base}${user.image}` : `${base}/uploads/${user.image}`))
+      : null;
   return (
     <div className="space-y-6">
 
@@ -12,8 +25,14 @@ const isSuperAdmin = loggedInUser?.role === "superAdmin";
      <div className="bg-white rounded-xl border p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
   
   <div className="flex items-center gap-4">
-    <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl font-semibold">
-      {user.name?.[0]}
+    <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center">
+      {profileImgSrc ? (
+        <img src={profileImgSrc} alt={user.name} className="w-16 h-16 object-cover" />
+      ) : (
+        <div className="w-16 h-16 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl font-semibold">
+          {user.name?.[0]}
+        </div>
+      )}
     </div>
 
     <div>
@@ -45,7 +64,7 @@ const isSuperAdmin = loggedInUser?.role === "superAdmin";
           <Info label="Email" value={user.email} />
           <Info label="Phone" value={user.phone || "-"} />
           <Info label="Gender" value={user.gender || "-"} />
-          <Info label="Date of Birth" value={user.dateofbirth || "-"} />
+          <Info label="Date of Birth" value={formatAnyDateToDDMMYYYY(user.dateofbirth) || "-"} />
           <Info label="Role" value={user.role} />
         </div>
       </div>

@@ -13,6 +13,30 @@ import {
 import { apiClient } from "../../apiclient/apiclient";
 import { Download } from "lucide-react";
 import Pagination from "../../components/Pagination";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { format, parse } from "date-fns";
+import { formatAnyDateToDDMMYYYY, parseDDMMYYYY as utilParseDDMMYYYY, formatDDMMYYYY as utilFormatDDMMYYYY, formatDDMMYYYYtoISO as utilFormatDDMMYYYYtoISO } from "../../utils/dateFormatter";
+
+// dd-MM-yyyy -> Date (local version used for DatePicker)
+const parseDDMMYYYY = (value) => {
+  if (!value) return null;
+  return parse(value, "dd-MM-yyyy", new Date());
+};
+
+// Date -> dd-MM-yyyy (local version)
+const formatDDMMYYYY = (date) => {
+  if (!date) return "";
+  return format(date, "dd-MM-yyyy");
+};
+
+// dd-MM-yyyy -> yyyy-mm-dd (for API)
+const formatDDMMYYYYtoISO = (ddmmyy) => {
+  if (!ddmmyy) return "";
+  const date = parseDDMMYYYY(ddmmyy);
+  if (!date) return ddmmyy;
+  return format(date, "yyyy-MM-dd");
+};
 const getStatusBadge = (status) => {
   const styles = {
     pending: 'bg-yellow-100 text-yellow-700',
@@ -29,6 +53,8 @@ const SalesReport = () => {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
+  // note: 'from' and 'to' are stored as dd-MM-yyyy display format
+
   const [cards, setCards] = useState({});
   const [chart, setChart] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
@@ -37,7 +63,11 @@ const SalesReport = () => {
 const [pageSize, setPageSize] = useState(10);
 const [currentPage, setCurrentPage] = useState(1);
   /* ================= FETCH REPORT ================= */
-  const fetchReport = async (startDate, endDate) => {
+  const fetchReport = async (startDateDisplay, endDateDisplay) => {
+    // convert display dd-mm-yyyy to ISO yyyy-mm-dd for API
+    const startDate = startDateDisplay ? formatDDMMYYYYtoISO(startDateDisplay) : "";
+    const endDate = endDateDisplay ? formatDDMMYYYYtoISO(endDateDisplay) : "";
+
     const res = await apiClient.get(
       `/daily-sales?start=${startDate}&end=${endDate}`
     );
@@ -71,19 +101,19 @@ const paginatedTable = filteredTable.slice(
     const last7 = new Date();
     last7.setDate(today.getDate() - 6);
 
-    const toDate = today.toISOString().slice(0, 10);
-    const fromDate = last7.toISOString().slice(0, 10);
+    const toDisplay = formatDDMMYYYY(today);
+    const fromDisplay = formatDDMMYYYY(last7);
 
-    setFrom(fromDate);
-    setTo(toDate);
-    fetchReport(fromDate, toDate);
+    setFrom(fromDisplay);
+    setTo(toDisplay);
+    fetchReport(fromDisplay, toDisplay);
   }, []);
 
   /* ================= DOWNLOAD ================= */
   const downloadExcel = async () => {
   try {
     const res = await apiClient.get(
-      `/daily-sales?start=${from}&end=${to}&download=true&search=${search}`,
+      `/daily-sales?start=${formatDDMMYYYYtoISO(from)}&end=${formatDDMMYYYYtoISO(to)}&download=true&search=${search}`,
       {
         responseType: "blob",
       }
@@ -270,10 +300,15 @@ const paginatedTable = filteredTable.slice(
 {/* FROM */}
 <div className="flex items-center gap-2">
   <label className="text-sm font-medium whitespace-nowrap">From</label>
-  <input
-    type="date"
-    value={from}
-    onChange={(e) => setFrom(e.target.value)}
+  <DatePicker
+    selected={parseDDMMYYYY(from)}
+    onChange={(date) => setFrom(formatDDMMYYYY(date))}
+    dateFormat="dd-MM-yyyy"
+    placeholderText="DD-MM-YYYY"
+    showMonthDropdown
+    showYearDropdown
+    dropdownMode="select"
+    maxDate={new Date()}
     className="border rounded px-3 py-2 w-full sm:w-52"
   />
 </div>
@@ -281,10 +316,15 @@ const paginatedTable = filteredTable.slice(
 {/* TO */}
 <div className="flex items-center gap-2">
   <label className="text-sm font-medium whitespace-nowrap">To</label>
-  <input
-    type="date"
-    value={to}
-    onChange={(e) => setTo(e.target.value)}
+  <DatePicker
+    selected={parseDDMMYYYY(to)}
+    onChange={(date) => setTo(formatDDMMYYYY(date))}
+    dateFormat="dd-MM-yyyy"
+    placeholderText="DD-MM-YYYY"
+    showMonthDropdown
+    showYearDropdown
+    dropdownMode="select"
+    maxDate={new Date()}
     className="border rounded px-3 py-2 w-full sm:w-52"
   />
 </div>
@@ -377,7 +417,7 @@ const paginatedTable = filteredTable.slice(
             </td>
 
             <td className="px-4 py-3 text-center text-slate-600">
-              {row.date}
+              {formatAnyDateToDDMMYYYY(row.date)}
             </td>
 
             <td className="px-4 py-3 text-slate-700">
