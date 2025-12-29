@@ -1,24 +1,28 @@
-import React from "react";
+import React, { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "../../components/Sidebar";
 import Header from "../../components/Header";
 import AgentBottomNav from "../../components/AgentBottomNav";
+import PageContainer from "../../components/PageContainer";
 
 const Profile = () => {
   const user = JSON.parse(localStorage.getItem("user"));
   const isAgent = user?.role === "delivery-boy";
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <div className="w-full min-h-screen overflow-x-hidden">
 
       {/* ===== ADMIN DESKTOP ===== */}
       {!isAgent && (
-        <div className="hidden md:flex">
-          <Sidebar />
+        <div className="flex">
+          <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
           <div className="flex-1">
-            <Header />
-            <div className="flex-1 bg-gray-100 w-full">
-              <Outlet />
+            <Header onMenuClick={() => setSidebarOpen((s) => !s)} sidebarOpen={sidebarOpen} />
+            <div className="flex-1 w-full">
+              <PageContainer>
+                <Outlet />
+              </PageContainer>
             </div>
           </div>
         </div>

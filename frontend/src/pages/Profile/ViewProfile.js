@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {apiClient} from "../../apiclient/apiclient";
 import ProfileCard from "./ProfileCard";
+import PageContainer from "../../components/PageContainer";
 
 const ViewProfile = () => {
   const { id } = useParams();
@@ -26,13 +27,13 @@ const ViewProfile = () => {
   const isSuperAdmin = loggedInUser?.role === "superAdmin";
 
   return (
-     <div className="px-6 lg:px-4 ml-64 mt-12">
+   
       <ProfileCard
         user={user}
         showEdit={isSuperAdmin}
         onEdit={() => navigate(`/profile/edit/${user._id}`)}
       />
-    </div>
+    
   );
 };
 

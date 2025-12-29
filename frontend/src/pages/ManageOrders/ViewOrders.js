@@ -7,6 +7,7 @@ import Pagination from "../../components/Pagination";
 import { FaFileInvoice } from "react-icons/fa";
 import OrderDateFilter from "../../components/OrderDateFilter";
 import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
+import PageContainer from "../../components/PageContainer";
 /* ================= HELPERS ================= */
 
 const getPaymentBadge = (status) => {
@@ -246,8 +247,8 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
 
   if (loading) {
     return (
-      <div className="ml-64 mt-12 p-6 text-gray-600">
-        Loading orders...
+      <div>
+        <div className="text-gray-600">Loading orders...</div>
       </div>
     );
   }
@@ -255,7 +256,7 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
   /* ================= UI ================= */
 
   return (
-    <div className="ml-64 mt-12 p-6">
+    <div>
       <h1 className="text-3xl font-bold mb-2">View Orders</h1>
       <p className="text-gray-600 mb-6">All orders and their statuses</p>
 

@@ -5,6 +5,7 @@ import Sidebar from "../../components/Sidebar";
 import Header from "../../components/Header";
 import MobileNavbar from "../../components/MobileNavbar";
 import { useState } from "react";
+import PageContainer from "../../components/PageContainer";
 
 
 const AdminDashboard = () => {
@@ -28,21 +29,18 @@ const AdminDashboard = () => {
       {/* HEADER (DESKTOP ONLY VISUALLY) */}
      <Header onMenuClick={() => setSidebarOpen(prev => !prev)} />
 
-      <main className="p-6 mt-16 md:ml-64">
-      {/* KPI CARDS */}
-      <AdminStatsCards />
+      <PageContainer>
+        {/* KPI CARDS */}
+        <AdminStatsCards />
 
-      {/* CHARTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* <div className="lg:col-span-2">
-          <AdminOrdersChart />
-        </div> */}
-        <AdminOrderStatusChart />
-      </div>
+        {/* CHARTS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <AdminOrderStatusChart />
+        </div>
 
-      {/* TOP PRODUCTS */}
-      <TopProducts />
-      </main>
+        {/* TOP PRODUCTS */}
+        <TopProducts />
+      </PageContainer>
     </div>
   );
 };

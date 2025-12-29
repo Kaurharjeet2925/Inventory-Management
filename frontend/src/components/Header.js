@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
-const Header = () => {
+const Header = ({ onMenuClick }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef();
 
@@ -43,6 +43,15 @@ const Header = () => {
     z-40
   "
 >
+
+  {/* Mobile hamburger - visible only on small screens */}
+  <button
+    onClick={() => onMenuClick && onMenuClick()}
+    aria-label="Open menu"
+    className="absolute left-4 top-4 md:hidden p-2 rounded-md text-slate-200 hover:bg-slate-800/40"
+  >
+    <Menu size={20} />
+  </button>
 
 
 

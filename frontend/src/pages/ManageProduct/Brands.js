@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
+import PageContainer from "../../components/PageContainer";
 
 const Brands = () => {
   const [search, setSearch] = useState("");
@@ -133,7 +134,7 @@ const Brands = () => {
   );
 
   return (
-    <div className="ml-64 mt-12 p-6 bg-gray-100 min-h-screen">
+  <div>
 
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">

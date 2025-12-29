@@ -3,6 +3,7 @@ import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
 import AddLocationModal from "./components/AddLocation";
 import { Pencil, Trash2 } from "lucide-react";
+import PageContainer from "../../components/PageContainer";
 
 const Locations = () => {
   const [locations, setLocations] = useState([]);
@@ -107,7 +108,7 @@ const handleUpdateLocation = async () => {
 
 
   return (
-    <div className="ml-64 mt-12 p-6">
+    <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-4">Locations</h1>
 

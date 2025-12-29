@@ -17,6 +17,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { format, parse } from "date-fns";
 import { formatAnyDateToDDMMYYYY, parseDDMMYYYY as utilParseDDMMYYYY, formatDDMMYYYY as utilFormatDDMMYYYY, formatDDMMYYYYtoISO as utilFormatDDMMYYYYtoISO } from "../../utils/dateFormatter";
+import PageContainer from "../../components/PageContainer";
 
 // dd-MM-yyyy -> Date (local version used for DatePicker)
 const parseDDMMYYYY = (value) => {
@@ -140,7 +141,7 @@ const paginatedTable = filteredTable.slice(
   
 
   return (
-    <div className="ml-64 mt-12  min-h-screen">
+    <div>
 
       {/* ================= HEADER ================= */}
       <div className="mb-8">

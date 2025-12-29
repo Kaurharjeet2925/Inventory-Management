@@ -1,5 +1,6 @@
 // Sidebar.js
 import React, { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -98,13 +99,14 @@ const isSuperAdmin = user?.role === "superAdmin";
        {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          className="fixed top-16 left-0 right-0 bottom-0 bg-black/40 z-30 md:hidden"
         />
       )}
 
    <aside
  className={`
-  fixed top-0 left-0 h-screen w-64
+  fixed top-16 left-0 bottom-0 w-64
+  md:top-0 md:bottom-auto md:h-screen
   bg-gradient-to-b from-slate-950 via-blue-950 to-slate-950
   text-slate-300
   border-r border-slate-800
@@ -118,8 +120,17 @@ const isSuperAdmin = user?.role === "superAdmin";
 
 
         {/* HEADER */}
-        <div className="px-4 py-4 text-lg font-semibold text-slate-100 border-b border-slate-800">
+        <div className="relative px-4 py-4 text-lg font-semibold text-slate-100 border-b border-slate-800">
           {isSuperAdmin ? "Super Admin Panel" : "Admin Panel"}
+
+          {/* Mobile close button - visible when sidebar is open */}
+          <button
+            onClick={onClose}
+            aria-label="Close menu"
+            className="absolute right-3 top-3 md:hidden p-2 rounded text-slate-200 hover:bg-slate-800/30"
+          >
+            <X size={18} />
+          </button>
         </div>
         <nav className="p-4 space-y-2">
           <NavLink to="/dashboard" className={linkClass}>

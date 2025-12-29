@@ -3,6 +3,7 @@ import { apiClient } from '../../apiclient/apiclient';
 import { Plus, Trash2, Edit3 } from 'lucide-react';
 import AddClient from '../ManageClient/AddClient';
 import socket from "../../socket/socketClient";
+import PageContainer from '../../components/PageContainer';
 
 const CreateOrders = () => {
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -390,7 +391,7 @@ const CreateOrders = () => {
 
 
   return (
-    <div className="ml-64 mt-12 p-6">
+    <div>
       <h1 className="text-3xl font-bold mb-2">Create New Order</h1>
       <p className="text-gray-600 mb-6">Select a client and add items</p>
 

@@ -145,8 +145,7 @@ const EditProfile = () => {
   };
 
   return (
-	 <main className="pt-16 md:pt-20 md:ml-64 px-4 md:px-6 pb-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
+        <div >
         <h1 className="text-3xl lg:text-4xl font-semibold mb-8"> {isEditMode ? "Edit Profile" : "Add New User"}</h1>
 
         <form
@@ -326,7 +325,7 @@ const EditProfile = () => {
           </div>
         </form>
       </div>
-    </main>
+    
   );
 };
 

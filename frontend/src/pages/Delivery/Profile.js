@@ -1,8 +1,11 @@
 import React from 'react'
+import PageContainer from '../../components/PageContainer'
 
 const Profile = () => {
   return (
-    <div>Profile Page</div>
+    <PageContainer>
+      <div>Profile Page</div>
+    </PageContainer>
   )
 }
 

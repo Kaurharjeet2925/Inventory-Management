@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, Mail, Eye, Trash2 } from "lucide-react";
+import { Phone, Mail, Eye, Trash2, Grid3x3, List, Plus } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
 
@@ -10,6 +10,10 @@ const AllAdmins = () => {
   const [view, setView] = useState("cards"); // cards OR list
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const base = (process.env.REACT_APP_IMAGE_URL|| "http://localhost:5000")
+   .replace(/\/uploads\/?$/i, '')
+            .replace(/\/$/, "");
+
 
   // Fetch all users from backend
   useEffect(() => {
@@ -46,31 +50,39 @@ const AllAdmins = () => {
   };
 
   return (
-  <main className="pt-16 md:pt-20 md:ml-64 px-4 md:px-6 pb-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-semibold">All Admins</h1>
+        <div>
+   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+  <h1 className="text-2xl sm:text-3xl font-semibold">All Users</h1>
 
-        <div className="flex gap-3">
-          <button
-            onClick={() => setView("cards")}
-            className={`px-4 py-2 rounded-lg ${
-              view === "cards" ? "bg-blue-600 text-white" : "bg-gray-200"
-            }`}
-          >
-            Card View
-          </button>
+  <div className="flex gap-3 items-center">
+     <button
+      onClick={() => navigate("/profile/add")}
+      className="p-2 rounded-lg bg-green-600 text-white hover:bg-green-700 ml-2"
+      title="Add User"
+    >
+      <Plus className="w-5 h-5" />
+    </button>
+    <button
+      onClick={() => setView("cards")}
+      className={`p-2 rounded-lg ${view === "cards" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+      title="Card View"
+    >
+      <Grid3x3 className="w-5 h-5" />
+    </button>
 
-          <button
-            onClick={() => setView("list")}
-            className={`px-4 py-2 rounded-lg ${
-              view === "list" ? "bg-blue-600 text-white" : "bg-gray-200"
-            }`}
-          >
-            List View
-          </button>
-        </div>
-      </div>
+    <button
+      onClick={() => setView("list")}
+      className={`p-2 rounded-lg ${view === "list" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
+      title="List View"
+    >
+      <List className="w-5 h-5" />
+    </button>
+
+   
+  </div>
+</div>
+
+
 
       {/* Show NO DATA message */}
       {admins.length === 0 ? (
@@ -81,7 +93,7 @@ const AllAdmins = () => {
         <>
           {/* CARD VIEW */}
           {view === "cards" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
+     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 xl:gap-8">
               {admins.map((admin, idx) => {
                 const key = admin._id || idx;
                 const failed = !!failedImages[key];
@@ -94,6 +106,15 @@ flex flex-col items-center
 shadow-md transition-all duration-200
 hover:-translate-y-1 hover:shadow-xl"
                   >
+                    {/* Delete Button - Top Right Corner */}
+                    <button
+                      onClick={() => handleDelete(admin._id)}
+                      className="absolute top-3 right-3 p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition z-30 opacity-0 group-hover:opacity-100"
+                      title="Delete user"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+
                     {/* Hover overlay with Eye */}
 <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px]
 opacity-0 group-hover:opacity-100
@@ -111,10 +132,10 @@ rounded-2xl transition z-20">
                     </div>
 
                     {/* Profile Image */}
-                    <div className="w-32 h-32 rounded-full overflow-hidden border shadow-sm bg-gray-100 flex items-center justify-center relative z-10">
+<div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden border shadow-sm bg-gray-100 flex items-center justify-center relative z-10">
                       {admin.image && !failed ? (
                         <img
-                          src={`http://localhost:5000${admin.image}`}
+                          src={`${base}${admin.image}`}
                           alt="profile"
                           className="object-cover w-full h-full"
                           onError={() =>
@@ -140,7 +161,7 @@ rounded-2xl transition z-20">
                     </div>
 
                     {/* Name */}
-                    <h2 className="text-xl font-semibold mt-4">
+                    <h2 className="text-lg sm:text-xl font-semibold mt-3 sm:mt-4 text-center">
                       {admin.name}
                     </h2>
 
@@ -159,7 +180,7 @@ rounded-2xl transition z-20">
 
                     {/* Email */}
                     <div className="mt-4 w-full">
-                      <div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center">
+<div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center break-all">
                         <Mail className="w-4 h-4 text-gray-500" />
                         {admin.email}
                       </div>
@@ -167,7 +188,7 @@ rounded-2xl transition z-20">
 
                     {/* Phone */}
                     <div className="mt-2 w-full">
-                      <div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center">
+<div className="bg-gray-50 px-3 py-2 rounded-md text-gray-700 text-sm flex gap-2 items-center break-all">
                         <Phone className="w-4 h-4 text-gray-500" />
                         {admin.phone || "N/A"}
                       </div>
@@ -180,8 +201,9 @@ rounded-2xl transition z-20">
 
           {/* LIST VIEW */}
           {view === "list" && (
-            <div className="bg-white p-6 rounded-xl shadow-md">
-              <table className="w-full text-left border-collapse">
+            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md overflow-x-auto">
+  <table className="min-w-[800px] w-full text-left border-collapse">
+
                 <thead>
                   <tr className="bg-gray-200 text-gray-700">
                     <th className="p-3">Profile</th>
@@ -203,7 +225,7 @@ rounded-2xl transition z-20">
                         <td className="p-3">
                           {admin.image && !failed ? (
                             <img
-                              src={`http://localhost:5000${admin.image}`}
+                              src={`${base}${admin.image}`}
                               alt="Profile"
                               className="w-10 h-10 rounded-full object-cover"
                               onError={() =>
@@ -235,14 +257,21 @@ rounded-2xl transition z-20">
                         </td>
 
                         <td className="p-3 flex gap-2">
-                          <button onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })} className="p-2 rounded-full border-2 border-blue-500 text-blue-500 hover:bg-blue-50">
-                            <Eye className="w-4 h-4" />
-                          </button>
+  <button
+    onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })}
+    className="p-2 sm:p-2.5 rounded-full border-2 border-blue-500 text-blue-500 hover:bg-blue-50"
+  >
+    <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+  </button>
 
-                          <button onClick={() => handleDelete(admin._id)} className="p-2 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
+  <button
+    onClick={() => handleDelete(admin._id)}
+    className="p-2 sm:p-2.5 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50"
+  >
+    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+  </button>
+</td>
+
                       </tr>
                     );
                   })}
@@ -253,7 +282,7 @@ rounded-2xl transition z-20">
         </>
       )}
     </div>
-    </main>
+   
   );
 };
 
