@@ -3,6 +3,7 @@ import { apiClient } from '../../apiclient/apiclient';
 import { Plus, Trash2, Edit3 } from 'lucide-react';
 import AddClient from '../ManageClient/AddClient';
 import socket from "../../socket/socketClient";
+import ThemedTable from '../../components/ThemedTable';
 import PageContainer from '../../components/PageContainer';
 
 const CreateOrders = () => {
@@ -621,7 +622,7 @@ const CreateOrders = () => {
   {/* ADDED ITEMS LIST */}
   {orderItems.length > 0 && (
     <div>
-      <table className="w-full text-sm">
+      <ThemedTable className="text-sm">
         <thead>
           <tr className="bg-gray-200 ">
             <th className="p-4 text-left">Product</th>
@@ -673,7 +674,7 @@ const CreateOrders = () => {
           
           ))}
         </tbody>
-      </table>
+      </ThemedTable>
     </div>
   )}
 </div>

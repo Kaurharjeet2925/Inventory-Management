@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../apiclient/apiclient';
 import { toast } from 'react-toastify';
 import AddClient from './AddClient';
+import ThemedTable from '../../components/ThemedTable';
 import PageContainer from "../../components/PageContainer";
 
 const Client = () => {
@@ -95,52 +96,44 @@ const [selectedClient, setSelectedClient] = useState(null);
 
       {/* Table */}
       {!loading && (
-        <div className="overflow-x-auto bg-white rounded-lg shadow">
-          <table className="w-full border-collapse">
-          <thead className="bg-gray-200">
-  <tr>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Phone</th>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Company</th>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Address</th>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">City</th>
-    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Actions</th>
+          <ThemedTable className="text-sm">
+         <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
+   <tr className="h-12">
+    <th className="px-6  text-left ">Name</th>
+    <th className="px-6 text-left ">Email</th>
+    <th className="px-6  text-left ">Phone</th>
+    <th className="px-6  text-left ">Company</th>
+    <th className="px-6  text-left ">Address</th>
+    <th className="px-6  text-left ">City</th>
+    <th className="px-6  text-left ">Actions</th>
   </tr>
          </thead>
 
             <tbody>
               {filteredClients.length > 0 ? (
                 filteredClients.map((client) => (
-                  <tr key={client._id} className="border-b hover:bg-gray-50 transition">
-  <td className="px-6 py-3 text-gray-800">{client.name}</td>
-  <td className="px-6 py-3 text-gray-800">{client.email}</td>
-  <td className="px-6 py-3 text-gray-800">{client.phone}</td>
+                  <tr key={client._id} className="border-b hover:bg-gray-50 transition h-[60px]">
+  <td className="px-6 whitespace-nowrap">{client.name}</td>
+  <td className="px-6 whitespace-nowrap">{client.email}</td>
+  <td className="px-6 whitespace-nowrap">{client.phone}</td>
 
   {/* New Company Column */}
-  <td className="px-6 py-3 text-gray-800">{client.companyName || '-'}</td>
+  <td className="px-6 whitespace-nowrap">{client.companyName || '-'}</td>
 
-  <td className="px-6 py-3 text-gray-800">{client.address || '-'}</td>
-  <td className="px-6 py-3 text-gray-800">{client.city || '-'}</td>
-  
-  <td className="px-6 py-3 space-x-2">
-  <button
-  onClick={() => {
-    setSelectedClient(client);
-    setIsEdit(true);
-    setIsAddClientOpen(true);
-  }}
-      className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600 transition"
-    >
+  <td className="px-6 whitespace-nowrap">{client.address || '-'}</td>
+  <td className="px-6 whitespace-nowrap">{client.city || '-'}</td>
+
+  <td className="px-6">
+  <div className="flex items-center justify-center gap-2 h-full">
+    <button className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600">
       Edit
     </button>
-    <button
-      onClick={() => handleDelete(client._id)}
-      className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition"
-    >
+    <button className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600">
       Delete
     </button>
-  </td>
+  </div>
+</td>
+
 </tr>
 
                 ))
@@ -152,8 +145,8 @@ const [selectedClient, setSelectedClient] = useState(null);
                 </tr>
               )}
             </tbody>
-          </table>
-        </div>
+          </ThemedTable>
+        
       )}
 
       {/* Add Client Modal */}

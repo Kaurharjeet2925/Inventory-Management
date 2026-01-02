@@ -4,9 +4,9 @@ const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
 
 const mongoose = require("mongoose")
-const io = require("../server").io;
+
 const { createNotification } = require("./notification.controller");
-// Helper to generate orderId like STN00001
+
 const generateOrderId = async () => {
   // Find all orders and get the highest number
   const allOrders = await Order.find().sort({ createdAt: -1 });
@@ -399,6 +399,25 @@ exports.updateOrder = async (req, res) => {
       },
       { new: true }
     );
+    const io = req.app.get("io");
+
+const populatedOrder = await Order.findById(updatedOrder._id)
+  .populate("clientId", "name phone address")
+  .populate("deliveryPersonId", "name phone email")
+  .populate("assignedBy", "name role");
+
+// Admin
+if (populatedOrder.assignedBy) {
+  io.to(`admin_${populatedOrder.assignedBy._id}`).emit("order_updated", populatedOrder);
+}
+
+// Delivery boy
+if (populatedOrder.deliveryPersonId) {
+  io.to(populatedOrder.deliveryPersonId._id.toString()).emit("order_updated", populatedOrder);
+}
+
+// SuperAdmin
+io.to("superadmins").emit("order_updated", populatedOrder);
 
     return res.json({
       message: "Order updated successfully",
@@ -505,14 +524,12 @@ exports.collectOrder = async (req, res) => {
     const order = await Order.findById(id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    // Mark only this item as collected
     const item = order.items.id(itemId);
     if (!item) return res.status(404).json({ message: "Item not found" });
 
     item.collected = true;
     await order.save();
 
-    // ⭐ Populate before sending to client
     const updatedOrder = await Order.findById(id)
       .populate("clientId", "name phone address")
       .populate("deliveryPersonId", "name phone")
@@ -520,21 +537,44 @@ exports.collectOrder = async (req, res) => {
 
     const io = req.app.get("io");
 
-    // Emit populated order to the admin who assigned it
-    if (updatedOrder.assignedBy) {
-      io.to(`admin_${updatedOrder.assignedBy._id.toString()}`).emit("order_collected", updatedOrder);
-      try { await createNotification({ io, message: `An item was collected for ${updatedOrder.orderId}`, targetUser: updatedOrder.assignedBy._id, data: { orderId: updatedOrder._id } }); } catch(e){console.error('notify admin failed', e);}
+    // Admin
+    if (updatedOrder.assignedBy?._id) {
+      io.to(`admin_${updatedOrder.assignedBy._id}`)
+        .emit("order_collected", updatedOrder);
+
+      await createNotification({
+        io,
+        message: `An item was collected for ${updatedOrder.orderId}`,
+        targetUser: updatedOrder.assignedBy._id,
+        data: { orderId: updatedOrder._id },
+      });
     }
+
+    // Delivery boy
+    if (updatedOrder.deliveryPersonId?._id) {
+      io.to(updatedOrder.deliveryPersonId._id.toString())
+        .emit("order_collected", updatedOrder);
+
+      await createNotification({
+        io,
+        message: `Item collected for order ${updatedOrder.orderId}`,
+        targetUser: updatedOrder.deliveryPersonId._id,
+        data: { orderId: updatedOrder._id },
+      });
+    }
+
+    // SuperAdmins
+    io.to("superadmins").emit("order_collected", updatedOrder);
 
     res.json({
       message: "Item collected successfully",
       order: updatedOrder,
     });
-
   } catch (error) {
     res.status(500).json({ message: "Failed to collect item", error });
   }
 };
+
 
 
 // Get order by id

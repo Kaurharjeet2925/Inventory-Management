@@ -38,36 +38,25 @@ const AgentDashboard = () => {
     }
   };
 
-  /* ------------------------------
-     SOCKET + INITIAL LOAD
-  ------------------------------ */
-  useEffect(() => {
-    loadDashboardData();
 
-    socket.on("order_created", (order) => {
-      const dpId = getDeliveryPersonId(order);
-      if (dpId === user?._id) {
-        loadDashboardData();
-      }
-    });
+useEffect(() => {
+  loadDashboardData();
 
-    socket.on("order_status_updated", (order) => {
-      const dpId = getDeliveryPersonId(order);
-      if (dpId === user?._id) {
-        loadDashboardData();
-      }
-    });
-
-    socket.on("order_deleted", () => {
+  const handleOrderUpdate = (order) => {
+    const dpId = getDeliveryPersonId(order);
+    if (dpId === user?._id) {
       loadDashboardData();
-    });
+    }
+  };
 
-    return () => {
-      socket.off("order_created");
-      socket.off("order_status_updated");
-      socket.off("order_deleted");
-    };
-  }, []);
+  socket.on("order_updated", handleOrderUpdate);
+  socket.on("order_deleted", loadDashboardData);
+
+  return () => {
+    socket.off("order_updated", handleOrderUpdate);
+    socket.off("order_deleted", loadDashboardData);
+  };
+}, [user?._id]);
 
   /* ------------------------------
      TABS

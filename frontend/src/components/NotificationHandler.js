@@ -1,139 +1,173 @@
-import {useRef, useEffect, useContext } from "react";
+import { useRef, useEffect, useContext } from "react";
 import socket from "../socket/socketClient";
 import { toast } from "react-toastify";
 import { NotificationContext } from "../context/NotificationContext";
 
 const NotificationHandler = () => {
   const { setNotifications } = useContext(NotificationContext);
-  const initialized = useRef(false);
+
+  // 🚫 Prevent toast on login / refresh
+  const isInitialLoadRef = useRef(true);
+
+  // 🚫 Prevent duplicate toasts
+  const lastToastRef = useRef(null);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
     const audio = new Audio("/notification_sound.mp3");
-    const user = JSON.parse(localStorage.getItem("agent") || localStorage.getItem("user") || localStorage.getItem("auth") || "{}");
+
+    const user =
+      JSON.parse(localStorage.getItem("agent")) ||
+      JSON.parse(localStorage.getItem("user")) ||
+      JSON.parse(localStorage.getItem("auth")) ||
+      {};
+
     const userId = user?._id || user?.id || user?.userId || "";
-    console.log("🔔 NotificationHandler initialized for user:", user?.name, user?.role, "id:", userId);
+    const role = user?.role;
 
-    const push = (msg, data) => {
-      console.log("🔥 Notification Added:", msg, data);
+    /* ------------------------------
+       PUSH HELPER
+    ------------------------------ */
+    const push = (msg, data, eventType) => {
+      const orderId = data?.orderId || data?._id || "unknown";
+      const uniqueKey = `${orderId}-${eventType}`;
 
-      toast.info(msg);
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
+      // ❌ Prevent duplicate toast
+      if (lastToastRef.current === uniqueKey) return;
+      lastToastRef.current = uniqueKey;
 
-      // Store inside context for bell display
+      // ✅ Always update context (bell count auto updates)
       setNotifications((prev) => [
-        { message: msg, data, time: new Date().toLocaleTimeString() },
+        { message: msg, data, createdAt: new Date() },
         ...prev,
       ]);
+
+      // ❌ No popup on login / refresh
+      if (isInitialLoadRef.current) return;
+
+      // ✅ Toast
+      toast.info(msg, {
+        position: "top-right",
+        autoClose: 4000,
+        pauseOnHover: true,
+      });
+
+      // ✅ Sound
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
     };
 
-    // EVENT HANDLERS
+    /* ------------------------------
+       SOCKET EVENTS
+    ------------------------------ */
+
     socket.on("order_created", (order) => {
-      console.log("📢 SOCKET RECEIVED: order_created", order);
-      
-      // Handle both cases: deliveryPersonId as string or as object
-      const deliveryPersonId = typeof order.deliveryPersonId === "string" 
-        ? order.deliveryPersonId 
-        : order.deliveryPersonId?._id;
-      // assignedBy may be string id or populated user object
-      const assignedById = typeof order.assignedBy === "string" ? order.assignedBy : order.assignedBy?._id;
-      
-      // Send notification to assigned delivery person only
-      if (user?.role === "delivery-boy" && deliveryPersonId === userId) {
-        push(`🆕 New order assigned to you: ${order.orderId}`, order);
+      const dpId =
+        typeof order.deliveryPersonId === "string"
+          ? order.deliveryPersonId
+          : order.deliveryPersonId?._id;
+
+      const adminId =
+        typeof order.assignedBy === "string"
+          ? order.assignedBy
+          : order.assignedBy?._id;
+
+      if (role === "delivery-boy" && dpId === userId) {
+        push(
+          `🆕 New order assigned: ${order.orderId}`,
+          order,
+          "order_created"
+        );
       }
 
-      // Notify the admin who created/assigned the order
-      if ((user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId) {
-        console.log("🔔 Notifying admin assignedById matches userId", { assignedById, userId });
-        push(`🆕 Order ${order.orderId} created`, order);
+      if (
+        (role === "admin" || role === "superAdmin") &&
+        adminId === userId
+      ) {
+        push(`🆕 Order ${order.orderId} created`, order, "order_created");
       }
     });
 
+    // ❌ Order updated → bell only
     socket.on("order_updated", (order) => {
-      console.log("📢 SOCKET RECEIVED: order_updated", order);
-      
-      // Handle both cases for IDs
-      const deliveryPersonId = typeof order.deliveryPersonId === "string" 
-        ? order.deliveryPersonId 
-        : order.deliveryPersonId?._id;
-      
-      const assignedById = typeof order.assignedBy === "string"
-        ? order.assignedBy
-        : order.assignedBy?._id;
-      
-      // Send to delivery person if it's their order, or to admin who assigned it
-      const isDeliveryPerson = user?.role === "delivery-boy" && deliveryPersonId === userId;
-      const isAssigningAdmin = (user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId;
-      
-      if (isDeliveryPerson || isAssigningAdmin) {
-        push(`✏️ Order ${order.orderId} has been updated`, order);
-      }
+      setNotifications((prev) => [
+        {
+          message: `✏️ Order ${order.orderId} updated`,
+          data: order,
+          createdAt: new Date(),
+        },
+        ...prev,
+      ]);
     });
 
     socket.on("order_status_updated", (order) => {
-      console.log("📢 SOCKET RECEIVED: order_status_updated", order);
-      
-      // Handle both cases for IDs
-      const deliveryPersonId = typeof order.deliveryPersonId === "string" 
-        ? order.deliveryPersonId 
-        : order.deliveryPersonId?._id;
-      
-      const assignedById = typeof order.assignedBy === "string"
-        ? order.assignedBy
-        : order.assignedBy?._id;
-      
-      const deliveryPersonName = typeof order.deliveryPersonId === "string"
-        ? "Delivery Person"
-        : order.deliveryPersonId?.name || "Delivery Person";
-      
-      // Send to admin who assigned the order when delivery person updates status
-      if ((user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId) {
-        push(`📦 Order ${order.orderId} status changed to ${order.status} by ${deliveryPersonName}`, order);
+      const dpId =
+        typeof order.deliveryPersonId === "string"
+          ? order.deliveryPersonId
+          : order.deliveryPersonId?._id;
+
+      const adminId =
+        typeof order.assignedBy === "string"
+          ? order.assignedBy
+          : order.assignedBy?._id;
+
+      if (
+        (role === "admin" || role === "superAdmin") &&
+        adminId === userId
+      ) {
+        push(
+          `📦 Order ${order.orderId} → ${order.status}`,
+          order,
+          "order_status_updated"
+        );
       }
-      // Also notify delivery person of their own status changes
-      else if (user?.role === "delivery-boy" && deliveryPersonId === userId) {
-        push(`📦 Your order ${order.orderId} is now ${order.status}`, order);
+
+      if (role === "delivery-boy" && dpId === userId) {
+        push(
+          `📦 Your order ${order.orderId} → ${order.status}`,
+          order,
+          "order_status_updated"
+        );
       }
     });
 
     socket.on("order_collected", (order) => {
-      console.log("📢 SOCKET RECEIVED: order_collected", order);
-      
-      // Handle both cases
-      const assignedById = typeof order.assignedBy === "string"
-        ? order.assignedBy
-        : order.assignedBy?._id;
-      
-      // Notify admin who assigned the order
-      if ((user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId) {
-        push(`✔️ Item collected in order ${order.orderId}`, order);
+      const adminId =
+        typeof order.assignedBy === "string"
+          ? order.assignedBy
+          : order.assignedBy?._id;
+
+      if (
+        (role === "admin" || role === "superAdmin") &&
+        adminId === userId
+      ) {
+        push(
+          `✔️ Item collected in ${order.orderId}`,
+          order,
+          "order_collected"
+        );
       }
     });
 
     socket.on("order_deleted", ({ orderId, assignedBy }) => {
-      console.log("📢 SOCKET RECEIVED: order_deleted", orderId);
-      
-      // Handle both cases
-      const assignedById = typeof assignedBy === "string"
-        ? assignedBy
-        : assignedBy?._id;
-      
-      // Notify admin who assigned the order
-      if ((user?.role === "admin" || user?.role === "superAdmin") && assignedById === userId) {
-        push(`❌ Order ${orderId} has been deleted`, orderId);
+      const adminId =
+        typeof assignedBy === "string"
+          ? assignedBy
+          : assignedBy?._id;
+
+      if (
+        (role === "admin" || role === "superAdmin") &&
+        adminId === userId
+      ) {
+        push(
+          `❌ Order ${orderId} deleted`,
+          { orderId },
+          "order_deleted"
+        );
       }
     });
 
-    // Global order creation (server may emit to all) — notify admins
-    socket.on("order_created_global", (order) => {
-      if (user?.role === "admin" || user?.role === "superAdmin") {
-        console.log("📢 SOCKET RECEIVED: order_created_global", order);
-        push(`🆕 New order created: ${order.orderId}`, order);
-      }
-    });
+    // ✅ Mark initial load complete
+    isInitialLoadRef.current = false;
 
     return () => {
       socket.off("order_created");
