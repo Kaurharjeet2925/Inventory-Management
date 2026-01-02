@@ -2,6 +2,7 @@ import React from "react";
 
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 const ThemedTable = ({ className = "", children, ...props }) => {
   // base classes ensure consistent sizing and typography
   const base = "w-full text-xs sm:text-sm";
@@ -11,6 +12,8 @@ const ThemedTable = ({ className = "", children, ...props }) => {
       {children}
     </table>
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 const ThemedTable = ({ children, className = "" }) => {
@@ -25,6 +28,9 @@ const ThemedTable = ({ children, className = "" }) => {
       </div>
     </div>
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
