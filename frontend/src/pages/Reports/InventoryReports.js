@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ThemedTable from "../../components/ThemedTable";
 import {
   BarChart,
   Bar,
@@ -217,7 +218,7 @@ const InventoryReports = () => {
       <div className="bg-white rounded-xl shadow p-6">
         <h3 className="text-lg font-semibold mb-4">Inventory Details</h3>
 
-        <table className="w-full border">
+        <ThemedTable className="border">
           <thead className="bg-slate-100">
             <tr>
               <th className="border p-2">Product</th>
@@ -254,7 +255,7 @@ const InventoryReports = () => {
               </tr>
             ))}
           </tbody>
-        </table>
+        </ThemedTable>
       </div>
 
     </div>

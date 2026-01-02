@@ -3,6 +3,7 @@ import { apiClient } from "../../apiclient/apiclient";
 import socket from "../../socket/socketClient";
 //import { useNavigate } from "react-router-dom";
 import OrderCard from "../Delivery/Deliveries/OrderCard";
+import ThemedTable from "./ThemedTable";
 import {Eye} from "lucide-react";
 const DeliveriesList = () => {
   //const navigate = useNavigate();
@@ -42,7 +43,7 @@ const DeliveriesList = () => {
 
       {/* TABLE WRAPPER (important for mobile) */}
       <div className="bg-white border rounded-lg overflow-x-auto">
-        <table className="w-full text-sm">
+        <ThemedTable className="text-sm">
           <thead className="bg-gray-100 text-gray-700 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Order</th>
@@ -111,7 +112,7 @@ const DeliveriesList = () => {
               ))
             )}
           </tbody>
-        </table>
+        </ThemedTable>
       </div>
          {viewModal && (
               <OrderCard

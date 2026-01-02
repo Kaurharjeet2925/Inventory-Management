@@ -3,6 +3,7 @@ import { apiClient } from "../../apiclient/apiclient";
 import socket from "../../socket/socketClient";
 import OrderCard from "../Delivery/Deliveries/OrderCard";
 import { Eye } from "lucide-react";
+import ThemedTable from "../../components/ThemedTable";
 import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 
 /* 🔹 SIMPLE MOBILE MODAL */
@@ -113,7 +114,7 @@ const loadOrders = async () => {
 
       {/* ================= TABLE ================= */}
       <div className="bg-white border rounded-lg overflow-x-auto">
-        <table className="w-full text-sm">
+        <ThemedTable className="text-sm">
           <thead className="bg-gray-100 text-gray-700 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Order</th>
@@ -176,7 +177,7 @@ const loadOrders = async () => {
               ))
             )}
           </tbody>
-        </table>
+        </ThemedTable>
       </div>
 
       {/* ================= MODAL ================= */}

@@ -3,6 +3,7 @@ import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
 import AddLocationModal from "./components/AddLocation";
 import { Pencil, Trash2 } from "lucide-react";
+import ThemedTable from "../../components/ThemedTable";
 import PageContainer from "../../components/PageContainer";
 
 const Locations = () => {
@@ -144,7 +145,7 @@ const handleUpdateLocation = async () => {
       {/* Table */}
       {!loading && (
         <div className="overflow-x-auto bg-white rounded-lg shadow">
-          <table className="w-full border-collapse">
+          <ThemedTable className="border-collapse">
             <thead className="bg-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
@@ -208,7 +209,7 @@ const handleUpdateLocation = async () => {
                 </tr>
               )}
             </tbody>
-          </table>
+          </ThemedTable>
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ThemedTable from "../../components/ThemedTable";
 import {
   LineChart,
   Line,
@@ -390,7 +391,7 @@ const paginatedTable = filteredTable.slice(
   </div>
 
   <div className="overflow-x-auto max-h-[420px]">
-    <table className="min-w-full text-sm">
+    <ThemedTable className="min-w-full text-sm">
       <thead className="sticky top-0 bg-slate-50 z-10">
         <tr className="text-slate-600 text-xs uppercase tracking-wide">
           <th className="px-4 py-3 text-left">Order ID</th>
@@ -489,7 +490,7 @@ const paginatedTable = filteredTable.slice(
           </tr>
         )}
       </tbody>
-    </table>
+    </ThemedTable>
     <div className="flex justify-center items-center py-5 bg-slate-50 border-t border-slate-200 rounded-b-2xl">
   <Pagination
     currentPage={currentPage}

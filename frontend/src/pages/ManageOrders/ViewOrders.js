@@ -7,7 +7,7 @@ import Pagination from "../../components/Pagination";
 import { FaFileInvoice } from "react-icons/fa";
 import OrderDateFilter from "../../components/OrderDateFilter";
 import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
-import PageContainer from "../../components/PageContainer";
+import ThemedTable from "../../components/ThemedTable";
 /* ================= HELPERS ================= */
 
 const getPaymentBadge = (status) => {
@@ -377,7 +377,7 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
 
 {/* Table Header */}
 <div className="overflow-x-auto">
-  <table className="w-full text-sm">
+  <ThemedTable className="text-sm">
     <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
       <tr className="h-12">
         <th className="px-6 text-left">Order ID</th>
@@ -559,7 +559,7 @@ const paymentStatus =
         })
       )}
     </tbody>
-  </table>
+  </ThemedTable>
 </div>
 <div className="mt-6">
         <Pagination

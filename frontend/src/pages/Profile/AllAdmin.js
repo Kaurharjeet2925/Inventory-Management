@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import ThemedTable from "../../components/ThemedTable";
 import { useNavigate } from "react-router-dom";
 import { Phone, Mail, Eye, Trash2, Grid3x3, List, Plus } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
@@ -202,7 +203,7 @@ rounded-2xl transition z-20">
           {/* LIST VIEW */}
           {view === "list" && (
             <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md overflow-x-auto">
-  <table className="min-w-[800px] w-full text-left border-collapse">
+  <ThemedTable className="min-w-[800px] text-left border-collapse">
 
                 <thead>
                   <tr className="bg-gray-200 text-gray-700">
@@ -276,7 +277,7 @@ rounded-2xl transition z-20">
                     );
                   })}
                 </tbody>
-              </table>
+              </ThemedTable>
             </div>
           )}
         </>
