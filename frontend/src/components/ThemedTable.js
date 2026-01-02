@@ -1,21 +1,5 @@
 import React from "react";
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-const ThemedTable = ({ className = "", children, ...props }) => {
-  // base classes ensure consistent sizing and typography
-  const base = "w-full text-xs sm:text-sm";
-
-  return (
-    <table className={`${base} ${className}`} {...props}>
-      {children}
-    </table>
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 const ThemedTable = ({ children, className = "" }) => {
   return (
     <div className="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
@@ -27,13 +11,6 @@ const ThemedTable = ({ children, className = "" }) => {
         </table>
       </div>
     </div>
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
   );
 };
 
