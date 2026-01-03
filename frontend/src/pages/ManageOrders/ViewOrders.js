@@ -47,6 +47,8 @@ const formatStatus = (status) => {
 
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
+  const [needsRefresh, setNeedsRefresh] = useState(false);
+
   const [statusCounts, setStatusCounts] = useState({
     pending: 0,
     shipped: 0,
@@ -132,24 +134,34 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
     loadOrders(currentPage, limit, activeTab);
   }, [currentPage]);
 
-  // socket realtime
   useEffect(() => {
-    const refresh = () => loadOrders(currentPage, limit, activeTab);
+  const onRealtimeEvent = () => {
+    if (document.visibilityState === "visible") {
+      loadOrders(currentPage, limit, activeTab);
+    } else {
+      setNeedsRefresh(true);
+    }
+  };
 
-    socket.on("order_created", refresh);
-    socket.on("order_deleted", refresh);
-    socket.on("order_updated", refresh);
-    socket.on("order_status_updated", refresh);
-    socket.on("connect", () => loadOrders(1, limit, activeTab));
+  socket.on("order_created", onRealtimeEvent);
+  socket.on("order_deleted", onRealtimeEvent);
+  socket.on("order_updated", onRealtimeEvent);
+  socket.on("order_collected", onRealtimeEvent);
+  socket.on("order_status_updated", onRealtimeEvent);
 
-    return () => {
-      socket.off("order_created", refresh);
-      socket.off("order_deleted", refresh);
-      socket.off("order_updated", refresh);
-      socket.off("order_status_updated", refresh);
-      socket.off("connect");
-    };
-  }, [currentPage, activeTab]);
+  socket.on("connect", () => {
+    loadOrders(1, limit, activeTab);
+  });
+
+  return () => {
+    socket.off("order_created", onRealtimeEvent);
+    socket.off("order_deleted", onRealtimeEvent);
+    socket.off("order_updated", onRealtimeEvent);
+    socket.off("order_collected", onRealtimeEvent);
+    socket.off("order_status_updated", onRealtimeEvent);
+    socket.off("connect");
+  };
+}, [currentPage, activeTab]);
 
   // products
   useEffect(() => {
@@ -168,6 +180,20 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
     };
     loadProducts();
   }, []);
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "visible" && needsRefresh) {
+      loadOrders(currentPage, limit, activeTab);
+      setNeedsRefresh(false);
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
+}, [needsRefresh, currentPage, activeTab]);
 
   /* ================= DELETE ================= */
 

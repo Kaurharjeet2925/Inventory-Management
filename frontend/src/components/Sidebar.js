@@ -1,6 +1,5 @@
 // Sidebar.js
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -11,6 +10,12 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const location = useLocation();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/";
+  };
   
 
   useEffect(() => {
@@ -33,13 +38,12 @@ const Sidebar = ({ isOpen, onClose }) => {
     setReportsOpen(location.pathname.startsWith("/reports"));
   }, [location.pathname]);
  const linkClass = ({ isActive }) =>
-  `block px-4 py-2 rounded-md text-sm transition-all
+  `block px-4 py-2 rounded-md text-sm transition-all duration-200
    ${
      isActive
-       ? "bg-blue-500/15 text-blue-400 font-medium"
-       : "text-slate-400 hover:bg-blue-500/10 hover:text-slate-200"
+       ? "bg-amber-500/15 text-amber-400 font-medium border-l-2 border-amber-400"
+       : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
    }`;
-
 
 
   const handleMenuToggle = (menu) => {
@@ -99,62 +103,44 @@ const isSuperAdmin = user?.role === "superAdmin";
        {isOpen && (
         <div
           onClick={onClose}
-          className="fixed top-16 left-0 right-0 bottom-0 bg-black/40 z-30 md:hidden"
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
         />
       )}
 
-   <aside
- className={`
-  fixed top-16 left-0 bottom-0 w-64
-  md:top-0 md:bottom-auto md:h-screen
-  bg-gradient-to-b from-slate-950 via-blue-950 to-slate-950
-  text-slate-300
-  border-r border-slate-800
-  z-50 transform transition-transform duration-300
-  ${isOpen ? "translate-x-0" : "-translate-x-full"}
-  md:translate-x-0
-`}
-
->
-
-
-
+      <aside
+        className={`
+          fixed top-0 left-0 h-screen w-64 bg-blue-950 text-slate-300 z-50
+          transform transition-transform duration-300
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          md:translate-x-0 md:block
+        `}
+      >
         {/* HEADER */}
-        <div className="relative px-4 py-4 text-lg font-semibold text-slate-100 border-b border-slate-800">
+        <div className="text-white text-xl font-bold p-4 border-b mt-1 border-blue-900">
           {isSuperAdmin ? "Super Admin Panel" : "Admin Panel"}
-
-          {/* Mobile close button - visible when sidebar is open */}
-          <button
-            onClick={onClose}
-            aria-label="Close menu"
-            className="absolute right-3 top-3 md:hidden p-2 rounded text-slate-200 hover:bg-slate-800/30"
-          >
-            <X size={18} />
-          </button>
         </div>
         <nav className="p-4 space-y-2">
           <NavLink to="/dashboard" className={linkClass}>
             Dashboard
           </NavLink>
 
-         <button
-  onClick={() => handleMenuToggle("profile")}
-  className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-    ${
-      profileOpen
-          ? "bg-blue-500/10 text-slate-100"
-      : "text-slate-400 hover:bg-blue-500/10 hover:text-slate-200"  
-    }
-  `}
->
+          <button
+            onClick={() => handleMenuToggle('profile')}
+           className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+  ${
+   profileOpen
+      ? "bg-amber-500/10 text-amber-300"
+      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
+  }
+`}
 
+          >
             <span>Manage Admin</span>
             <span>{profileOpen ? "▾" : "▸"}</span>
           </button>
 
           {profileOpen && (
-           <div className="ml-4 mt-1 space-y-1 border-l border-slate-800 pl-2">
-
+            <div className="ml-4 mt-1 space-y-1">
               <NavLink to="/profile/alladmin" className={linkClass}>
                 All Admin
               </NavLink>
@@ -165,23 +151,22 @@ const isSuperAdmin = user?.role === "superAdmin";
             </div>
           )}
             <button
-  onClick={() => handleMenuToggle("product")}
-  className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-    ${
-      productOpen
-          ? "bg-blue-500/10 text-slate-100"
-      : "text-slate-400 hover:bg-blue-500/10 hover:text-slate-200"
-    }
-  `}
->
+            onClick={() => handleMenuToggle('product')}
+            className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+  ${
+    productOpen
+      ? "bg-amber-500/10 text-amber-300"
+      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
+  }
+`}
 
+          >
             <span>Manage Products</span>
             <span>{productOpen ? "▾" : "▸"}</span>
           </button>
 
           {productOpen && (
-           <div className="ml-4 mt-1 space-y-1 border-l border-slate-800 pl-2">
-
+            <div className="ml-4 mt-1 space-y-1">
               
 
               <NavLink to="/manage-products/brands" className={linkClass}>
@@ -199,23 +184,22 @@ const isSuperAdmin = user?.role === "superAdmin";
             </div>
           )}
            <button
-  onClick={() => handleMenuToggle("orders")}
-  className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-          ${
-            ordersOpen
-               ? "bg-blue-500/10 text-slate-100"
-      : "text-slate-400 hover:bg-blue-500/10 hover:text-slate-200"
-    }
-  `}
->
+            onClick={() => handleMenuToggle('orders')}
+           className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+  ${
+    ordersOpen
+      ? "bg-amber-500/10 text-amber-300"
+      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
+  }
+`}
 
+          >
             <span>Manage Orders</span>
             <span>{ordersOpen ? "▾" : "▸"}</span>
           </button>
 
            {ordersOpen && (
-           <div className="ml-4 mt-1 space-y-1 border-l border-slate-800 pl-2">
-
+            <div className="ml-4 mt-1 space-y-1">
               
 
               <NavLink to="/orders/generate-order" className={linkClass}>
@@ -228,24 +212,23 @@ const isSuperAdmin = user?.role === "superAdmin";
              
             </div>
           )}
-          <button
-  onClick={() => handleMenuToggle("clients")}
-   className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-          ${
-            clientsOpen
-               ? "bg-blue-500/10 text-slate-100"
-      : "text-slate-400 hover:bg-blue-500/10 hover:text-slate-200"
-    }
-  `}
->
+           <button
+            onClick={() => handleMenuToggle('clients')}
+            className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+  ${
+    clientsOpen
+      ? "bg-amber-500/10 text-amber-300"
+      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
+  }
+`}
 
+          >
             <span>Manage Clients</span>
             <span>{clientsOpen ? "▾" : "▸"}</span>
           </button>
 
            {clientsOpen && (
-            <div className="ml-4 mt-1 space-y-1 border-l border-slate-800 pl-2">
-
+            <div className="ml-4 mt-1 space-y-1">
               
 
               <NavLink to="/manage-client/client" className={linkClass}>
@@ -257,23 +240,22 @@ const isSuperAdmin = user?.role === "superAdmin";
             </div>
            )}
           <button
-  onClick={() => handleMenuToggle("reports")}
-  className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-    ${
-      reportsOpen 
-         ? "bg-orange-500/10 text-slate-100"
-        : "text-slate-400 hover:bg-orange-500/10 hover:text-slate-200"
-    }
-  `}
->
+            onClick={() => handleMenuToggle('reports')}
+          className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+  ${
+    reportsOpen
+      ? "bg-amber-500/10 text-amber-300"
+      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
+  }
+`}
 
+          >
             <span>Reports</span>
             <span>{reportsOpen ? "▾" : "▸"}</span>
           </button>
 
           {reportsOpen && (
-           <div className="ml-4 mt-1 space-y-1 border-l border-slate-800 pl-2">
-
+            <div className="ml-4 mt-1 space-y-1">
               <NavLink to="/reports/sales-reports" className={linkClass}>
                 Sales Reports
               </NavLink>
@@ -288,7 +270,7 @@ const isSuperAdmin = user?.role === "superAdmin";
           </NavLink> */}
 
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-700">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-900">
     {/* <button
       onClick={handleLogout}
       className="w-full px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"

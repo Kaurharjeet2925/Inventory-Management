@@ -44,6 +44,20 @@ const CreateOrders = () => {
 
   const [clients, setClients] = useState([]);
   const [products, setProducts] = useState([]);
+ const inputClass =
+    "w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 " +
+    "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition"
+
+  const primaryBtn =
+    "inline-flex items-center justify-center gap-2 rounded-md bg-blue-900 px-5 py-2.5 text-sm font-medium text-white " +
+    "hover:bg-amber-500 focus:ring-2 focus:ring-amber-400 transition " +
+    "disabled:opacity-50 disabled:cursor-not-allowed"
+
+  const secondaryBtn =
+    "inline-flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700 " +
+    "hover:bg-slate-100 transition"
+
+  const labelClass = "flex items-center h-10 text-sm font-medium text-slate-600"
 
   useEffect(() => {
     socket.on("order_created", (order) => {
@@ -165,7 +179,7 @@ const CreateOrders = () => {
             setOpen(true);
           }}
           placeholder={placeholder}
-          className="w-full border p-2 rounded"
+          className={inputClass}
           onFocus={() => setOpen(true)}
         />
 
@@ -391,88 +405,96 @@ const CreateOrders = () => {
   };
 
 
-  return (
-    <div>
-      <h1 className="text-3xl font-bold mb-2">Create New Order</h1>
-      <p className="text-gray-600 mb-6">Select a client and add items</p>
+ return (
+  <div className="max-w-7xl mx-auto">
 
-      <form onSubmit={handleSubmit}>
-        
-        {/* CLIENT SELECTION */}
-        <div className="bg-gray-50 p-6 rounded-lg mb-6">
-          <h2 className="text-xl font-bold mb-4">Select Client</h2>
+    {/* PAGE HEADER */}
+    <h1 className="text-2xl font-semibold text-slate-800 mb-1">
+      Create New Order
+    </h1>
+    <p className="text-sm text-slate-500 mb-6">
+      Select a client and add items
+    </p>
 
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <select
-                value={selectedClientId}
-                onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full border rounded p-3 text-lg"
-              >
-                <option value="">-- Select Client --</option>
-                {clients.map((client) => (
-                  <option key={client._id} value={client._id}>
-                    {client.name} ({client.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
+    <form onSubmit={handleSubmit}>
 
-            <button
-              type="button"
-              onClick={() => setIsAddClientOpen(true)}
-              className="bg-blue-500 text-white px-4 py-3 rounded hover:bg-blue-600 flex items-center gap-2"
+      {/* CLIENT SELECTION */}
+      
+<div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Client Details
+        </h2>
+
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <select
+              value={selectedClientId}
+              onChange={(e) => setSelectedClientId(e.target.value)}
+              className={inputClass}
             >
-              <Plus size={20} /> New Client
-            </button>
+              <option value="">Select Client</option>
+              {clients.map((client) => (
+                <option key={client._id} value={client._id}>
+                  {client.name} ({client.phone})
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* CLIENT DETAILS */}
-          {selectedClient && (
-            <div className="mt-4 p-4 bg-white border-l-4 border-blue-500 rounded">
-              <div className="grid grid-cols-2 gap-4">
-                <div><b>Name:</b> {selectedClient.name}</div>
-                <div><b>Phone:</b> {selectedClient.phone}</div>
-                <div><b>Company:</b> {selectedClient.companyName || '-'}</div>
-                <div><b>Email:</b> {selectedClient.email}</div>
-               
-              </div>
+          <button
+            type="button"
+            onClick={() => setIsAddClientOpen(true)}
+            className={primaryBtn}
+          >
+            <Plus size={16} /> New Client
+          </button>
+        </div>
+
+        {selectedClient && (
+          <div className="mt-4 p-4 rounded-lg bg-white border-l-4 border-amber-500">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div><b>Name:</b> {selectedClient.name}</div>
+              <div><b>Phone:</b> {selectedClient.phone}</div>
+              <div><b>Company:</b> {selectedClient.companyName || "-"}</div>
+              <div><b>Email:</b> {selectedClient.email}</div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
-        <div className="bg-gray-50 p-6 rounded-lg mb-6">
-          <h2 className="text-xl font-bold mb-4">Delivery Person</h2>
+      {/* DELIVERY PERSON */}
+<div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">
+          Delivery Person
+        </h2>
 
-          <select
-  value={selectedDeliveryPersonId}
-  onChange={(e) => setSelectedDeliveryPersonId(e.target.value)}
-  className="w-full border p-3 rounded"
->
-  <option value="">Select Delivery Person</option>
+        <select
+          value={selectedDeliveryPersonId}
+          onChange={(e) => setSelectedDeliveryPersonId(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select Delivery Person</option>
+          {deliveryPersons.map((d) => (
+            <option key={d._id} value={d._id}>
+              {d.name} ({d.phone})
+            </option>
+          ))}
+        </select>
+      </div>
 
-  {deliveryPersons.map((d) => (
-    <option key={d._id} value={d._id}>
-      {d.name} ({d.phone})
-    </option>
-  ))}
-</select>
+      {/* ORDER ITEMS */}
+<div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+        <h2 className="text-lg font-semibold text-slate-800 ">
+          Order Items
+        </h2>
 
-        </div>
+        {/* PRODUCT LINE */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end
+                        bg-gray-50  mb-4">
 
-        {/* ORDER ITEMS */}
-      
-<div className="bg-gray-50 p-6 rounded-lg mb-6">
-  <h2 className="text-xl font-bold mb-4">Order Items</h2>
-
-  {/* 3-column layout: Product – Stock – Add */}
-  <div className="grid grid-cols-1 sm:grid-cols-7 gap-3 mb-4 items-end">
-
-    {/* PRODUCT SELECT */}
-    <div className="sm:col-span-2">
-      <label className="block text-sm font-semibold mb-1">Product</label>
-
-      <SearchableSelect
+          <div className="md:col-span-3">
+            <label className={labelClass}>Product</label>
+           <SearchableSelect
         options={products}
         value={itemForm.productId}
         onChange={(id) => {
@@ -504,123 +526,80 @@ const CreateOrders = () => {
         }}
         placeholder="Search product..."
       />
-    </div>
-    <div className="sm:col-span-2">
-  <label className="font-semibold">Warehouse</label>
-  <select
-    value={selectedWarehouseId}
-    onChange={(e) => setSelectedWarehouseId(e.target.value)}
-    className="border p-2 rounded w-full"
-  >
-    <option value="">Select Warehouse</option>
+          </div>
 
-    {warehouseOptions.map((wh) => {
-      // calculate already ordered FROM THIS warehouse only
-      const alreadyOrdered = orderItems
-        .filter(
-          (it) =>
-            it.productId === itemForm.productId &&
-            it.warehouseId === wh.id
-        )
-        .reduce((sum, it) => sum + it.quantity, 0);
+          <div className="md:col-span-3">
+            <label className={labelClass}>Warehouse</label>
+            <select
+              value={selectedWarehouseId}
+              onChange={(e) => setSelectedWarehouseId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select Warehouse</option>
+              {warehouseOptions.map((wh) => {
+                const alreadyOrdered = orderItems
+                  .filter(it => it.productId === itemForm.productId && it.warehouseId === wh.id)
+                  .reduce((sum, it) => sum + it.quantity, 0);
 
-      const remainingStock = wh.stock - alreadyOrdered;
+                return (
+                  <option key={wh.id} value={wh.id}>
+                    {wh.warehouseName} (Stock: {wh.stock - alreadyOrdered})
+                  </option>
+                );
+              })}
+            </select>
+          </div>
 
-      return (
-        <option key={wh.id} value={wh.id}>
-          {wh.warehouseName} (Stock: {remainingStock})
-        </option>
-      );
-    })}
-  </select>
-</div>
-<div className="relative sm:col-span-1">
-<label className="block text-sm font-semibold mb-1">Price per product</label>
-<input
-  type="number"
-  className="border rounded p-2 w-full"
-  value={itemForm.price ?? ""}
-  onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
-  placeholder="Enter price"
-/> 
+          <div className="md:col-span-2">
+            <label className={labelClass}>Unit Price (₹)</label>
+            <input
+              type="number"
+              className={inputClass}
+              value={itemForm.price ?? ""}
+              onChange={(e) => setItemForm({ ...itemForm, price: e.target.value })}
+            />
+          </div>
 
-</div>
-    {/* STOCK (order quantity) */}
-    <div className="relative sm:col-span-1">
-      <label className="block text-sm font-semibold mb-1">Quantity</label>
+          <div className="md:col-span-2">
+            <label className={labelClass}>Quantity</label>
+            <input
+              type="number"
+              name="quantity"
+              value={itemForm.quantity}
+              disabled={
+                selectedWarehouseId &&
+                warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
+              }
+              onChange={handleItemChange}
+              className={inputClass}
+              min="1"
+            />
+          </div>
 
-      <input
-        type="number"
-        name="quantity"
-        value={itemForm.quantity}
-        disabled={
-          selectedWarehouseId &&
-          warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
-        }
-        onChange={handleItemChange}
-        className={`w-full border rounded p-2 ${qtyError ? "border-red-500" : ""}`}
-        min="1"
-      />
+          <div className="md:col-span-2">
+            <button
+              type="button"
+              onClick={addItem}
+              disabled={
+                !itemForm.productId ||
+                !selectedWarehouseId ||
+                warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
+              }
+              className={`${primaryBtn} w-full h-[42px]`}
+            >
+              {editingItemId ? <><Edit3 size={16}/> Update</> : <><Plus size={18}/> Add Item</>}
+            </button>
+          </div>
+        </div>
 
-      {/* AVAILABLE STOCK */}
-      {itemForm.productId && selectedWarehouseId && (
-  <span className="absolute -bottom-5 left-0 text-xs text-gray-600">
-    Available:{" "}
-    {(() => {
-      const wh = warehouseOptions.find(
-        (w) => w.id === selectedWarehouseId
-      );
-
-      // deduct already ordered 
-      const alreadyOrdered = orderItems
-        .filter(
-          (it) =>
-            it.productId === itemForm.productId &&
-            it.warehouseId === selectedWarehouseId
-        )
-        .reduce((sum, it) => sum + it.quantity, 0);
-
-      return (wh?.stock || 0) - alreadyOrdered;
-    })()}
-  </span>
-)}
-
-
-      {qtyError && (
-        <p className="text-red-500 text-xs absolute -bottom-10 left-0">
-          {qtyError}
-        </p>
-      )}
-    </div>
-
-    {/* ADD BUTTON */}
-    <div className="sm:col-span-1">
-      <button
-        type="button"
-        onClick={addItem}
-        disabled={
-          !itemForm.productId ||
-          !selectedWarehouseId ||
-          warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
-        }
-        className="w-full bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 flex items-center justify-center gap-2 h-10"
-      >
-        {editingItemId ? (
-          <>
-            <Edit3 size={16} /> Update
-          </>
-        ) : (
-          <>
-            <Plus size={18} /> Add
-          </>
+        {qtyError && (
+          <p className="text-red-500 text-xs font-medium px-1">
+            {qtyError}
+          </p>
         )}
-      </button>
-    </div>
 
-  </div>
-
-  {/* ADDED ITEMS LIST */}
-  {orderItems.length > 0 && (
+        {/* TABLE */}
+        {orderItems.length > 0 && (
     <div>
       <ThemedTable className="text-sm">
         <thead>
@@ -663,7 +642,7 @@ const CreateOrders = () => {
              <button
                type="button"
                onClick={() => removeItem(item.id)}
-               className="text-red-500 hover:text-red-700"
+               className={secondaryBtn}
                title="Remove"
              >
                <Trash2 size={18} />
@@ -677,26 +656,29 @@ const CreateOrders = () => {
       </ThemedTable>
     </div>
   )}
-</div>
+      </div>
 
-<div className="bg-gray-50 p-6 rounded-lg mb-6">
-          <h2 className="text-xl font-bold mb-4">Payment Details</h2>
+      {/* PAYMENT */}
+<div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+        <h2 className="text-lg font-semibold text-slate-800 ">Payment Details</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label>Total Amount</label>
+           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end
+                        bg-gray-50  mb-4">
+
+          <div className="md:col-span-3">
+                 <label className={labelClass}>Total Amount</label>
               <input
                 type="number"
                 value={amountData.totalAmount}
                 onChange={(e) =>
                   setAmountData({ ...amountData, totalAmount: e.target.value })
                 }
-                className="border p-2 rounded w-full"
+                className={inputClass}
               />
             </div>
 
-            <div>
-              <label>Paid Amount</label>
+            <div className="md:col-span-3">
+                <label className={labelClass}>Paid Amount</label>
               <input
                 type="number"
                 value={amountData.paidAmount}
@@ -707,57 +689,49 @@ const CreateOrders = () => {
                 })
                }
 
-                className="border p-2 rounded w-full"
+                className={inputClass}
               />
             </div>
 
-            <div>
-              <label>Balance</label>
+             <div className="md:col-span-3">
+               <label className={labelClass}>Balance</label>
               <input
                 type="number"
                 value={amountData.balanceAmount}
                 readOnly
-                className="border bg-gray-100 p-2 rounded w-full"
+                className={inputClass}
               />
             </div>
-          </div>
-
-          <div className="mt-3">
-            <label>Payment Status</label>
+              <div className="md:col-span-3">
+               <label className={labelClass}>Payment Status</label>
             <input
               type="text"
               value={amountData.paymentStatus}
               readOnly
-              className="border bg-gray-100 p-2 rounded w-full"
+              className={inputClass}
             />
           </div>
+          </div>
+
+         
         </div>
 
-        {/* SUBMIT */}
-        <div className="flex gap-3 justify-end">
-          <button
-            type="reset"
-            className="px-6 py-2 border border-gray-300 rounded hover:bg-gray-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            Create Order
-          </button>
-        </div>
-      </form>
+      {/* ACTIONS */}
+      <div className="flex justify-end gap-3">
+        <button type="reset" className={secondaryBtn}>Cancel</button>
+        <button type="submit" className={primaryBtn}>Create Order</button>
+      </div>
 
-      {/* ADD CLIENT MODAL */}
-      <AddClient
-        isOpen={isAddClientOpen}
-        onClose={() => setIsAddClientOpen(false)}
-        onAddClient={handleAddNewClient}
-      />
-    </div>
-  );
+    </form>
+
+    <AddClient
+      isOpen={isAddClientOpen}
+      onClose={() => setIsAddClientOpen(false)}
+      onAddClient={handleAddNewClient}
+    />
+  </div>
+);
+
 };
 
 export default CreateOrders;

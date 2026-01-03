@@ -4,9 +4,8 @@ const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
 
 const mongoose = require("mongoose")
-
 const { createNotification } = require("./notification.controller");
-
+// Helper to generate orderId like STN00001
 const generateOrderId = async () => {
   // Find all orders and get the highest number
   const allOrders = await Order.find().sort({ createdAt: -1 });
