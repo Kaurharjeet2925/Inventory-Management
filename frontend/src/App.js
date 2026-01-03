@@ -34,8 +34,11 @@ import SalesReports from './pages/Reports/SalesReports.js';
 import InventoryReports from './pages/Reports/InventoryReports.js';
 import { NotificationProvider } from "./context/NotificationContext";
 import Reports from './pages/Reports/Reports.js';
+import SettingsLayout from './components/SettingsLayout.js';
 import DeliveryList from './pages/Delivery/DeliveriesList.js';
 import MyProfile from './pages/Profile/MyProfile.js';
+import CompanySettings from './pages/Settings/CompanySettings.js';
+import ChangePassword from './pages/Settings/ChangePassword.js';
 function App() {
   useEffect(() => {
     socket.on("connect", () => {
@@ -104,6 +107,10 @@ function App() {
           </Route>
           <Route path="deliveries-history" element={<DeliveryList />} />
         </Route>
+         <Route path="/settings" element={<SettingsLayout />}>
+            <Route path="company" element={<CompanySettings />} />
+            <Route path="change-password" element={<ChangePassword />} />
+          </Route>
       </Routes>
       </div>
     </NotificationProvider>

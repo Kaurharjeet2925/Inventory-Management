@@ -9,13 +9,10 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [clientsOpen, setClientsOpen] = useState(false);
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const location = useLocation();
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
-  };
+ 
   
 
   useEffect(() => {
@@ -85,6 +82,15 @@ const Sidebar = ({ isOpen, onClose }) => {
     }
     else if (menu === 'reports') {
       setReportsOpen(!reportsOpen);
+      setProfileOpen(false);
+      setProductOpen(false);
+      setOrdersOpen(false);
+      setClientsOpen(false);
+      setDeliveryOpen(false);
+    }
+    else if (menu === 'settings') {
+      setSettingsOpen(!settingsOpen);
+      setReportsOpen(false);
       setProfileOpen(false);
       setProductOpen(false);
       setOrdersOpen(false);
@@ -261,6 +267,33 @@ const isSuperAdmin = user?.role === "superAdmin";
               </NavLink>
               <NavLink to="/reports/inventory-reports" className={linkClass}>
                 Inventory Reports
+              </NavLink>
+            </div>
+          )}
+
+          {/* Settings link below Reports */}
+            <button
+            onClick={() => handleMenuToggle('settings')}
+          className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+  ${
+    settingsOpen
+      ? "bg-amber-500/10 text-amber-300"
+      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
+  }
+`}
+
+          >
+            <span>Settings</span>
+            <span>{settingsOpen ? "▾" : "▸"}</span>
+          </button>
+
+          {settingsOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              <NavLink to="/settings/company" className={linkClass}>
+                Company Settings
+              </NavLink>
+              <NavLink to="/settings/change-password" className={linkClass}>
+                Change Password
               </NavLink>
             </div>
           )}

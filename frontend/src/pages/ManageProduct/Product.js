@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import { Package, AlertTriangle, XCircle, BarChart3 } from "lucide-react";
 import AddLocationModal from "./components/AddLocation";
 import AddProducts from "./components/AddProducts";
-import ThemedTable from "../../components/ThemedTable";
 const DEFAULT_UNITS = ["piece", "packet", "kg", "ltr", "gm"];
 
 const Product = () => {
@@ -242,7 +241,7 @@ const Product = () => {
         </div>
 
         <div className="bg-yellow-50 border border-yellow-300 rounded-lg sm:rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4">
-          <div className="p-3 bg-yellow-200 text-yellow-600 rounded-lg">
+          <div className="p-3 bg-yellow-100 text-yellow-600 rounded-lg">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div className="text-center sm:text-left">
@@ -251,9 +250,9 @@ const Product = () => {
           </div>
         </div>
 
-        <div className="bg-red-50 border border-red-300 rounded-lg sm:rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4">
-          <div className="p-3 bg-red-200 text-red-600 rounded-lg">
-            <XCircle className="w-6 h-6" />
+        <div className="bg-red-50 border border-red-100 rounded-lg sm:rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4">
+          <div className="p-3 bg-red-100 text-red-600 rounded-lg">
+            <XCircle className="w-4 sm:w-6 h-4 sm:h-6" />
           </div>
           <div className="text-center sm:text-left">
             <p className="text-xs sm:text-sm text-slate-600">Out of Stock</p>
@@ -261,9 +260,9 @@ const Product = () => {
           </div>
         </div>
 
-        <div className="bg-green-50 border border-green-300 rounded-lg sm:rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4">
-          <div className="p-2 sm:p-3 bg-green-200 text-green-600 rounded-lg">
-            <BarChart3 className="w-6 h-6" />
+        <div className="bg-green-50 border border-green-100 rounded-lg sm:rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4">
+          <div className="p-2 sm:p-3 bg-green-100 text-green-600 rounded-lg">
+            <BarChart3 className="w-4 sm:w-6 h-4 sm:h-6" />
           </div>
           <div className="text-center sm:text-left">
             <p className="text-xs sm:text-sm text-slate-600">Most Stock</p>
@@ -273,57 +272,63 @@ const Product = () => {
       </div>
 
       {/* ================= FILTER BAR (LIGHT SECTION) ================= */}
-      <div className="bg-slate-50 border border-slate-200 p-2 sm:p-4 rounded-lg sm:rounded-xl mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center border rounded-lg bg-white px-2 sm:px-3 py-2 w-full sm:flex-1 text-sm">
-            <Search className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-            <input
-              type="text"
-              placeholder="Search…"
-              className="outline-none w-full text-xs sm:text-sm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+  <div className="bg-slate-50 border border-slate-200 p-2 sm:p-4 rounded-lg sm:rounded-xl mb-4 sm:mb-6">
+  <div className="flex flex-col sm:flex-row items-center gap-3">
 
-          <div className="flex w-full gap-2 sm:w-auto">
-            <select
-              className="border rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white w-1/2 sm:w-auto"
-              value={filterStock}
-              onChange={(e) => setFilterStock(e.target.value)}
-            >
-              <option value="">All Stock</option>
-              <option value="low">Low Stock</option>
-              <option value="out">Out of Stock</option>
-              <option value="most">Most Stock</option>
-            </select>
+    {/* SEARCH */}
+    <div className="flex items-center border rounded-lg bg-white px-2 sm:px-3 py-2 w-full sm:flex-1 text-sm">
+      <Search className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+      <input
+        type="text"
+        placeholder="Search…"
+        className="outline-none w-full text-xs sm:text-sm"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+    </div>
 
-            <select
-              className="border rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white w-1/2 sm:w-auto"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="">Sort Qty</option>
-              <option value="qty-low">Low → High</option>
-              <option value="qty-high">High → Low</option>
-            </select>
-          </div>
-        </div>
-      </div>
+    {/* FILTERS */}
+    <div className="flex flex-row gap-2 w-full sm:w-auto">
+      <select
+        className="border rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white w-full sm:w-44"
+        value={filterStock}
+        onChange={(e) => setFilterStock(e.target.value)}
+      >
+        <option value="">All Stock</option>
+        <option value="low">Low Stock</option>
+        <option value="out">Out of Stock</option>
+        <option value="most">Most Stock</option>
+      </select>
+
+      <select
+        className="border rounded-lg px-2 sm:px-3 py-2 text-xs sm:text-sm bg-white w-full sm:w-44"
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value)}
+      >
+        <option value="">Sort Qty</option>
+        <option value="qty-low">Low → High</option>
+        <option value="qty-high">High → Low</option>
+      </select>
+    </div>
+
+  </div>
+</div>
+
 
       {/* ================= TABLE ================= */}
-    
-          <ThemedTable className="text-sm">
-            <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
-              <tr className="h-12">
-                <th className="px-6 text-left">Img</th>
-                <th className="px-6 text-left">Product</th>
-                <th className="px-6 text-left ">Brand</th>
-                <th className="px-6 text-left ">Category</th>
-                <th className="px-6 text-center">Qty</th>
-                <th className="px-6 text-center">Stock</th>
-                <th className="px-6 text-center">Location</th>
-                <th className="px-6 text-center">Action</th>
+      <div className="border border-slate-200 rounded-lg sm:rounded-xl overflow-hidden">
+        <div className="overflow-x-auto max-h-[55vh]">
+          <table className="w-full text-xs sm:text-sm table-auto">
+            <thead className="bg-gray-100 text-gray-700 uppercase text-xs sticky top-0 z-10">
+              <tr>
+                <th className="p-2 sm:p-4 text-center border">Img</th>
+                <th className="p-2 sm:p-4 text-left border">Product</th>
+                <th className="p-2 sm:p-4 text-left border hidden sm:table-cell">Brand</th>
+                <th className="p-2 sm:p-4 text-left border hidden lg:table-cell">Category</th>
+                <th className="p-2 sm:p-4 text-center border">Qty</th>
+                <th className="p-2 sm:p-4 text-center border">Stock</th>
+                <th className="p-2 sm:p-4 text-center border hidden lg:table-cell">Location</th>
+                <th className="p-2 sm:p-4 text-center border">Act</th>
               </tr>
             </thead>
 
@@ -342,11 +347,7 @@ const Product = () => {
                   return 0;
                 })
                 .map((p) => (
-                 <tr
-              key={p._id}
-              className="border-b hover:bg-gray-50 transition h-[60px] align-middle"
-             >
-
+                  <tr key={p._id} className="border-b hover:bg-gray-50 transition">
                     {/* IMAGE */}
                     <td className="p-2 sm:p-4 text-center">
                       <img
@@ -410,57 +411,69 @@ const Product = () => {
                 </tr>
               )}
             </tbody>
-          </ThemedTable>
-       
+          </table>
+        </div>
+      </div>
 
       {/* ================= MODAL ================= */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2">
-          <div className="bg-white p-4 sm:p-8 rounded-lg sm:rounded-xl shadow-lg w-full md:w-[70%] max-h-[95vh] overflow-y-auto">
-            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6">{editingId ? "Edit Product" : "Add New Product"}</h2>
+    {showModal && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2">
+    <div className="w-full md:w-[70%] max-h-[95vh]">
 
-            <AddProducts
-              productData={productData}
-              setProductData={setProductData}
-              brands={brands}
-              categories={categories}
-              units={units}
-              setUnits={setUnits}
-              locations={locations}
-              setShowLocationModal={setShowLocationModal}
-              thumbnailPreview={thumbnailPreview}
-              imagesPreview={imagesPreview}
-              handleThumbnail={handleThumbnail}
-              handleImages={handleImages}
-            />
-            {showLocationModal && (
-              <AddLocationModal
-                show={showLocationModal}
-                onClose={() => {
-                  setShowLocationModal(false);
-                  setNewLocationName("");
-                  setNewAddress("");
-                }}
-                locationName={newLocationName}
-                address={newAddress}
-                setLocationName={setNewLocationName}
-                setAddress={setNewAddress}
-                onSave={handleAddLocationFromProduct}
-              />
-            )}
+      <AddProducts
+        productData={productData}
+        setProductData={setProductData}
+        brands={brands}
+        categories={categories}
+        units={units}
+        setUnits={setUnits}
+        locations={locations}
+        setShowLocationModal={setShowLocationModal}
+        thumbnailPreview={thumbnailPreview}
+        imagesPreview={imagesPreview}
+        handleThumbnail={handleThumbnail}
+        handleImages={handleImages}
+        onClose={() => setShowModal(false)}   // ✅ IMPORTANT
+        isEdit={!!editingId}                  // ✅ IMPORTANT
+      />
 
-            <div className="flex justify-end mt-4 sm:mt-6 gap-2 sm:gap-3">
-              <button className="bg-gray-300 px-3 sm:px-4 py-2 rounded text-sm" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-
-              <button className="bg-blue-600 text-white px-3 sm:px-4 py-2 rounded text-sm" onClick={saveProduct}>
-                {editingId ? "Update" : "Save"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {showLocationModal && (
+        <AddLocationModal
+          show={showLocationModal}
+          onClose={() => {
+            setShowLocationModal(false);
+            setNewLocationName("");
+            setNewAddress("");
+          }}
+          locationName={newLocationName}
+          address={newAddress}
+          setLocationName={setNewLocationName}
+          setAddress={setNewAddress}
+          onSave={handleAddLocationFromProduct}
+        />
       )}
+
+      {/* FOOTER */}
+      <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+        <button
+          onClick={() => setShowModal(false)}
+          className="px-5 py-2 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={saveProduct}
+          className="px-6 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+        >
+          {editingId ? "Update Product" : "Save Product"}
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

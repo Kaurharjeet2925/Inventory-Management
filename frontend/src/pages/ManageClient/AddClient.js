@@ -1,24 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { apiClient } from '../../apiclient/apiclient';
-import { toast } from 'react-toastify';
+import React, { useState, useEffect } from "react";
+import { apiClient } from "../../apiclient/apiclient";
+import { toast } from "react-toastify";
+
+const inputClass =
+  "w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 " +
+  "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition";
+
+const labelClass =
+  "block text-sm font-medium text-slate-600 mb-1";
 
 const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    companyName: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: ''
+    name: "",
+    email: "",
+    phone: "",
+    companyName: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "",
   });
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // 🔥 Prefill values when editing
+  /* ================= PREFILL ON EDIT ================= */
   useEffect(() => {
     if (isEdit && clientData) {
       setFormData({ ...clientData });
@@ -27,60 +34,50 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     }
   }, [isOpen]);
 
+  /* ================= HANDLERS ================= */
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // clear field error
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Name is required';
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    if (!formData.name.trim()) newErrors.name = "Name is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      newErrors.email = 'Invalid email';
-    if (!formData.phone.trim()) newErrors.phone = 'Phone is required';
+      newErrors.email = "Invalid email";
+    if (!formData.phone.trim()) newErrors.phone = "Phone is required";
     return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const newErrors = validateForm();
-    if (Object.keys(newErrors).length > 0) {
+    if (Object.keys(newErrors).length) {
       setErrors(newErrors);
       return;
     }
 
     setLoading(true);
-
     try {
       let response;
-
       if (isEdit) {
-        // UPDATE client
-        response = await apiClient.put(`/clients/${clientData._id}`, formData);
-        toast.success('Client updated successfully');
+        response = await apiClient.put(
+          `/clients/${clientData._id}`,
+          formData
+        );
+        toast.success("Client updated successfully");
         onAddClient(response.data?.client, true);
       } else {
-        // ADD new client
-        response = await apiClient.post('/clients', formData);
-        toast.success('Client added successfully');
+        response = await apiClient.post("/clients", formData);
+        toast.success("Client added successfully");
         onAddClient(response.data?.client, false);
       }
-
       resetForm();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save client');
+      toast.error(err.response?.data?.message || "Failed to save client");
     } finally {
       setLoading(false);
     }
@@ -88,28 +85,29 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      companyName: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: ''
+      name: "",
+      email: "",
+      phone: "",
+      companyName: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
+      country: "",
     });
     setErrors({});
   };
 
   if (!isOpen) return null;
 
+  /* ================= UI ================= */
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2">
+      <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
 
-        {/* Header */}
-        <div className="bg-gray-800 px-6 py-4 flex justify-between items-center sticky top-0">
-          <h2 className="text-xl font-bold text-white">
+        {/* HEADER */}
+        <div className="px-6 py-4 bg-gray-100 border-b border-slate-200 flex justify-between items-center sticky top-0">
+          <h2 className="text-lg font-semibold text-slate-800">
             {isEdit ? "Edit Client" : "Add New Client"}
           </h2>
 
@@ -118,153 +116,141 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
               resetForm();
               onClose();
             }}
-            className="text-white hover:bg-gray-700 rounded px-2 py-1 transition"
+            className="text-slate-500 hover:text-slate-700 text-xl"
           >
             ✕
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
-          {/* ROW 1 → Name, Email */}
+          {/* ROW 1 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-semibold mb-2">Name *</label>
+              <label className={labelClass}>Name *</label>
               <input
-                type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                placeholder="Client name"
-                className={`w-full px-4 py-2 border rounded-lg ${
-                  errors.name ? "border-red-500" : "border-gray-300"
+                className={`${inputClass} ${
+                  errors.name ? "border-red-500" : ""
                 }`}
               />
-              {errors.name && <p className="text-red-500 text-sm">{errors.name}</p>}
+              {errors.name && (
+                <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Email *</label>
+              <label className={labelClass}>Email *</label>
               <input
-                type="email"
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="client@example.com"
-                className={`w-full px-4 py-2 border rounded-lg ${
-                  errors.email ? "border-red-500" : "border-gray-300"
+                className={`${inputClass} ${
+                  errors.email ? "border-red-500" : ""
                 }`}
               />
-              {errors.email && <p className="text-red-500 text-sm">{errors.email}</p>}
+              {errors.email && (
+                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+              )}
             </div>
           </div>
 
-          {/* ROW 2 → Company & Phone */}
+          {/* ROW 2 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-semibold mb-2">Company Name</label>
+              <label className={labelClass}>Company Name</label>
               <input
-                type="text"
                 name="companyName"
                 value={formData.companyName}
                 onChange={handleChange}
-                placeholder="Business / Company name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Phone *</label>
+              <label className={labelClass}>Phone *</label>
               <input
-                type="text"
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="Phone number"
-                className={`w-full px-4 py-2 border rounded-lg ${
-                  errors.phone ? "border-red-500" : "border-gray-300"
+                className={`${inputClass} ${
+                  errors.phone ? "border-red-500" : ""
                 }`}
               />
-              {errors.phone && <p className="text-red-500 text-sm">{errors.phone}</p>}
+              {errors.phone && (
+                <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+              )}
             </div>
           </div>
 
-          {/* ROW 3 → Address, City */}
+          {/* ROW 3 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-semibold mb-2">Address</label>
+              <label className={labelClass}>Address</label>
               <input
-                type="text"
                 name="address"
                 value={formData.address}
                 onChange={handleChange}
-                placeholder="Street address"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">City</label>
+              <label className={labelClass}>City</label>
               <input
-                type="text"
                 name="city"
                 value={formData.city}
                 onChange={handleChange}
-                placeholder="City"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                className={inputClass}
               />
             </div>
           </div>
 
-          {/* ROW 4 → State, Zip, Country */}
+          {/* ROW 4 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-semibold mb-2">State</label>
+              <label className={labelClass}>State</label>
               <input
-                type="text"
                 name="state"
                 value={formData.state}
                 onChange={handleChange}
-                placeholder="State"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Zip Code</label>
+              <label className={labelClass}>Zip Code</label>
               <input
-                type="text"
                 name="zipCode"
                 value={formData.zipCode}
                 onChange={handleChange}
-                placeholder="12345"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                className={inputClass}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-2">Country</label>
+              <label className={labelClass}>Country</label>
               <input
-                type="text"
                 name="country"
                 value={formData.country}
                 onChange={handleChange}
-                placeholder="Country"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                className={inputClass}
               />
             </div>
           </div>
 
-          {/* BUTTONS */}
-          <div className="flex gap-3 justify-end pt-6 border-t">
+          {/* FOOTER */}
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <button
               type="button"
               onClick={() => {
                 resetForm();
                 onClose();
               }}
-              className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              className="px-5 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
             >
               Cancel
             </button>
@@ -272,7 +258,7 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 disabled:bg-gray-500"
+              className="px-6 py-2 rounded-md bg-blue-900 text-white hover:bg-amber-500 disabled:opacity-50"
             >
               {loading
                 ? isEdit
@@ -285,7 +271,6 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
           </div>
 
         </form>
-
       </div>
     </div>
   );
