@@ -4,7 +4,6 @@ import { toast } from "react-toastify";
 import AddLocationModal from "./components/AddLocation";
 import { Pencil, Trash2 } from "lucide-react";
 import ThemedTable from "../../components/ThemedTable";
-import PageContainer from "../../components/PageContainer";
 
 const Locations = () => {
   const [locations, setLocations] = useState([]);

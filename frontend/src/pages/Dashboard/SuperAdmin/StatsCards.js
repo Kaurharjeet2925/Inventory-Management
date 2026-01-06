@@ -110,40 +110,38 @@ const StatsCards = () => {
   const outOfStock = summary?.inventory?.outOfStock ?? 0;
 
   return (
-    <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+  <div className="bg-white rounded-xl p-4">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
 
       {/* ================= SALES ACTIVITY ================= */}
       <div className="lg:col-span-2 bg-blue-50/40 rounded-xl p-4 border border-blue-100">
-        <div className="flex items-start justify-between mb-3">
-          <h4 className="text-xs font-semibold text-blue-700">Sales Activity</h4>
-
-          {/* Small sales summary widget on the right */}
-          {/* <div className="ml-4">
-            <SalesSummary />
-          </div> */}
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-semibold text-blue-700">
+            Sales Activity
+          </h4>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <SalesCard
-            value={loading ? "..." : (typeof pending === 'number' ? pending.toLocaleString() : pending)}
+            value={loading ? "..." : pending.toLocaleString()}
             label="To Be Packed"
             icon={Clock}
             color="text-blue-600"
           />
           <SalesCard
-            value={loading ? "..." : (typeof shipped === 'number' ? shipped.toLocaleString() : shipped)}
+            value={loading ? "..." : shipped.toLocaleString()}
             label="To Be Shipped"
             icon={Truck}
             color="text-red-500"
           />
           <SalesCard
-            value={loading ? "..." : (typeof delivered === 'number' ? delivered.toLocaleString() : delivered)}
+            value={loading ? "..." : delivered.toLocaleString()}
             label="To Be Delivered"
             icon={Package}
             color="text-green-600"
           />
           <SalesCard
-            value={loading ? "..." : (typeof completed === 'number' ? completed.toLocaleString() : completed)}
+            value={loading ? "..." : completed.toLocaleString()}
             label="Completed"
             icon={CheckCircle}
             color="text-indigo-600"
@@ -153,17 +151,33 @@ const StatsCards = () => {
 
       {/* ================= INVENTORY SUMMARY ================= */}
       <div className="bg-emerald-50/40 rounded-xl p-4 border border-emerald-100">
-        <h4 className="text-xs font-semibold text-emerald-700 mb-3">Inventory Summary</h4>
+        <h4 className="text-xs font-semibold text-emerald-700 mb-3">
+          Inventory Summary
+        </h4>
 
         <div className="space-y-2">
-          <InventoryRow label="Quantity in Hand" value={loading ? "..." : (typeof totalQty === 'number' ? totalQty.toLocaleString() : totalQty)} dot="bg-green-500" />
-          <InventoryRow label="Low Stock Items" value={loading ? "..." : (typeof lowStock === 'number' ? lowStock.toLocaleString() : lowStock)} dot="bg-orange-500" />
-          <InventoryRow label="Out of Stock Items" value={loading ? "..." : (typeof outOfStock === 'number' ? outOfStock.toLocaleString() : outOfStock)} dot="bg-red-500" />
+          <InventoryRow
+            label="Quantity in Hand"
+            value={loading ? "..." : totalQty.toLocaleString()}
+            dot="bg-green-500"
+          />
+          <InventoryRow
+            label="Low Stock Items"
+            value={loading ? "..." : lowStock.toLocaleString()}
+            dot="bg-orange-500"
+          />
+          <InventoryRow
+            label="Out of Stock Items"
+            value={loading ? "..." : outOfStock.toLocaleString()}
+            dot="bg-red-500"
+          />
         </div>
       </div>
 
     </div>
-  );
+  </div>
+);
+
 };
 
 export default StatsCards;

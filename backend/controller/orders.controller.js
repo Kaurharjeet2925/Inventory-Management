@@ -961,3 +961,49 @@ exports.getAllOrders = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch orders" });
   }
 };
+// GET /api/orders/agent/dashboard-summary
+exports.agentDashboardSummary = async (req, res) => {
+  try {
+    if (req.user.role !== "delivery-boy") {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const deliveryBoyId = new mongoose.Types.ObjectId(req.user._id);
+
+    const counts = await Order.aggregate([
+      {
+        $match: {
+          deleted: { $ne: true },
+          deliveryPersonId: deliveryBoyId
+        }
+      },
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const statusCounts = {
+      pending: 0,
+      shipped: 0,
+      delivered: 0,
+      completed: 0
+    };
+
+    counts.forEach(c => {
+      if (c._id === "processing" || c._id === "shipped") {
+        statusCounts.shipped += c.count;
+      } else if (statusCounts[c._id] !== undefined) {
+        statusCounts[c._id] = c.count;
+      }
+    });
+
+    res.json({ statusCounts });
+
+  } catch (error) {
+    console.error("agentDashboardSummary error:", error);
+    res.status(500).json({ message: "Failed to load dashboard summary" });
+  }
+};

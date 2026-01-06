@@ -4,7 +4,6 @@ import { Plus, Trash2, Edit3 } from 'lucide-react';
 import AddClient from '../ManageClient/AddClient';
 import socket from "../../socket/socketClient";
 import ThemedTable from '../../components/ThemedTable';
-import PageContainer from '../../components/PageContainer';
 
 const CreateOrders = () => {
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -406,7 +405,8 @@ const CreateOrders = () => {
 
 
  return (
-  <div className="max-w-7xl mx-auto">
+  <div className="max-w-7xl mx-auto px-3 sm:px-6">
+
 
     {/* PAGE HEADER */}
     <h1 className="text-2xl font-semibold text-slate-800 mb-1">
@@ -425,7 +425,7 @@ const CreateOrders = () => {
           Client Details
         </h2>
 
-        <div className="flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex flex-row gap-2 sm:gap-4 sm:items-end">
           <div className="flex-1">
             <select
               value={selectedClientId}
@@ -441,12 +441,15 @@ const CreateOrders = () => {
             </select>
           </div>
 
+          {/* Small round button on mobile, full button on desktop */}
           <button
             type="button"
             onClick={() => setIsAddClientOpen(true)}
-            className={primaryBtn}
+            className="inline-flex items-center justify-center rounded-full bg-blue-900 text-white p-2 sm:rounded-md sm:px-5 sm:py-2.5 sm:gap-2 sm:text-sm sm:font-medium sm:bg-blue-900 sm:hover:bg-amber-500 sm:focus:ring-2 sm:focus:ring-amber-400 transition w-9 h-9 sm:w-auto sm:h-auto"
+            title="Add New Client"
           >
-            <Plus size={16} /> New Client
+            <Plus size={18} />
+            <span className="hidden sm:inline">New Client</span>
           </button>
         </div>
 
@@ -483,16 +486,22 @@ const CreateOrders = () => {
       </div>
 
       {/* ORDER ITEMS */}
-<div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
+<div className="
+  bg-gray-50 p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm mb-6
+  max-h-[75vh] sm:max-h-none
+  flex flex-col
+">
+
         <h2 className="text-lg font-semibold text-slate-800 ">
           Order Items
         </h2>
+<div className="shrink-0"></div>
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 items-end mb-4">
 
-        {/* PRODUCT LINE */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end
-                        bg-gray-50  mb-4">
 
-          <div className="md:col-span-3">
+
+          <div className="lg:col-span-3">
+
             <label className={labelClass}>Product</label>
            <SearchableSelect
         options={products}
@@ -528,7 +537,8 @@ const CreateOrders = () => {
       />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="lg:col-span-3">
+
             <label className={labelClass}>Warehouse</label>
             <select
               value={selectedWarehouseId}
@@ -550,7 +560,8 @@ const CreateOrders = () => {
             </select>
           </div>
 
-          <div className="md:col-span-2">
+          <div className="lg:col-span-2">
+
             <label className={labelClass}>Unit Price (₹)</label>
             <input
               type="number"
@@ -560,7 +571,8 @@ const CreateOrders = () => {
             />
           </div>
 
-          <div className="md:col-span-2">
+        <div className="lg:col-span-2">
+
             <label className={labelClass}>Quantity</label>
             <input
               type="number"
@@ -576,7 +588,7 @@ const CreateOrders = () => {
             />
           </div>
 
-          <div className="md:col-span-2">
+         <div className="lg:col-span-2">
             <button
               type="button"
               onClick={addItem}
@@ -585,7 +597,8 @@ const CreateOrders = () => {
                 !selectedWarehouseId ||
                 warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
               }
-              className={`${primaryBtn} w-full h-[42px]`}
+              className={`${primaryBtn} w-full h-10 sm:h-[42px]`}
+
             >
               {editingItemId ? <><Edit3 size={16}/> Update</> : <><Plus size={18}/> Add Item</>}
             </button>
@@ -598,64 +611,64 @@ const CreateOrders = () => {
           </p>
         )}
 
-        {/* TABLE */}
-        {orderItems.length > 0 && (
-    <div>
-      <ThemedTable className="text-sm">
+       
+{orderItems.length > 0 && (
+  <div className="mt-4 border rounded-lg bg-white">
+    
+    {/* TABLE HEADER (STAYS VISIBLE) */}
+    <div className="bg-gray-100 border-b">
+      <ThemedTable className="min-w-[800px] text-sm">
         <thead>
-          <tr className="bg-gray-200 ">
+          <tr>
             <th className="p-4 text-left">Product</th>
             <th className="p-4 text-left">Warehouse</th>
-            <th className='p-4 text-left'>Price Per Product</th>
-            <th className="p-4 text-left">Quantity</th>           
-            <th className="p-4 text-left">Total Price</th>
+            <th className="p-4 text-left">Price</th>
+            <th className="p-4 text-left">Qty</th>
+            <th className="p-4 text-left">Total</th>
             <th className="p-4 text-left">Action</th>
           </tr>
         </thead>
+      </ThemedTable>
+    </div>
 
+    {/* TABLE BODY (SCROLLS) */}
+    <div className="max-h-[220px] overflow-y-auto overflow-x-auto">
+      <ThemedTable className="min-w-[800px] text-sm">
         <tbody>
           {orderItems.map((item) => (
-           <tr key={item.id} className="border-b hover:bg-gray-100">
-           <td className="p-4 text-left">
-             {item.productName}-{item.quantityValue}{item.quantityUnit}
-           </td>
-         
-           <td className="p-4 text-left">{item.warehouseName}</td>
-           <td className="p-4 text-left"> ₹{item.price}</td>
-           <td className="p-4 text-left">{item.quantity}</td>
-         
-           {/* TOTAL PRICE */}
-           <td className="p-4 text-left">
-             ₹{Number(item.quantity) * Number(item.price || 0)}
-           </td>
-         
-           <td className="p-4 text-left flex items-center gap-2">
-             <button
-               type="button"
-               onClick={() => handleEditItem(item)}
-               className="text-blue-500 hover:text-blue-700"
-               title="Edit"
-             >
-               <Edit3 size={18} />
-             </button>
-
-             <button
-               type="button"
-               onClick={() => removeItem(item.id)}
-               className={secondaryBtn}
-               title="Remove"
-             >
-               <Trash2 size={18} />
-             </button>
-           </td>
-         </tr>
-         
-          
+            <tr key={item.id} className="border-b hover:bg-gray-50">
+              <td className="p-4">{item.productName}</td>
+              <td className="p-4">{item.warehouseName}</td>
+              <td className="p-4">₹{item.price}</td>
+              <td className="p-4">{item.quantity}</td>
+              <td className="p-4">
+                ₹{item.quantity * item.price}
+              </td>
+              <td className="p-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleEditItem(item)}
+                  className="text-blue-600"
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeItem(item.id)}
+                  className="text-red-500"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </td>
+            </tr>
           ))}
         </tbody>
       </ThemedTable>
     </div>
-  )}
+
+  </div>
+)}
+
       </div>
 
       {/* PAYMENT */}
@@ -717,9 +730,9 @@ const CreateOrders = () => {
         </div>
 
       {/* ACTIONS */}
-      <div className="flex justify-end gap-3">
-        <button type="reset" className={secondaryBtn}>Cancel</button>
-        <button type="submit" className={primaryBtn}>Create Order</button>
+   <div className="flex flex-col sm:flex-row justify-end gap-3">
+        <button type="reset" className={`${secondaryBtn} w-full sm:w-auto`}>Cancel</button>
+        <button type="submit" className={`${primaryBtn} w-full sm:w-auto`}>Create Order</button>
       </div>
 
     </form>

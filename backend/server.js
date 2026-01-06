@@ -18,6 +18,7 @@ const ClientRoutes = require("./routes/client.routes");
 const LocationRoutes = require("./routes/location.routes");
 const ReportRoutes = require("./routes/report.routes");
 const DashboardRoutes = require("./routes/dashboard.routes");
+const CompanySettingsRoutes = require("./routes/companySettings.routes");
 const UserRoutes = require("./routes/user.routes");
 
 // Load environment & DB
@@ -61,6 +62,7 @@ app.use("/api", OrderRoutes);
 app.use("/api/clients", ClientRoutes);
 app.use("/api", LocationRoutes);
 app.use("/api", ReportRoutes);
+app.use("/api", CompanySettingsRoutes);
 app.use("/api", UserRoutes);
 
 

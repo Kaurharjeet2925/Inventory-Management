@@ -1,5 +1,5 @@
 import React from "react";
-import { Home, Truck, History, User } from "lucide-react";
+import { Home, Truck, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const AgentBottomNav = () => {

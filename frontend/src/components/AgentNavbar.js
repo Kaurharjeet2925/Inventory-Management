@@ -1,48 +1,106 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { NotificationContext } from "../context/NotificationContext";
 import NotificationBell from "./NotificationBell";
 import socket from "../socket/socketClient";
+import { apiClient } from "../apiclient/apiclient";
+
+/* ================= GREETING ================= */
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good Morning";
+  if (hour < 17) return "Good Afternoon";
+  return "Good Evening";
+};
 
 const AgentNavbar = () => {
   const navigate = useNavigate();
   const { notifications = [] } = useContext(NotificationContext) || {};
+  const [company, setCompany] = useState(null);
+  const [greeting, setGreeting] = useState("");
+  const ref = useRef(null);
 
+  const user = JSON.parse(localStorage.getItem("user"));
+  const userName = user?.name || "Agent";
+
+  /* ================= LOAD COMPANY ================= */
+  useEffect(() => {
+    const loadCompany = async () => {
+      try {
+        const res = await apiClient.get("/settings/company");
+        setCompany(res.data);
+      } catch (err) {
+        console.error("Failed to load company");
+      }
+    };
+    loadCompany();
+  }, []);
+
+  /* ================= GREETING LOGIC ================= */
+  useEffect(() => {
+    const today = new Date().toDateString();
+    const lastVisit = localStorage.getItem("agentDashboardLastVisit");
+
+    if (lastVisit !== today) {
+      setGreeting(getGreeting());
+      localStorage.setItem("agentDashboardLastVisit", today);
+    } else {
+      setGreeting("Welcome back");
+    }
+  }, []);
+
+  /* ================= LOGOUT ================= */
   const handleLogout = () => {
-    // 1️⃣ Clear stored auth data
     localStorage.removeItem("token");
     localStorage.removeItem("user");
 
-    // 2️⃣ Disconnect socket (important for agent)
     if (socket?.connected) {
       socket.disconnect();
     }
 
-    // 3️⃣ Redirect to login
     navigate("/");
   };
+  
 
   return (
-    <div className="fixed top-0 left-0 w-full bg-white shadow-md p-4 z-50 flex justify-between items-center">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-blue-900 border-b border-blue-800 z-50">
+      <div className="h-full flex items-center justify-between px-4 md:px-6">
 
-      <h2 className="text-xl font-bold text-blue-600">
-        Agent Panel
-      </h2>
+        {/* LEFT: LOGO + COMPANY */}
+        <div className="flex items-center gap-3">
+          <img
+            src={
+              company?.logo
+                ? `${process.env.REACT_APP_IMAGE_URL}/${company.logo}`
+                : `${process.env.PUBLIC_URL}/logo192.png`
+            }
+            alt="Company Logo"
+            className="h-10 w-10 object-contain rounded-md bg-white p-1"
+          />
 
-      <div className="flex items-center gap-5">
-        <NotificationBell />
+          
+            <div className="text-white font-semibold text-lg">
+              {company?.companyName || "Company"}
+            
+          </div>
+        </div>
 
-        {/* 🔴 LOGOUT BUTTON */}
-        <button
-          onClick={handleLogout}
-          className="text-red-600 hover:text-red-800"
-          title="Logout"
-        >
-          <LogOut className="w-6 h-6" />
-        </button>
+        {/* RIGHT */}
+        <div className="flex items-center gap-4">
+          <NotificationBell />
+
+          <button
+            onClick={handleLogout}
+            className="text-red-300 hover:text-red-400 transition"
+            title="Logout"
+          >
+            <LogOut className="w-6 h-6" />
+          </button>
+        </div>
+
       </div>
-    </div>
+    </header>
   );
 };
 

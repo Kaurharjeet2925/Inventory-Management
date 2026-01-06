@@ -113,23 +113,57 @@ exports.getProducts = async (req, res) => {
 };
 
 // UPDATE PRODUCT
+const fs = require("fs");
+const path = require("path");
+
 exports.updateProduct = async (req, res) => {
   try {
     const id = req.params.id;
 
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
     let updateData = { ...req.body };
 
-    // Thumbnail update
-    if (req.files?.thumbnail) {
+    /* ---------------- THUMBNAIL UPDATE ---------------- */
+    if (req.files?.thumbnail?.length) {
+      // delete old thumbnail
+      if (product.thumbnail) {
+        const oldThumbPath = path.join(__dirname, "../uploads", product.thumbnail);
+        if (fs.existsSync(oldThumbPath)) fs.unlinkSync(oldThumbPath);
+      }
+
       updateData.thumbnail = req.files.thumbnail[0].filename;
     }
 
-    // Images update (replace all)
-    if (req.files?.images) {
-      updateData.images = req.files.images.map((img) => img.filename);
+    /* ---------------- HANDLE DELETED IMAGES ---------------- */
+    const deletedImages = req.body.deletedImages
+      ? JSON.parse(req.body.deletedImages)
+      : [];
+
+    let updatedImages = [...(product.images || [])];
+
+    if (deletedImages.length) {
+      updatedImages = updatedImages.filter((img) => !deletedImages.includes(img));
+
+      // delete from filesystem
+      deletedImages.forEach((img) => {
+        const imgPath = path.join(__dirname, "../uploads", img);
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      });
     }
 
-    // Convert numeric fields properly when provided (leave absent fields untouched)
+    /* ---------------- HANDLE NEW IMAGES ---------------- */
+    if (req.files?.images?.length) {
+      const newImages = req.files.images.map((img) => img.filename);
+      updatedImages = [...updatedImages, ...newImages];
+    }
+
+    updateData.images = updatedImages;
+
+    /* ---------------- NORMALIZE NUMERIC FIELDS ---------------- */
     const numericFields = ["mrp", "price", "quantityValue", "totalQuantity", "rating"];
     numericFields.forEach((field) => {
       if (Object.prototype.hasOwnProperty.call(updateData, field)) {
@@ -138,22 +172,27 @@ exports.updateProduct = async (req, res) => {
     });
 
     if (Object.prototype.hasOwnProperty.call(updateData, "quantityUnit")) {
-      updateData.quantityUnit = updateData.quantityUnit === "" ? null : updateData.quantityUnit;
+      updateData.quantityUnit =
+        updateData.quantityUnit === "" ? null : updateData.quantityUnit;
     }
 
-
-    const product = await Product.findByIdAndUpdate(id, updateData, {
+    /* ---------------- UPDATE PRODUCT ---------------- */
+    const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
       new: true,
     })
       .populate("brand", "name")
       .populate("category", "name");
 
-    res.json({ message: "Product updated successfully", product });
+    res.json({
+      message: "Product updated successfully",
+      product: updatedProduct,
+    });
   } catch (error) {
     console.error("Update Product Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
+
 
 // DELETE PRODUCT
 exports.deleteProduct = async (req, res) => {

@@ -1,26 +1,28 @@
 import { Outlet } from "react-router-dom";
+import Header from "./Header";
+import Sidebar from "../components/Sidebar";
+import { useState } from "react";
+import PageContainer from "./PageContainer";
 
 const SettingsLayout = () => {
+ const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200">
-
-      {/* HEADER (SAME FOR ALL SETTINGS PAGES) */}
-      <div className="px-6 py-4 border-b bg-slate-100">
-        <h1 className="text-lg font-semibold text-slate-800">
-          Settings
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Manage application and account settings
-        </p>
+    <div className="w-full min-h-screen overflow-x-hidden">
+      <div className="flex">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <div className="flex-1">
+          <Header onMenuClick={() => setSidebarOpen((s) => !s)} />
+          <div className="flex-1 w-full">
+            <PageContainer>
+              <Outlet />
+            </PageContainer>
+          </div>
+        </div>
       </div>
-
-      {/* PAGE CONTENT */}
-      <div className="p-6">
-        <Outlet />
-      </div>
-
     </div>
   );
+
 };
 
 export default SettingsLayout;

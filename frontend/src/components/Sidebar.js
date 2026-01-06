@@ -10,6 +10,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [company, setCompany] = useState(null);
   const location = useLocation();
 
  
@@ -34,6 +35,10 @@ const Sidebar = ({ isOpen, onClose }) => {
   useEffect(() => {
     setReportsOpen(location.pathname.startsWith("/reports"));
   }, [location.pathname]);
+  useEffect(() => {
+  setSettingsOpen(location.pathname.startsWith("/settings"));
+}, [location.pathname]);
+
  const linkClass = ({ isActive }) =>
   `block px-4 py-2 rounded-md text-sm transition-all duration-200
    ${
@@ -114,195 +119,202 @@ const isSuperAdmin = user?.role === "superAdmin";
       )}
 
       <aside
-        className={`
-          fixed top-0 left-0 h-screen w-64 bg-blue-950 text-slate-300 z-50
-          transform transition-transform duration-300
-          ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          md:translate-x-0 md:block
+  className={`
+    fixed top-16 left-0 h-[calc(100vh-4rem)] w-64
+    bg-blue-950 text-slate-300 z-40
+    transform transition-transform duration-300
+    ${isOpen ? "translate-x-0" : "-translate-x-full"}
+    md:translate-x-0 md:block
+  `}
+>
+
+          
+          {/* <div className="p-4 border-b border-blue-900 flex items-center gap-3">
+  <img
+    src={
+      company?.logo
+        ? `${process.env.REACT_APP_IMAGE_URL}/${company.logo}`
+        : `${process.env.PUBLIC_URL}/logo192.png`
+    }
+    alt="Company Logo"
+    className="h-10 w-10 object-contain rounded-md bg-white p-1"
+  />
+
+  <div className="leading-tight">
+    <div className="text-white font-semibold text-sm">
+      {company?.companyName || "Inventory System"}
+    </div>
+    <div className="text-xs text-slate-400">
+      {isSuperAdmin ? "Super Admin" : "Admin"}
+    </div>
+  </div>
+</div> */}
+
+        <nav className="p-4 space-y-2">
+
+  {/* DASHBOARD – ALL */}
+  <NavLink to="/dashboard" className={linkClass}>
+    Dashboard
+  </NavLink>
+
+  {/* ================= SUPER ADMIN ONLY ================= */}
+  {isSuperAdmin && (
+    <>
+      {/* MANAGE ADMIN */}
+      <button
+        onClick={() => handleMenuToggle("profile")}
+        className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+          ${profileOpen
+            ? "bg-amber-500/10 text-amber-300"
+            : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"}
         `}
       >
-        {/* HEADER */}
-        <div className="text-white text-xl font-bold p-4 border-b mt-1 border-blue-900">
-          {isSuperAdmin ? "Super Admin Panel" : "Admin Panel"}
-        </div>
-        <nav className="p-4 space-y-2">
-          <NavLink to="/dashboard" className={linkClass}>
-            Dashboard
+        <span>Manage Admin</span>
+        <span>{profileOpen ? "▾" : "▸"}</span>
+      </button>
+
+      {profileOpen && (
+        <div className="ml-4 mt-1 space-y-1">
+          <NavLink to="/profile/alladmin" className={linkClass}>
+            All Admin
           </NavLink>
+          <NavLink to="/profile/add" className={linkClass}>
+            Add Admin
+          </NavLink>
+        </div>
+      )}
+    </>
+  )}
 
-          <button
-            onClick={() => handleMenuToggle('profile')}
-           className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-  ${
-   profileOpen
-      ? "bg-amber-500/10 text-amber-300"
-      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
-  }
-`}
+  {/* ================= PRODUCTS – ADMIN + SUPER ADMIN ================= */}
+  <button
+    onClick={() => handleMenuToggle("product")}
+    className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+      ${productOpen
+        ? "bg-amber-500/10 text-amber-300"
+        : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"}
+    `}
+  >
+    <span>Manage Products</span>
+    <span>{productOpen ? "▾" : "▸"}</span>
+  </button>
 
-          >
-            <span>Manage Admin</span>
-            <span>{profileOpen ? "▾" : "▸"}</span>
-          </button>
+  {productOpen && (
+    <div className="ml-4 mt-1 space-y-1">
+      <NavLink to="/manage-products/brands" className={linkClass}>
+        Brands
+      </NavLink>
+      <NavLink to="/manage-products/categories" className={linkClass}>
+        Category
+      </NavLink>
+      <NavLink to="/manage-products/products" className={linkClass}>
+        Products
+      </NavLink>
+      <NavLink to="/manage-products/location" className={linkClass}>
+        Warehouse Locations
+      </NavLink>
+    </div>
+  )}
 
-          {profileOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              <NavLink to="/profile/alladmin" className={linkClass}>
-                All Admin
-              </NavLink>
+  {/* ================= ORDERS ================= */}
+  <button
+    onClick={() => handleMenuToggle("orders")}
+    className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+      ${ordersOpen
+        ? "bg-amber-500/10 text-amber-300"
+        : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"}
+    `}
+  >
+    <span>Manage Orders</span>
+    <span>{ordersOpen ? "▾" : "▸"}</span>
+  </button>
 
-              <NavLink to="/profile/add" className={linkClass}>
-                Add Admin
-              </NavLink>
-            </div>
-          )}
-            <button
-            onClick={() => handleMenuToggle('product')}
-            className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-  ${
-    productOpen
-      ? "bg-amber-500/10 text-amber-300"
-      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
-  }
-`}
+  {ordersOpen && (
+    <div className="ml-4 mt-1 space-y-1">
+      <NavLink to="/orders/generate-order" className={linkClass}>
+        Generate Order
+      </NavLink>
+      <NavLink to="/orders/view-order" className={linkClass}>
+        View Orders
+      </NavLink>
+    </div>
+  )}
 
-          >
-            <span>Manage Products</span>
-            <span>{productOpen ? "▾" : "▸"}</span>
-          </button>
+  {/* ================= CLIENTS ================= */}
+  <button
+    onClick={() => handleMenuToggle("clients")}
+    className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+      ${clientsOpen
+        ? "bg-amber-500/10 text-amber-300"
+        : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"}
+    `}
+  >
+    <span>Manage Clients</span>
+    <span>{clientsOpen ? "▾" : "▸"}</span>
+  </button>
 
-          {productOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              
+  {clientsOpen && (
+    <div className="ml-4 mt-1 space-y-1">
+      <NavLink to="/manage-client/client" className={linkClass}>
+        Clients
+      </NavLink>
+    </div>
+  )}
 
-              <NavLink to="/manage-products/brands" className={linkClass}>
-                Brands
-              </NavLink>
-              <NavLink to="/manage-products/categories" className={linkClass}>
-                Category
-              </NavLink>
-              <NavLink to="/manage-products/products" className={linkClass}>
-                Products
-              </NavLink>
-              <NavLink to="/manage-products/location" className={linkClass}>
-                Warehouse Locations
-              </NavLink>
-            </div>
-          )}
-           <button
-            onClick={() => handleMenuToggle('orders')}
-           className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-  ${
-    ordersOpen
-      ? "bg-amber-500/10 text-amber-300"
-      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
-  }
-`}
+  {/* ================= REPORTS ================= */}
+  <button
+    onClick={() => handleMenuToggle("reports")}
+    className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+      ${reportsOpen
+        ? "bg-amber-500/10 text-amber-300"
+        : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"}
+    `}
+  >
+    <span>Reports</span>
+    <span>{reportsOpen ? "▾" : "▸"}</span>
+  </button>
 
-          >
-            <span>Manage Orders</span>
-            <span>{ordersOpen ? "▾" : "▸"}</span>
-          </button>
+  {reportsOpen && (
+    <div className="ml-4 mt-1 space-y-1">
+      <NavLink to="/reports/sales-reports" className={linkClass}>
+        Sales Reports
+      </NavLink>
+      <NavLink to="/reports/inventory-reports" className={linkClass}>
+        Inventory Reports
+      </NavLink>
+    </div>
+  )}
 
-           {ordersOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              
+  {/* ================= SETTINGS – SUPER ADMIN ONLY ================= */}
+  {isSuperAdmin && (
+    <>
+      <button
+        onClick={() => handleMenuToggle("settings")}
+        className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
+          ${settingsOpen
+            ? "bg-amber-500/10 text-amber-300"
+            : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"}
+        `}
+      >
+        <span>Settings</span>
+        <span>{settingsOpen ? "▾" : "▸"}</span>
+      </button>
 
-              <NavLink to="/orders/generate-order" className={linkClass}>
-               Generate Order
-              </NavLink>
-              <NavLink to="/orders/view-order" className={linkClass}>
-                View Orders
-              </NavLink>
-             
-             
-            </div>
-          )}
-           <button
-            onClick={() => handleMenuToggle('clients')}
-            className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-  ${
-    clientsOpen
-      ? "bg-amber-500/10 text-amber-300"
-      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
-  }
-`}
+      {settingsOpen && (
+        <div className="ml-4 mt-1 space-y-1">
+          <NavLink to="/settings/company" className={linkClass}>
+            Company Settings
+          </NavLink>
+          <NavLink to="/settings/change-password" className={linkClass}>
+            Change Password
+          </NavLink>
+        </div>
+      )}
+    </>
+  )}
 
-          >
-            <span>Manage Clients</span>
-            <span>{clientsOpen ? "▾" : "▸"}</span>
-          </button>
+</nav>
 
-           {clientsOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              
-
-              <NavLink to="/manage-client/client" className={linkClass}>
-               Clients
-              </NavLink>
-              
-             
-             
-            </div>
-           )}
-          <button
-            onClick={() => handleMenuToggle('reports')}
-          className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-  ${
-    reportsOpen
-      ? "bg-amber-500/10 text-amber-300"
-      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
-  }
-`}
-
-          >
-            <span>Reports</span>
-            <span>{reportsOpen ? "▾" : "▸"}</span>
-          </button>
-
-          {reportsOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              <NavLink to="/reports/sales-reports" className={linkClass}>
-                Sales Reports
-              </NavLink>
-              <NavLink to="/reports/inventory-reports" className={linkClass}>
-                Inventory Reports
-              </NavLink>
-            </div>
-          )}
-
-          {/* Settings link below Reports */}
-            <button
-            onClick={() => handleMenuToggle('settings')}
-          className={`w-full px-4 py-2 rounded-md flex justify-between items-center transition
-  ${
-    settingsOpen
-      ? "bg-amber-500/10 text-amber-300"
-      : "text-slate-400 hover:bg-amber-500/10 hover:text-amber-300"
-  }
-`}
-
-          >
-            <span>Settings</span>
-            <span>{settingsOpen ? "▾" : "▸"}</span>
-          </button>
-
-          {settingsOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              <NavLink to="/settings/company" className={linkClass}>
-                Company Settings
-              </NavLink>
-              <NavLink to="/settings/change-password" className={linkClass}>
-                Change Password
-              </NavLink>
-            </div>
-          )}
-
-          {/* <NavLink to="/agent/agent-dashboard" className={linkClass}>
-            Agent Dashboard
-          </NavLink> */}
-
-        </nav>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-blue-900">
     {/* <button
       onClick={handleLogout}

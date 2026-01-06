@@ -32,7 +32,7 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     } else {
       resetForm();
     }
-  }, [isOpen]);
+  },  [isOpen, clientData, isEdit]);
 
   /* ================= HANDLERS ================= */
   const handleChange = (e) => {

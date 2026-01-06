@@ -12,7 +12,8 @@ const {
     generateInvoice,
     updateOrderPayment,
     getAllOrders,
-    deliverySummary
+    deliverySummary,
+    agentDashboardSummary
 } = require("../controller/orders.controller");
 
 // Create order
@@ -25,6 +26,7 @@ router.get("/delivery-summary", auth, deliverySummary);
 router.put("/orders/:id/collect-item/:itemId", auth, collectOrder);
 router.put("/orders/:id", auth, updateOrder);
 router.put("/orders/:id/payment", auth, updateOrderPayment);
+router.get("/agent-dashboard-summary", auth, agentDashboardSummary);
 
 // Get single order
 router.get("/orders/:id", auth, getOrderById);

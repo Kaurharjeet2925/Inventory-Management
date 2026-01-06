@@ -23,6 +23,7 @@ const Product = () => {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [newLocationName, setNewLocationName] = useState("");
   const [newAddress, setNewAddress] = useState("");
+  const [deletedImages, setDeletedImages] = useState([]);
 
   const [productData, setProductData] = useState({
     name: "",
@@ -142,7 +143,7 @@ const Product = () => {
       thumbnail: null,
       images: [],
     });
-
+   setDeletedImages([]); // reset on open
     setThumbnailPreview(p.thumbnail ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}` : "");
     setImagesPreview(Array.isArray(p.images) ? p.images.map((img) => `${process.env.REACT_APP_IMAGE_URL}/${img}`) : []);
     setShowModal(true);
@@ -162,50 +163,102 @@ const Product = () => {
     setThumbnailPreview(URL.createObjectURL(file));
   };
 
-  const handleImages = (e) => {
-    const files = Array.from(e.target.files);
-    setProductData({ ...productData, images: files });
-    setImagesPreview(files.map((file) => URL.createObjectURL(file)));
-  };
+ const MAX_IMAGES = 4;
 
-  const saveProduct = async () => {
-    const formData = new FormData();
+const handleImages = (e) => {
+  const files = Array.from(e.target.files);
 
-    Object.entries(productData).forEach(([key, value]) => {
-      if (key === "images" && Array.isArray(value)) {
-        value.forEach((img) => {
-          if (img instanceof File) {
-            formData.append("images", img);
-          }
-        });
-      } else if (key === "thumbnail") {
-        if (value instanceof File) {
-          formData.append("thumbnail", value);
+  // current images count
+  const currentCount = productData.images.length;
+
+  // remaining slots
+  const remaining = MAX_IMAGES - currentCount;
+
+  if (remaining <= 0) {
+    toast.error("You can upload only 4 images");
+    return;
+  }
+
+  const filesToAdd = files.slice(0, remaining);
+
+  setProductData((prev) => ({
+    ...prev,
+    images: [...prev.images, ...filesToAdd],
+  }));
+
+  setImagesPreview((prev) => [
+    ...prev,
+    ...filesToAdd.map((file) => URL.createObjectURL(file)),
+  ]);
+
+  // reset input so same file can be reselected
+  e.target.value = "";
+};
+
+const removeImage = (index) => {
+  const img = imagesPreview[index];
+
+  // if image is from backend (URL), mark it for deletion
+  if (img.startsWith(process.env.REACT_APP_IMAGE_URL)) {
+    const filename = img.split("/").pop();
+    setDeletedImages((prev) => [...prev, filename]);
+  }
+
+  setImagesPreview((prev) => prev.filter((_, i) => i !== index));
+
+  setProductData((prev) => ({
+    ...prev,
+    images: prev.images.filter((_, i) => i !== index),
+  }));
+};
+
+
+
+ const saveProduct = async (e) => {
+  e.preventDefault(); // ✅ REQUIRED (form submit)
+
+  const formData = new FormData();
+
+  Object.entries(productData).forEach(([key, value]) => {
+    if (key === "images" && Array.isArray(value)) {
+      value.forEach((img) => {
+        if (img instanceof File) {
+          formData.append("images", img);
         }
-      } else if (key !== "images") {
-        formData.append(key, value);
+      });
+    } else if (key === "thumbnail") {
+      if (value instanceof File) {
+        formData.append("thumbnail", value);
       }
-    });
-
-    try {
-      if (editingId) {
-        await apiClient.put(`/product/${editingId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      } else {
-        await apiClient.post("/product/add", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      }
-
-      toast.success(editingId ? "Product updated successfully" : "Product added successfully");
-      fetchAll();
-      setShowModal(false);
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Error saving product");
-      console.error(error);
+    } else {
+      formData.append(key, value);
     }
-  };
+  });
+
+  // Send deletedImages to backend if editing
+  if (editingId && deletedImages.length) {
+    formData.append("deletedImages", JSON.stringify(deletedImages));
+  }
+
+  try {
+    if (editingId) {
+      await apiClient.put(`/product/${editingId}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    } else {
+      await apiClient.post("/product/add", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    }
+
+    toast.success(editingId ? "Product updated successfully" : "Product added successfully");
+    fetchAll();
+    setShowModal(false);
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Error saving product");
+  }
+ };
+
 
   return (
     <div>
@@ -420,22 +473,24 @@ const Product = () => {
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2">
     <div className="w-full md:w-[70%] max-h-[95vh]">
 
-      <AddProducts
-        productData={productData}
-        setProductData={setProductData}
-        brands={brands}
-        categories={categories}
-        units={units}
-        setUnits={setUnits}
-        locations={locations}
-        setShowLocationModal={setShowLocationModal}
-        thumbnailPreview={thumbnailPreview}
-        imagesPreview={imagesPreview}
-        handleThumbnail={handleThumbnail}
-        handleImages={handleImages}
-        onClose={() => setShowModal(false)}   // ✅ IMPORTANT
-        isEdit={!!editingId}                  // ✅ IMPORTANT
-      />
+     <AddProducts
+  productData={productData}
+  setProductData={setProductData}
+  brands={brands}
+  categories={categories}
+  units={units}
+  setUnits={setUnits}
+  locations={locations}
+  setShowLocationModal={setShowLocationModal}
+  thumbnailPreview={thumbnailPreview}
+  imagesPreview={imagesPreview}
+  handleThumbnail={handleThumbnail}
+  handleImages={handleImages}
+  removeImage={removeImage}
+  onClose={() => setShowModal(false)}
+  onSubmit={saveProduct}          // ✅ CONNECT SAVE
+  isEdit={!!editingId}             // ✅ ADD vs EDIT
+/>
 
       {showLocationModal && (
         <AddLocationModal
@@ -454,7 +509,7 @@ const Product = () => {
       )}
 
       {/* FOOTER */}
-      <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+      {/* <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
         <button
           onClick={() => setShowModal(false)}
           className="px-5 py-2 rounded border border-slate-300 text-slate-700 hover:bg-slate-100"
@@ -468,7 +523,7 @@ const Product = () => {
         >
           {editingId ? "Update Product" : "Save Product"}
         </button>
-      </div>
+      </div> */}
 
     </div>
   </div>

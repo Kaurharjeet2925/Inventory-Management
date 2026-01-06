@@ -19,7 +19,7 @@ import CreateOrders from './pages/ManageOrders/CreateOrders.js';
 import ViewOrders from './pages/ManageOrders/ViewOrders.js';
 import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
-import Locations from './pages/ManageProduct/Locations.js';
+import Locations from "./pages/ManageProduct/Locations.js";
 import Agent from './pages/Delivery/Agent.js';
 //import History from './pages/Delivery/History.js';
 import CompletedOrders from './pages/Delivery/Deliveries/CompletedOrders.js';

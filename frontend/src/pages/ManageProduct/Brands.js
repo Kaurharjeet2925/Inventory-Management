@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2, Upload } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
-import PageContainer from "../../components/PageContainer";
+
+const inputClass =
+  "w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 " +
+  "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition";
+
+const labelClass = "block text-sm font-medium text-slate-600 mb-1";
 
 const Brands = () => {
   const [search, setSearch] = useState("");
@@ -15,134 +20,97 @@ const Brands = () => {
     image: null,
   });
 
+  /* ================= FETCH ================= */
   useEffect(() => {
-  const fetchBrands = async () => {
-    try {
-      const response = await apiClient.get("/brands");
-      setBrands(response.data);
-    } catch (err) {
-      console.error("Error fetching brands:", err);
-    }
-  };
+    const fetchBrands = async () => {
+      const res = await apiClient.get("/brands");
+      setBrands(res.data || []);
+    };
+    fetchBrands();
+  }, []);
 
-  fetchBrands();   // <-- REQUIRED
-}, []);
-
-
-  // ---------------------------
-  // OPEN MODAL
-  // ---------------------------
-  const handleOpenModal = () => {
+  /* ================= MODAL HANDLERS ================= */
+  const openModal = () => {
     setEditingId(null);
     setNewBrand({ name: "", image: null });
     setImagePreview("");
     setShowModal(true);
   };
 
-  // ---------------------------
-  // EDIT BRAND
-  // ---------------------------
-  const handleEditBrand = (brand) => {
+  const openEdit = (brand) => {
     setEditingId(brand._id);
     setNewBrand({ name: brand.name, image: null });
-     setImagePreview(
-          brand.image
-          ? `${process.env.REACT_APP_IMAGE_URL}/${brand.image}`
-           : ""
-          );
-       setShowModal(true);
-    };
+    setImagePreview(
+      brand.image ? `${process.env.REACT_APP_IMAGE_URL}/${brand.image}` : ""
+    );
+    setShowModal(true);
+  };
 
-  // ---------------------------
-  // CLOSE MODAL
-  // ---------------------------
-  const handleCloseModal = () => {
+  const closeModal = () => {
     setShowModal(false);
     setEditingId(null);
     setNewBrand({ name: "", image: null });
     setImagePreview("");
   };
 
-  // ---------------------------
-  // IMAGE HANDLER (REAL FILE)
-  // ---------------------------
+  /* ================= IMAGE ================= */
   const handleImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setNewBrand((prev) => ({ ...prev, image: file }));
     setImagePreview(URL.createObjectURL(file));
   };
 
-  // ---------------------------
-  // ADD / UPDATE BRAND
-  // ---------------------------
-  const handleAddBrand = async () => {
-    if (!newBrand.name) {
-      alert("Brand name is required");
-      return;
-    }
+  /* ================= SAVE ================= */
+  const saveBrand = async () => {
+    if (!newBrand.name.trim()) return alert("Brand name required");
 
     const formData = new FormData();
     formData.append("name", newBrand.name);
-
     if (newBrand.image instanceof File) {
       formData.append("uploadImage", newBrand.image);
     }
 
     try {
-      if (!editingId) {
-        // ADD MODE
-        const res = await apiClient.post("/add-brand", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        setBrands((prev) => [res.data.brand, ...prev]);
-      } else {
-        // UPDATE MODE
-        const res = await apiClient.put(`/brand/${editingId}`, formData, {
+      let res;
+      if (editingId) {
+        res = await apiClient.put(`/brand/${editingId}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         setBrands((prev) =>
           prev.map((b) => (b._id === editingId ? res.data.brand : b))
         );
+      } else {
+        res = await apiClient.post("/add-brand", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        setBrands((prev) => [res.data.brand, ...prev]);
       }
-
-      handleCloseModal();
+      closeModal();
     } catch (err) {
-      console.error("Error saving brand:", err);
       alert("Error saving brand");
     }
   };
 
-  // ---------------------------
-  // DELETE BRAND
-  // ---------------------------
-  const handleDeleteBrand = async (id) => {
+  /* ================= DELETE ================= */
+  const deleteBrand = async (id) => {
     if (!window.confirm("Delete this brand?")) return;
-
-    try {
-      await apiClient.delete(`/brand/${id}`);
-      setBrands((prev) => prev.filter((b) => b._id !== id));
-    } catch (err) {
-      console.error("Delete error:", err);
-    }
+    await apiClient.delete(`/brand/${id}`);
+    setBrands((prev) => prev.filter((b) => b._id !== id));
   };
 
-  // SEARCH FILTER
   const filteredBrands = brands.filter((b) =>
     b.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-  <div>
-
+    <div>
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Brand Management</h1>
-
+        <h1 className="text-3xl font-bold text-gray-800">Brand Management</h1>
         <button
-          onClick={handleOpenModal}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          onClick={openModal}
+          className="flex items-center gap-2 bg-blue-900 hover:bg-amber-500 text-white px-4 py-2 rounded-lg"
         >
           <Plus className="w-5 h-5" /> Add Brand
         </button>
@@ -152,125 +120,132 @@ const Brands = () => {
       <div className="flex items-center bg-white p-3 rounded-lg shadow mb-6 max-w-md">
         <Search className="w-5 h-5 text-gray-500 mr-2" />
         <input
-          type="text"
-          placeholder="Search by brand name..."
+          placeholder="Search brand..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full outline-none"
         />
       </div>
 
-      {/* BRAND GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* GRID */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
         {filteredBrands.map((brand) => (
           <div
             key={brand._id}
-            className="bg-white p-4 rounded-xl shadow-md border hover:shadow-lg transition-all"
+            className="bg-white p-2 rounded-lg shadow-sm border hover:shadow-md transition"
           >
-            <div className="w-full h-40 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-              <img
-                src={
-                  brand.image
-                    ? `${process.env.REACT_APP_IMAGE_URL}/${brand.image}`
-                    : "https://via.placeholder.com/150"
-                }
-                alt={brand.name}
-                className="object-contain w-full h-full"
-              />
-            </div>
+<div>
+  <div className="w-full aspect-square bg-gray-100 rounded-md overflow-hidden border max-h-40">
 
-            <h2 className="text-lg font-semibold text-center mt-3">
-              {brand.name}
-            </h2>
+    <img
+      src={
+        brand.image
+          ? `${process.env.REACT_APP_IMAGE_URL}/${brand.image}`
+          : "https://via.placeholder.com/300"
+      }
+      alt={brand.name}
+      className="w-full h-full object-cover"
+    />
+  </div>
 
-            <div className="mt-3 flex justify-center gap-3">
-              <button
-                onClick={() => handleEditBrand(brand)}
-                className="p-2 bg-blue-100 rounded-full hover:bg-blue-200"
-              >
-                <Pencil className="w-4 h-4 text-blue-600" />
-              </button>
+  <h2 className="text-sm font-medium text-center mt-2 truncate">
+    {brand.name}
+  </h2>
 
-              <button
-                onClick={() => handleDeleteBrand(brand._id)}
-                className="p-2 bg-red-100 rounded-full hover:bg-red-200"
-              >
-                <Trash2 className="w-4 h-4 text-red-600" />
-              </button>
-            </div>
+  <div className="mt-2 flex justify-center gap-2">
+    <button
+      onClick={() => openEdit(brand)}
+      className="p-1.5 rounded-full border border-blue-200 text-blue-600 hover:bg-blue-100"
+    >
+      <Pencil className="w-4 h-4" />
+    </button>
+
+    <button
+      onClick={() => deleteBrand(brand._id)}
+      className="p-1.5 rounded-full border border-red-200 text-red-600 hover:bg-red-100"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  </div>
+</div>
+
           </div>
         ))}
       </div>
 
-      {/* NO RESULTS */}
-      {filteredBrands.length === 0 && (
-        <p className="text-gray-500 mt-6 text-lg">No brands found.</p>
-      )}
-
-      {/* MODAL */}
+      {/* ================= MODAL (SAME THEME) ================= */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white w-[400px] p-6 rounded-xl shadow-lg">
-
-            <h2 className="text-xl font-semibold mb-4">
-              {editingId ? "Edit Brand" : "Add New Brand"}
-            </h2>
-
-            {/* IMAGE UPLOAD */}
-            <div className="mb-4 flex flex-col items-center">
-              <div className="w-32 h-32 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center border">
-                {imagePreview ? (
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <span className="text-gray-400">No image</span>
-                )}
-              </div>
-
-              <label className="mt-3 cursor-pointer bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2">
-                <Upload className="w-4 h-4" /> Upload Image
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={handleImage}
-                />
-              </label>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveBrand();
+            }}
+            className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+          >
+            {/* HEADER */}
+            <div className="px-6 py-4 bg-gray-100 border-b flex justify-between items-center">
+              <h2 className="text-lg font-semibold">
+                {editingId ? "Edit Brand" : "Add Brand"}
+              </h2>
+              <button type="button" onClick={closeModal} className="text-xl text-gray-500">
+                ✕
+              </button>
             </div>
 
-            {/* BRAND NAME */}
-            <label className="block text-sm font-medium mb-1">Brand Name</label>
-            <input
-              type="text"
-              placeholder="Enter brand name"
-              value={newBrand.name}
-              onChange={(e) =>
-                setNewBrand((prev) => ({ ...prev, name: e.target.value }))
-              }
-              className="w-full border rounded-md p-2 mb-4"
-            />
+            {/* BODY */}
+            <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+              {/* IMAGE */}
+              <div className="flex flex-col items-center">
+               <div className="relative w-32 h-32 border rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+  {imagePreview ? (
+    <img
+      src={imagePreview}
+      alt="Brand Preview"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span className="text-gray-400 text-sm">No Image</span>
+  )}
+</div>
 
-            {/* BUTTONS */}
-            <div className="flex justify-end gap-3">
+
+                <label className="mt-3 cursor-pointer bg-blue-900 hover:bg-amber-500 text-white px-3 py-2 rounded-md flex items-center gap-2">
+                  <Upload className="w-4 h-4" /> Upload Image
+                  <input type="file" hidden accept="image/*" onChange={handleImage} />
+                </label>
+              </div>
+
+              {/* NAME */}
+              <div>
+                <label className={labelClass}>Brand Name</label>
+                <input
+                  value={newBrand.name}
+                  onChange={(e) =>
+                    setNewBrand((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            {/* FOOTER */}
+            <div className="px-6 py-4 border-t bg-white flex justify-end gap-3">
               <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 bg-gray-300 rounded-md"
+                type="button"
+                onClick={closeModal}
+                className="px-5 py-2 border rounded-md hover:bg-slate-100"
               >
                 Cancel
               </button>
-
               <button
-                onClick={handleAddBrand}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                type="submit"
+                className="px-6 py-2 rounded-md bg-blue-900 hover:bg-amber-500 text-white"
               >
                 {editingId ? "Update Brand" : "Save Brand"}
               </button>
             </div>
-
-          </div>
+          </form>
         </div>
       )}
     </div>
