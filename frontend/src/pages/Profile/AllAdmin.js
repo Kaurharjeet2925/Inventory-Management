@@ -202,84 +202,90 @@ rounded-2xl transition z-20">
 
           {/* LIST VIEW */}
           {view === "list" && (
-            <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md overflow-x-auto">
-  <ThemedTable className="min-w-[800px] text-left border-collapse">
+  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
+   
+    
+      <ThemedTable className="min-w-[900px] text-left border-collapse">
+        <thead>
+          <tr className="bg-gray-200 text-gray-700">
+            <th className="p-3 whitespace-nowrap">Profile</th>
+            <th className="p-3 whitespace-nowrap">Name</th>
+            <th className="p-3 whitespace-nowrap">Email</th>
+            <th className="p-3 whitespace-nowrap">Phone</th>
+            <th className="p-3 whitespace-nowrap">Role</th>
+            <th className="p-3 whitespace-nowrap text-center">Actions</th>
+          </tr>
+        </thead>
 
-                <thead>
-                  <tr className="bg-gray-200 text-gray-700">
-                    <th className="p-3">Profile</th>
-                    <th className="p-3">Name</th>
-                    <th className="p-3">Email</th>
-                    <th className="p-3">Phone</th>
-                    <th className="p-3">Role</th>
-                    <th className="p-3">Actions</th>
-                  </tr>
-                </thead>
+        <tbody>
+          {admins.map((admin, idx) => {
+            const key = admin._id || idx;
+            const failed = !!failedImages[key];
 
-                <tbody>
-                  {admins.map((admin, idx) => {
-                    const key = admin._id || idx;
-                    const failed = !!failedImages[key];
+            return (
+              <tr key={key} className="border-b hover:bg-gray-50">
+                <td className="p-3">
+                  {admin.image && !failed ? (
+                    <img
+                      src={`${base}${admin.image}`}
+                      alt="Profile"
+                      className="w-10 h-10 rounded-full object-cover"
+                      onError={() =>
+                        setFailedImages((prev) => ({
+                          ...prev,
+                          [key]: true,
+                        }))
+                      }
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
+                      {(admin.name?.[0] || "?").toUpperCase()}
+                    </div>
+                  )}
+                </td>
 
-                    return (
-                      <tr key={key} className="border-b hover:bg-gray-50">
-                        <td className="p-3">
-                          {admin.image && !failed ? (
-                            <img
-                              src={`${base}${admin.image}`}
-                              alt="Profile"
-                              className="w-10 h-10 rounded-full object-cover"
-                              onError={() =>
-                                setFailedImages((prev) => ({
-                                  ...prev,
-                                  [key]: true,
-                                }))
-                              }
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-semibold">
-                              {(admin.name?.[0] || "?").toUpperCase()}
-                            </div>
-                          )}
-                        </td>
+                <td className="p-3 whitespace-nowrap">{admin.name}</td>
+                <td className="p-3 whitespace-nowrap">{admin.email}</td>
+                <td className="p-3 whitespace-nowrap">
+                  {admin.phone || "N/A"}
+                </td>
 
-                        <td className="p-3">
-                          {admin.name}
-                        </td>
+                <td className="p-3 whitespace-nowrap">
+                  <span className="px-3 py-1 bg-gray-100 rounded text-gray-700">
+                    {admin.role}
+                  </span>
+                </td>
 
-                        <td className="p-3">{admin.email}</td>
+                <td className="p-3 whitespace-nowrap">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        navigate(`/profile/view/${key}`, {
+                          state: { admin },
+                        })
+                      }
+                      className="p-2 rounded-full border-2 border-blue-500 text-blue-500 hover:bg-blue-50"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
 
-                        <td className="p-3">{admin.phone || "N/A"}</td>
+                    <button
+                      onClick={() => handleDelete(admin._id)}
+                      className="p-2 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </ThemedTable>
+    </div>
+  
+)}
 
-                        <td className="p-3">
-                          <span className="px-3 py-1 bg-gray-100 rounded text-gray-700">
-                            {admin.role}
-                          </span>
-                        </td>
-
-                        <td className="p-3 flex gap-2">
-  <button
-    onClick={() => navigate(`/profile/view/${key}`, { state: { admin } })}
-    className="p-2 sm:p-2.5 rounded-full border-2 border-blue-500 text-blue-500 hover:bg-blue-50"
-  >
-    <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-  </button>
-
-  <button
-    onClick={() => handleDelete(admin._id)}
-    className="p-2 sm:p-2.5 rounded-full border-2 border-red-500 text-red-500 hover:bg-red-50"
-  >
-    <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
-  </button>
-</td>
-
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </ThemedTable>
-            </div>
-          )}
         </>
       )}
     </div>

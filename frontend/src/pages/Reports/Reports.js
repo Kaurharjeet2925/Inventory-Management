@@ -8,7 +8,7 @@ const Reports = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="w-full min-h-screen overflow-x-hidden">
+    <div className="w-full min-h-screen ">
       <div className="flex">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="flex-1">

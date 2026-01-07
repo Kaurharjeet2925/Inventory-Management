@@ -12,35 +12,32 @@ const Profile = () => {
 
   return (
     <div className="w-full min-h-screen overflow-x-hidden">
-
-      {/* ===== ADMIN DESKTOP ===== */}
       {!isAgent && (
         <div className="flex">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <div className="flex-1">
-            <Header onMenuClick={() => setSidebarOpen((s) => !s)} sidebarOpen={sidebarOpen} />
-            <div className="flex-1 w-full">
-              <PageContainer>
-                <Outlet />
-              </PageContainer>
-            </div>
+          <div className="flex-1 min-w-0">
+            <Header
+              onMenuClick={() => setSidebarOpen((s) => !s)}
+              sidebarOpen={sidebarOpen}
+            />
+            <PageContainer>
+              <Outlet />
+            </PageContainer>
           </div>
         </div>
       )}
 
-      {/* ===== AGENT + MOBILE ===== */}
       {isAgent && (
         <div className="md:hidden pb-16">
           <main className="px-4 py-4">
             <Outlet />
           </main>
-
-          {/* ✅ ALWAYS SHOW BOTTOM NAV FOR AGENT */}
           <AgentBottomNav />
         </div>
       )}
     </div>
   );
 };
+
 
 export default Profile;

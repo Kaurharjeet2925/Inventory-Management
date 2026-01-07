@@ -42,7 +42,7 @@ const DeliveriesList = () => {
       />
 
       {/* TABLE WRAPPER (important for mobile) */}
-      <div className="bg-white border rounded-lg overflow-x-auto">
+      <div className="bg-white border rounded-lg">
         <ThemedTable className="text-sm">
           <thead className="bg-gray-100 text-gray-700 text-xs uppercase">
             <tr>

@@ -613,11 +613,10 @@ const CreateOrders = () => {
 
        
 {orderItems.length > 0 && (
-  <div className="mt-4 border rounded-lg bg-white">
+    <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
+   
     
-    {/* TABLE HEADER (STAYS VISIBLE) */}
-    <div className="bg-gray-100 border-b">
-      <ThemedTable className="min-w-[800px] text-sm">
+      <ThemedTable className="min-w-[900px] text-left border-collapse">
         <thead>
           <tr>
             <th className="p-4 text-left">Product</th>
@@ -628,12 +627,11 @@ const CreateOrders = () => {
             <th className="p-4 text-left">Action</th>
           </tr>
         </thead>
-      </ThemedTable>
-    </div>
+     
+   
 
     {/* TABLE BODY (SCROLLS) */}
-    <div className="max-h-[220px] overflow-y-auto overflow-x-auto">
-      <ThemedTable className="min-w-[800px] text-sm">
+   
         <tbody>
           {orderItems.map((item) => (
             <tr key={item.id} className="border-b hover:bg-gray-50">
@@ -666,7 +664,7 @@ const CreateOrders = () => {
       </ThemedTable>
     </div>
 
-  </div>
+ 
 )}
 
       </div>
