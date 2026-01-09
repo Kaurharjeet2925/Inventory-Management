@@ -20,7 +20,6 @@ exports.generateDailySalesReport = async (req, res) => {
 
     /* ================= FETCH DATA ================= */
     const allOrders = await Order.find({ status: "completed" })
-
       .populate("clientId")
       .populate("deliveryPersonId")
       .populate("assignedBy");
@@ -37,27 +36,24 @@ exports.generateDailySalesReport = async (req, res) => {
 
     if (search) {
       const q = search.toLowerCase();
-
       searchedOrders = filteredOrders.filter((order) => {
         const orderIdMatch = order.orderId?.toLowerCase().includes(q);
         const clientMatch = order.clientId?.name?.toLowerCase().includes(q);
         const statusMatch = order.status?.toLowerCase().includes(q);
-
         const productMatch = order.items?.some((item) =>
           item.productName?.toLowerCase().includes(q)
         );
-
         return orderIdMatch || clientMatch || statusMatch || productMatch;
       });
     }
-    // 🔒 SAFETY FILTER (ensure only completed)
-          searchedOrders = searchedOrders.filter(
-            (order) => order.status === "completed"
-            );
 
+    // Safety: only completed
+    searchedOrders = searchedOrders.filter(
+      (order) => order.status === "completed"
+    );
 
     /* =================================================
-       📥 EXCEL DOWNLOAD (SEARCH APPLIED)
+       📥 EXCEL DOWNLOAD WITH TOTAL
        ================================================= */
     if (download === "true") {
       const workbook = new ExcelJS.Workbook();
@@ -76,27 +72,36 @@ exports.generateDailySalesReport = async (req, res) => {
         "Warehouse",
         "Order Status",
         "Amount",
-        "Balance ",
+        "Balance",
         "Payment Status",
       ]);
 
-      sheet.getRow(1).eachCell((cell) => (cell.font = { bold: true }));
+      sheet.getRow(1).eachCell((cell) => {
+        cell.font = { bold: true };
+      });
+
+      let grandTotalAmount = 0;
+      let grandTotalBalance = 0;
 
       searchedOrders.forEach((order) => {
-  const items = order.items || [];
+        const items = order.items || [];
 
-  const orderAmount =
-    order.paymentDetails?.totalAmount ||
-    items.reduce(
-      (sum, item) =>
-        sum + (item.price || 0) * (item.quantity || 0),
-      0
-    );
+        const orderAmount =
+          order.paymentDetails?.totalAmount ||
+          items.reduce(
+            (sum, item) =>
+              sum + (item.price || 0) * (item.quantity || 0),
+            0
+          );
 
-  const paidAmount = order.paymentDetails?.paidAmount ?? 0;
-  const balanceAmount =
-    order.paymentDetails?.balanceAmount ?? orderAmount - paidAmount;
+        const paidAmount = order.paymentDetails?.paidAmount ?? 0;
+        const balanceAmount =
+          order.paymentDetails?.balanceAmount ??
+          orderAmount - paidAmount;
 
+        // ✅ Accumulate totals ONCE per order
+        grandTotalAmount += orderAmount;
+        grandTotalBalance += balanceAmount;
 
         items.forEach((item, index) => {
           sheet.addRow([
@@ -112,16 +117,42 @@ exports.generateDailySalesReport = async (req, res) => {
             item.warehouseName || "N/A",
             index === 0 ? order.status : "",
             index === 0 ? orderAmount : "",
-            index === 0? balanceAmount :"",
+            index === 0 ? balanceAmount : "",
             index === 0
-               ? order.paymentDetails?.paymentStatus || "cod"
-              : ""
-
-
+              ? order.paymentDetails?.paymentStatus || "cod"
+              : "",
           ]);
         });
       });
 
+      /* ================= TOTAL ROW ================= */
+      const totalRow = sheet.addRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "TOTAL",
+        "",
+        "",
+        "",
+        grandTotalAmount,
+        grandTotalBalance,
+        "",
+      ]);
+
+      totalRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF3F4F6" },
+        };
+      });
+
+      /* ================= COLUMN WIDTH ================= */
       sheet.columns.forEach((col) => {
         let maxLength = 10;
         col.eachCell({ includeEmpty: true }, (cell) => {
@@ -145,6 +176,7 @@ exports.generateDailySalesReport = async (req, res) => {
       await workbook.xlsx.write(res);
       return res.end();
     }
+
 
     /* =================================================
        📊 DASHBOARD CARDS (ALL ORDERS – unchanged)
