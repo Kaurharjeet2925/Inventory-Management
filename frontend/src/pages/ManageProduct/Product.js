@@ -47,7 +47,13 @@ const Product = () => {
   const totalProducts = products.length;
   const lowStock = products.filter((p) => p.totalQuantity <= 10 && p.totalQuantity > 0).length;
   const outOfStock = products.filter((p) => p.totalQuantity === 0).length;
-  const mostStockProduct = products.length ? Math.max(...products.map((p) => p.totalQuantity)) : 0;
+  const mostStockProduct = products.reduce((max, p) => {
+  if (!max || p.totalQuantity > max.totalQuantity) {
+    return p;
+  }
+  return max;
+}, null);
+
 
   // FETCH DATA
   useEffect(() => {
@@ -103,6 +109,11 @@ const Product = () => {
       toast.error("Failed to add location");
     }
   };
+const getInitials = (name = "") => {
+  const words = name.trim().split(" ");
+  if (words.length === 1) return words[0][0]?.toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
 
   const openAdd = () => {
     setEditingId(null);
@@ -313,15 +324,33 @@ const removeImage = (index) => {
           </div>
         </div>
 
-        <div className="bg-green-50 border border-green-100 rounded-lg sm:rounded-xl p-3 sm:p-5 flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-4">
-          <div className="p-2 sm:p-3 bg-green-100 text-green-600 rounded-lg">
-            <BarChart3 className="w-4 sm:w-6 h-4 sm:h-6" />
-          </div>
-          <div className="text-center sm:text-left">
-            <p className="text-xs sm:text-sm text-slate-600">Most Stock</p>
-            <p className="text-lg sm:text-2xl font-semibold text-slate-900">{mostStockProduct}</p>
-          </div>
-        </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-4">
+  
+  {/* ICON */}
+  <div className="w-11 h-11 flex items-center justify-center rounded-full bg-green-100 text-green-700 font-semibold">
+    {mostStockProduct
+      ? getInitials(mostStockProduct.name)
+      : <BarChart3 className="w-5 h-5" />}
+  </div>
+
+  {/* TEXT */}
+  <div className="flex-1 min-w-0">
+    <p className="text-xs sm:text-sm text-slate-600">Highest Available Stock</p>
+
+    <p className="font-semibold text-slate-900 truncate">
+      {mostStockProduct ? mostStockProduct.name : "-"}
+    </p>
+
+    <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+      {mostStockProduct
+        ? `${mostStockProduct.totalQuantity}${mostStockProduct.quantityUnit}`
+        : ""}
+    </span>
+  </div>
+
+</div>
+
+
       </div>
 
       {/* ================= FILTER BAR (LIGHT SECTION) ================= */}
@@ -374,14 +403,14 @@ const removeImage = (index) => {
           <table className="w-full text-xs sm:text-sm table-auto">
             <thead className="bg-gray-100 text-gray-700 uppercase text-xs sticky top-0 z-10">
               <tr>
-                <th className="p-2 sm:p-4 text-center border">Img</th>
+                <th className="p-2 sm:p-4 text-center border">Image</th>
                 <th className="p-2 sm:p-4 text-left border">Product</th>
                 <th className="p-2 sm:p-4 text-left border hidden sm:table-cell">Brand</th>
                 <th className="p-2 sm:p-4 text-left border hidden lg:table-cell">Category</th>
-                <th className="p-2 sm:p-4 text-center border">Qty</th>
+                <th className="p-2 sm:p-4 text-center border">Quantity</th>
                 <th className="p-2 sm:p-4 text-center border">Stock</th>
                 <th className="p-2 sm:p-4 text-center border hidden lg:table-cell">Location</th>
-                <th className="p-2 sm:p-4 text-center border">Act</th>
+                <th className="p-2 sm:p-4 text-center border">Action</th>
               </tr>
             </thead>
 
@@ -391,7 +420,9 @@ const removeImage = (index) => {
                 .filter((p) => {
                   if (filterStock === "low") return p.totalQuantity <= 10 && p.totalQuantity > 0;
                   if (filterStock === "out") return p.totalQuantity === 0;
-                  if (filterStock === "most") return p.totalQuantity === mostStockProduct;
+                  if (filterStock === "most")
+  return mostStockProduct && p._id === mostStockProduct._id;
+
                   return true;
                 })
                 .sort((a, b) => {
@@ -403,12 +434,19 @@ const removeImage = (index) => {
                   <tr key={p._id} className="border-b hover:bg-gray-50 transition">
                     {/* IMAGE */}
                     <td className="p-2 sm:p-4 text-center">
-                      <img
-                        src={p.thumbnail ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}` : "https://via.placeholder.com/60"}
-                        alt={p.name}
-                        className="w-10 sm:w-14 h-10 sm:h-14 mx-auto rounded object-contain"
-                      />
-                    </td>
+  {p.thumbnail ? (
+    <img
+      src={`${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}`}
+      alt={p.name}
+      className="w-10 sm:w-14 h-10 sm:h-14 mx-auto rounded object-contain"
+    />
+  ) : (
+    <div className="w-10 sm:w-14 h-10 sm:h-14 mx-auto rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-sm sm:text-base">
+      {getInitials(p.name)}
+    </div>
+  )}
+</td>
+
 
                     {/* PRODUCT NAME */}
                     <td className="p-2 sm:p-4 font-medium truncate text-xs sm:text-sm">{p.name}</td>
@@ -420,10 +458,13 @@ const removeImage = (index) => {
                     <td className="p-2 sm:p-4 hidden lg:table-cell text-xs sm:text-sm truncate">{p.category?.name}</td>
 
                     {/* QUANTITY */}
-                    <td className="p-2 sm:p-4 text-center font-semibold text-xs sm:text-sm">
-                      <span className="hidden xs:inline">{p.quantityValue} {p.quantityUnit}</span>
-                      <span className="inline xs:hidden">{p.quantityValue}</span>
-                    </td>
+                   <td className="p-2 sm:p-4 text-center font-semibold text-xs sm:text-sm">
+  <span className="whitespace-nowrap">
+    {p.quantityValue}
+    <span className="text-gray-500">{p.quantityUnit}</span>
+  </span>
+</td>
+
 
                     {/* STOCK */}
                     <td className="p-2 sm:p-4 text-center text-xs sm:text-sm">{p.totalQuantity}</td>
