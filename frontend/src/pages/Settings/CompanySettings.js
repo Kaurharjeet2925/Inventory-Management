@@ -25,7 +25,7 @@ const CompanySettings = () => {
 
           if (res.data.logo) {
             setLogoPreview(
-              `${process.env.REACT_APP_API_URL}/uploads/${res.data.logo}`
+              `${process.env.REACT_APP_IMAGE_URL}/${res.data.logo}?t=${Date.now()}`
             );
           }
         }

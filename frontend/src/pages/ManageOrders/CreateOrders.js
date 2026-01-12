@@ -230,7 +230,9 @@ const CreateOrders = () => {
         return;
       }
 
-      const selectedWh = warehouseOptions.find((w) => w.id === selectedWarehouseId);
+const selectedWh = warehouseOptions.find(
+  (w) => w.warehouseId === selectedWarehouseId
+);
       const availableQty = selectedWh?.stock || 0;
 
       const alreadyOrdered = orderItems
@@ -262,7 +264,9 @@ const CreateOrders = () => {
     if (!itemForm.quantity) return alert("Enter quantity");
   
     const selectedProduct = products.find(p => p._id === itemForm.productId);
-    const selectedWarehouse = warehouseOptions.find(w => w.id === selectedWarehouseId);
+const selectedWarehouse = warehouseOptions.find(
+  w => w.warehouseId === selectedWarehouseId
+);
   
     const itemToAdd = {
       id: Date.now(),
@@ -500,42 +504,40 @@ const CreateOrders = () => {
 
 
 
-          <div className="lg:col-span-3">
+         <div className="lg:col-span-3">
+  <label className={labelClass}>Product</label>
 
-            <label className={labelClass}>Product</label>
-           <SearchableSelect
-        options={products}
-        value={itemForm.productId}
-        onChange={(id) => {
-          const p = products.find((prod) => prod._id === id);
+  <SearchableSelect
+    options={products}
+    value={itemForm.productId}
+    onChange={(id) => {
+      const p = products.find((prod) => prod._id === id);
+      if (!p) return;
 
-          setItemForm({
-            productId: id,
-            productName: p.name,
-            quantity: "",
-            unitType: p.quantityUnit,
-            price: p.price || 0,
-          });
+      setItemForm({
+        productId: id,
+        productName: p.name,
+        quantity: "",
+        unitType: p.quantityUnit,
+        price: p.price || 0,
+      });
 
-          const warehouses = rawProducts
-            .filter(prod =>
-              prod.name === p.name &&
-              prod.quantityValue === p.quantityValue &&
-              prod.quantityUnit === p.quantityUnit
-            )
-            .map(prod => ({
-              id: prod._id,
-              warehouseName: prod.location?.name || "Unknown",
-              stock: prod.totalQuantity || 0,
-            }));
+      // ✅ ONLY warehouse-based stock
+      const warehouses = (p.warehouses || []).map((w) => ({
+        warehouseId: w.location._id,
+        warehouseName: w.location.name,
+        warehouseAddress: w.location.address,
+        stock: Number(w.quantity || 0),
+      }));
 
-          setWarehouseOptions(warehouses);
-          setSelectedWarehouseId("");
-          setQtyError("");
-        }}
-        placeholder="Search product..."
-      />
-          </div>
+      setWarehouseOptions(warehouses);
+      setSelectedWarehouseId("");
+      setQtyError("");
+    }}
+    placeholder="Search product..."
+  />
+</div>
+
 
           <div className="lg:col-span-3">
 
@@ -547,16 +549,21 @@ const CreateOrders = () => {
             >
               <option value="">Select Warehouse</option>
               {warehouseOptions.map((wh) => {
-                const alreadyOrdered = orderItems
-                  .filter(it => it.productId === itemForm.productId && it.warehouseId === wh.id)
-                  .reduce((sum, it) => sum + it.quantity, 0);
+  const alreadyOrdered = orderItems
+    .filter(
+      it =>
+        it.productId === itemForm.productId &&
+        it.warehouseId === wh.warehouseId
+    )
+    .reduce((sum, it) => sum + it.quantity, 0);
 
-                return (
-                  <option key={wh.id} value={wh.id}>
-                    {wh.warehouseName} (Stock: {wh.stock - alreadyOrdered})
-                  </option>
-                );
-              })}
+  return (
+    <option key={wh.warehouseId} value={wh.warehouseId}>
+      {wh.warehouseName} (Stock: {wh.stock - alreadyOrdered})
+    </option>
+  );
+})}
+
             </select>
           </div>
 
@@ -580,7 +587,7 @@ const CreateOrders = () => {
               value={itemForm.quantity}
               disabled={
                 selectedWarehouseId &&
-                warehouseOptions.find(w => w.id === selectedWarehouseId)?.stock <= 0
+              warehouseOptions.find(w => w.warehouseId === selectedWarehouseId)?.stock <= 0
               }
               onChange={handleItemChange}
               className={inputClass}

@@ -15,7 +15,10 @@ const orderSchema = new mongoose.Schema(
       ref: "Users",
       required: true
     },
-
+    acceptedByDeliveryBoy: {
+  type: Boolean,
+  default: false,
+},
     items: [
       {
         productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },

@@ -39,6 +39,7 @@ import DeliveryList from './pages/Delivery/DeliveriesList.js';
 import MyProfile from './pages/Profile/MyProfile.js';
 import CompanySettings from './pages/Settings/CompanySettings.js';
 import ChangePassword from './pages/Settings/ChangePassword.js';
+import ProcessingOrders from './pages/Delivery/Deliveries/ProcessingOrders.js';
 function App() {
   useEffect(() => {
     socket.on("connect", () => {
@@ -101,6 +102,7 @@ function App() {
           <Route path="deliveries">
             <Route index element={<AgentDashboard />} />
             <Route path="pending" element={<PendingOrders />} />
+            <Route path="processing" element={<ProcessingOrders />} />
             <Route path="shipped" element={<ShippedOrders />} />
             <Route path="delivered" element={<DeliveredOrders />} />
             <Route path="completed" element={<CompletedOrders />} />

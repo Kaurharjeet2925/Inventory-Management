@@ -77,6 +77,15 @@ import { toast } from "react-toastify";
       toast.error("Failed to collect item");
     }
   };
+const handleAccept = async () => {
+  try {
+    await apiClient.put(`/orders/${order._id}/accept`);
+    toast.success("Order accepted");
+    reload();
+  } catch {
+    toast.error("Failed to accept order");
+  }
+};
 
   // ---------------------------
   // UPDATE STATUS
@@ -183,19 +192,20 @@ import { toast } from "react-toastify";
                 </p>
               </div>
 
-              {order.status === "pending" && (
-                <button
-                  disabled={item.collected}
-                  onClick={() => handleCollect(order._id, item._id)}
-                  className={`px-3 py-1 text-xs rounded text-white ${
-                    item.collected
-                      ? "bg-gray-400"
-                      : "bg-orange-600 hover:bg-orange-700"
-                  }`}
-                >
-                  {item.collected ? "Collected" : "Collect"}
-                </button>
-              )}
+             {order.status === "processing" && (
+  <button
+    disabled={item.collected}
+    onClick={() => handleCollect(order._id, item._id)}
+    className={`px-3 py-1 text-xs rounded text-white ${
+      item.collected
+        ? "bg-gray-400"
+        : "bg-orange-600 hover:bg-orange-700"
+    }`}
+  >
+    {item.collected ? "Collected" : "Collect"}
+  </button>
+)}
+
             </div>
           </div>
         ))}
@@ -255,18 +265,27 @@ import { toast } from "react-toastify";
           </div>
         )}
       </div>
+     {order.status === "pending" && !order.acceptedByDeliveryBoy && (
+  <button
+    onClick={handleAccept}
+    className="w-full bg-green-600 text-white py-2 rounded mt-2"
+  >
+    Accept Order
+  </button>
+)}
 
       {/* STATUS ACTIONS */}
       {!viewOnly &&
-      order.items?.every((i) => i.collected) &&
-        order.status === "pending" && (
-          <button
-            onClick={() => updateStatus(order._id, "shipped")}
-            className="w-full bg-blue-500 text-white py-2 rounded"
-          >
-            Mark Shipped
-          </button>
-        )}
+ order.items?.every(i => i.collected) &&
+ order.status === "processing" && (
+  <button
+    onClick={() => updateStatus(order._id, "shipped")}
+    className="w-full bg-blue-500 text-white py-2 rounded"
+  >
+    Mark Shipped
+  </button>
+)}
+
 
       {order.status === "shipped" && (
         <button

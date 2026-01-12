@@ -32,6 +32,51 @@ const AddProducts = ({
   isEdit,
   onSubmit,
 }) => {
+   const normalizedProductData = {
+    ...productData,
+    warehouses:
+      Array.isArray(productData?.warehouses) && productData.warehouses.length > 0
+        ? productData.warehouses
+        : [{ locationId: "", quantity: 0 }],
+  };
+
+  /* ================= FIX: HELPERS ================= */
+  const updateWarehouse = (index, field, value) => {
+    const updated = [...normalizedProductData.warehouses];
+    updated[index][field] = value;
+
+    setProductData({
+      ...productData,
+      warehouses: updated,
+    });
+  };
+
+  const addWarehouse = () => {
+    setProductData({
+      ...productData,
+      warehouses: [
+        ...normalizedProductData.warehouses,
+        { locationId: "", quantity: 0 },
+      ],
+    });
+  };
+
+  const removeWarehouse = (index) => {
+    const updated = normalizedProductData.warehouses.filter(
+      (_, i) => i !== index
+    );
+
+    setProductData({
+      ...productData,
+      warehouses: updated.length ? updated : [{ locationId: "", quantity: 0 }],
+    });
+  };
+
+  const totalStock = normalizedProductData.warehouses.reduce(
+    (sum, w) => sum + Number(w.quantity || 0),
+    0
+  );
+
   return (
     <form
       onSubmit={onSubmit}
@@ -108,28 +153,62 @@ const AddProducts = ({
               </div>
             </div>
 
-            <div>
-              <label className={labelClass}>Inventory Location</label>
-              <select
-                className={inputClass}
-                value={productData.location}
-                onChange={(e) => {
-                  if (e.target.value === "__add_new__") {
-                    setShowLocationModal(true);
-                    setProductData({ ...productData, location: "" });
-                  } else {
-                    setProductData({ ...productData, location: e.target.value });
-                  }
-                }}
+             <div>
+              <label className={labelClass}>Warehouses & Stock</label>
+
+              {normalizedProductData.warehouses.map((wh, index) => (
+                <div key={index} className="grid grid-cols-12 gap-3 mb-2">
+                  <select
+                    className={`${inputClass} col-span-6`}
+                    value={wh.locationId}
+                    onChange={(e) => {
+                      if (e.target.value === "__add_new__") {
+                        setShowLocationModal(true);
+                        return;
+                      }
+                      updateWarehouse(index, "locationId", e.target.value);
+                    }}
+                  >
+                    <option value="">Select Warehouse</option>
+                    {locations.map((l) => (
+                      <option key={l._id} value={l._id}>{l.name}</option>
+                    ))}
+                    <option value="__add_new__">➕ Add New Location</option>
+                  </select>
+
+                  <input
+                    type="number"
+                    className={`${inputClass} col-span-5`}
+                    value={wh.quantity}
+                    onChange={(e) =>
+                      updateWarehouse(index, "quantity", Number(e.target.value))
+                    }
+                  />
+
+                  {normalizedProductData.warehouses.length > 1 && (
+                    <button
+                      type="button"
+                      className="col-span-1 text-red-600"
+                      onClick={() => removeWarehouse(index)}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+<div className="flex flex-row gap-4 items-center">  
+              <button
+                type="button"
+                onClick={addWarehouse}
+                className="text-sm text-blue-700 mt-2"
               >
-                <option value="">Select Location</option>
-                {locations.map((loc) => (
-                  <option key={loc._id} value={loc._id}>
-                    {loc.name}
-                  </option>
-                ))}
-                <option value="__add_new__">➕ Add New Location</option>
-              </select>
+                ➕ Add another warehouse
+              </button>
+
+              <p className="text-xs text-gray-500 mt-1">
+                Total Stock: <strong>{totalStock}</strong>
+              </p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -204,7 +283,7 @@ const AddProducts = ({
               </div>
             </div>
 
-            <div>
+            {/* <div>
               <label className={labelClass}>Stock Quantity</label>
               <input
                 type="number"
@@ -214,7 +293,7 @@ const AddProducts = ({
                   setProductData({ ...productData, totalQuantity: e.target.value })
                 }
               />
-            </div>
+            </div> */}
 
             <div>
               <label className={labelClass}>Rating</label>

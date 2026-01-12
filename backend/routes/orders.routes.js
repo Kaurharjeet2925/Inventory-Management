@@ -7,6 +7,7 @@ const {
   getOrderById, 
   updateOrderStatus, 
   deleteOrder ,
+    acceptOrder,
     collectOrder,
     updateOrder,
     generateInvoice,
@@ -23,6 +24,7 @@ router.post("/orders", auth, createOrder);
 router.get("/orders", auth, getOrders);
 router.get("/all-order", auth, getAllOrders);
 router.get("/delivery-summary", auth, deliverySummary);
+router.put("/orders/:id/accept", auth, acceptOrder);
 router.put("/orders/:id/collect-item/:itemId", auth, collectOrder);
 router.put("/orders/:id", auth, updateOrder);
 router.put("/orders/:id/payment", auth, updateOrderPayment);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
-import { Package, AlertTriangle, XCircle, BarChart3 } from "lucide-react";
+import { Package, AlertTriangle, XCircle, BarChart3,Move } from "lucide-react";
 import AddLocationModal from "./components/AddLocation";
 import AddProducts from "./components/AddProducts";
 const DEFAULT_UNITS = ["piece", "packet", "kg", "ltr", "gm"];
@@ -17,6 +17,11 @@ const Product = () => {
   const [locations, setLocations] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+const [mode, setMode] = useState("add"); // add | transfer
+const [transferProduct, setTransferProduct] = useState(null);
+const [transferFrom, setTransferFrom] = useState("");
+const [transferTo, setTransferTo] = useState("");
+const [transferQty, setTransferQty] = useState("");
 
   const [thumbnailPreview, setThumbnailPreview] = useState("");
   const [imagesPreview, setImagesPreview] = useState([]);
@@ -24,35 +29,55 @@ const Product = () => {
   const [newLocationName, setNewLocationName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [deletedImages, setDeletedImages] = useState([]);
+const getTotalStock = (warehouses = []) =>
+  warehouses.reduce((sum, w) => sum + Number(w.quantity || 0), 0);
 
-  const [productData, setProductData] = useState({
-    name: "",
-    brand: "",
-    category: "",
-    quantityValue: "",
-    quantityUnit: "",
-    totalQuantity: "",
-    mrp: "",
-    price: "",
-    description: "",
-    location: "",
-    rating: 0,
-    thumbnail: null,
-    images: [],
-  });
+const getWarehouseNames = (warehouses = [], locations = []) => {
+  return warehouses
+    .map((w) => {
+      const loc = locations.find((l) => l._id === w.locationId);
+      return loc?.name;
+    })
+    .filter(Boolean);
+};
+
+ const [productData, setProductData] = useState({
+  name: "",
+  brand: "",
+  category: "",
+  mrp: "",
+  price: "",
+  quantityValue: "",
+  quantityUnit: "",
+  rating: 0,
+  description: "",
+  warehouses: [{ locationId: "", quantity: 0 }],
+});
+
 
   const [filterStock, setFilterStock] = useState("");
   const [sortBy, setSortBy] = useState("");
 
   const totalProducts = products.length;
-  const lowStock = products.filter((p) => p.totalQuantity <= 10 && p.totalQuantity > 0).length;
-  const outOfStock = products.filter((p) => p.totalQuantity === 0).length;
-  const mostStockProduct = products.reduce((max, p) => {
-  if (!max || p.totalQuantity > max.totalQuantity) {
+  const lowStock = products.filter(
+  (p) => {
+    const total = getTotalStock(p.warehouses);
+    return total > 0 && total <= 10;
+  }
+).length;
+
+const outOfStock = products.filter(
+  (p) => getTotalStock(p.warehouses) === 0
+).length;
+
+ const mostStockProduct = products.reduce((max, p) => {
+  const stock = getTotalStock(p.warehouses);
+  if (!max || stock > getTotalStock(max.warehouses)) {
     return p;
   }
   return max;
 }, null);
+
 
 
   // FETCH DATA
@@ -205,6 +230,34 @@ const handleImages = (e) => {
   // reset input so same file can be reselected
   e.target.value = "";
 };
+const handleTransferStock = async () => {
+  if (!transferFrom || !transferTo || !transferQty) {
+    toast.error("All fields are required");
+    return;
+  }
+
+  if (transferFrom === transferTo) {
+    toast.error("Source and destination cannot be same");
+    return;
+  }
+
+  try {
+    await apiClient.put(`/product/transfer/${transferProduct._id}`, {
+      fromLocationId: transferFrom,
+      toLocationId: transferTo,
+      quantity: Number(transferQty),
+    });
+
+    toast.success("Stock transferred successfully");
+    setShowLocationModal(false);
+    setTransferFrom("");
+    setTransferTo("");
+    setTransferQty("");
+    fetchAll();
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Transfer failed");
+  }
+};
 
 const removeImage = (index) => {
   const img = imagesPreview[index];
@@ -226,27 +279,42 @@ const removeImage = (index) => {
 
 
  const saveProduct = async (e) => {
-  e.preventDefault(); // ✅ REQUIRED (form submit)
+  e.preventDefault();
 
   const formData = new FormData();
 
-  Object.entries(productData).forEach(([key, value]) => {
-    if (key === "images" && Array.isArray(value)) {
-      value.forEach((img) => {
-        if (img instanceof File) {
-          formData.append("images", img);
-        }
-      });
-    } else if (key === "thumbnail") {
-      if (value instanceof File) {
-        formData.append("thumbnail", value);
-      }
-    } else {
-      formData.append(key, value);
-    }
-  });
+  // ---------- TEXT & NUMBERS ----------
+  formData.append("name", productData.name);
+  formData.append("brand", productData.brand);
+  formData.append("category", productData.category);
+  formData.append("quantityValue", productData.quantityValue);
+  formData.append("quantityUnit", productData.quantityUnit);
+  formData.append("mrp", productData.mrp);
+  formData.append("price", productData.price);
+  formData.append("rating", productData.rating);
+  formData.append("description", productData.description);
 
-  // Send deletedImages to backend if editing
+  // ---------- ✅ WAREHOUSES (JSON) ----------
+  formData.append(
+    "warehouses",
+    JSON.stringify(productData.warehouses)
+  );
+
+  // ---------- THUMBNAIL ----------
+  if (productData.thumbnail instanceof File) {
+    formData.append("thumbnail", productData.thumbnail);
+  }
+
+  // ---------- IMAGES ----------
+  if (Array.isArray(productData.images)) {
+    productData.images.forEach((img) => {
+      if (img instanceof File) {
+        formData.append("images", img);
+      }
+    });
+  }
+
+  // ---------- DELETED IMAGES (EDIT MODE) ----------
   if (editingId && deletedImages.length) {
     formData.append("deletedImages", JSON.stringify(deletedImages));
   }
@@ -268,7 +336,8 @@ const removeImage = (index) => {
   } catch (error) {
     toast.error(error.response?.data?.message || "Error saving product");
   }
- };
+};
+
 
 
   return (
@@ -418,16 +487,23 @@ const removeImage = (index) => {
               {products
                 .filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
                 .filter((p) => {
-                  if (filterStock === "low") return p.totalQuantity <= 10 && p.totalQuantity > 0;
-                  if (filterStock === "out") return p.totalQuantity === 0;
+                 const total = getTotalStock(p.warehouses);
+
+if (filterStock === "low") return total > 0 && total <= 10;
+if (filterStock === "out") return total === 0;
+
                   if (filterStock === "most")
   return mostStockProduct && p._id === mostStockProduct._id;
 
                   return true;
                 })
                 .sort((a, b) => {
-                  if (sortBy === "qty-low") return a.totalQuantity - b.totalQuantity;
-                  if (sortBy === "qty-high") return b.totalQuantity - a.totalQuantity;
+                 if (sortBy === "qty-low")
+  return getTotalStock(a.warehouses) - getTotalStock(b.warehouses);
+
+if (sortBy === "qty-high")
+  return getTotalStock(b.warehouses) - getTotalStock(a.warehouses);
+
                   return 0;
                 })
                 .map((p) => (
@@ -467,17 +543,51 @@ const removeImage = (index) => {
 
 
                     {/* STOCK */}
-                    <td className="p-2 sm:p-4 text-center text-xs sm:text-sm">{p.totalQuantity}</td>
+<td className="p-2 sm:p-4 text-center text-xs sm:text-sm font-semibold">
+  {getTotalStock(p.warehouses)}
+</td>
 
-                    {/* LOCATION */}
-                    <td className="p-2 sm:p-4 text-center hidden lg:table-cell text-xs">
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full">{p.location?.name}</span>
-                    </td>
+        <td className="p-2 sm:p-4 text-center hidden lg:table-cell text-xs">
+  <div className="flex flex-col gap-1 items-center">
+
+    {Array.isArray(p.warehouses) && p.warehouses.length > 0 ? (
+      p.warehouses.map((w, i) => (
+        <div
+          key={i}
+          className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 text-xs whitespace-nowrap"
+        >
+          <strong>{w.location?.name || "Unknown"}</strong>
+          <span className="ml-1 text-gray-600">
+            – {w.quantity}
+          </span>
+        </div>
+      ))
+    ) : (
+      <span className="text-gray-400">—</span>
+    )}
+
+  </div>
+</td>
+
+
+
 
                     {/* ACTIONS */}
                     <td className="p-2 sm:p-4">
                       <div className="flex justify-center gap-2">
-                        {/* EDIT */}
+            <button
+  onClick={() => {
+    setTransferProduct(p);
+    setMode("transfer");
+    setShowLocationModal(true);
+  }}
+  className="p-1.5 sm:p-2 rounded-full text-purple-600 hover:bg-purple-100 transition border border-purple-200"
+  title="Transfer Stock"
+>
+  <Move className="w-4 h-4" />
+</button>
+
+
                         <button
                           onClick={() => openEdit(p)}
                           className="p-1.5 sm:p-2 rounded-full text-blue-600 hover:bg-blue-100 transition border border-blue-200"
@@ -533,21 +643,38 @@ const removeImage = (index) => {
   isEdit={!!editingId}             // ✅ ADD vs EDIT
 />
 
-      {showLocationModal && (
-        <AddLocationModal
-          show={showLocationModal}
-          onClose={() => {
-            setShowLocationModal(false);
-            setNewLocationName("");
-            setNewAddress("");
-          }}
-          locationName={newLocationName}
-          address={newAddress}
-          setLocationName={setNewLocationName}
-          setAddress={setNewAddress}
-          onSave={handleAddLocationFromProduct}
-        />
-      )}
+     {showLocationModal && (
+  <AddLocationModal
+    show={showLocationModal}
+    onClose={() => {
+      setShowLocationModal(false);
+      setMode("add");
+      setNewLocationName("");
+      setNewAddress("");
+    }}
+
+    /* ADD / EDIT */
+    locationName={newLocationName}
+    address={newAddress}
+    setLocationName={setNewLocationName}
+    setAddress={setNewAddress}
+    isEdit={false}
+
+    /* 🔥 TRANSFER */
+    mode={mode}
+    locations={locations}
+    product={transferProduct}
+    transferFrom={transferFrom}
+    transferTo={transferTo}
+    transferQty={transferQty}
+    setTransferFrom={setTransferFrom}
+    setTransferTo={setTransferTo}
+    setTransferQty={setTransferQty}
+
+    onSave={mode === "transfer" ? handleTransferStock : handleAddLocationFromProduct}
+  />
+)}
+
 
       {/* FOOTER */}
       {/* <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">

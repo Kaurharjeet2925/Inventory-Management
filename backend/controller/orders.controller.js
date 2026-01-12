@@ -49,42 +49,58 @@ exports.createOrder = async (req, res) => {
     const io = req.app.get("io");
 
     for (let item of items) {
-      const warehouseProduct = await Product.findById(item.warehouseId).populate("location");
+  const product = await Product.findById(item.productId)
+    .populate("warehouses.location");
 
-      if (!warehouseProduct) {
-        return res.status(404).json({
-          message: `Warehouse stock not found for product: ${item.productName}`
-        });
-      }
+  if (!product) {
+    return res.status(404).json({
+      message: `Product not found: ${item.productName}`,
+    });
+  }
 
-      const available = warehouseProduct.totalQuantity || 0;
-      const qty = Number(item.quantity);
+  const warehouse = product.warehouses.find(
+    w => w.location._id.toString() === item.warehouseId
+  );
 
-      if (qty > available) {
-        return res.status(400).json({
-          message: `Not enough stock in ${warehouseProduct.location?.name}. Available: ${available}`
-        });
-      }
-    }
+  if (!warehouse) {
+    return res.status(404).json({
+      message: `Warehouse stock not found for product: ${item.productName}`,
+    });
+  }
+
+  const available = Number(warehouse.quantity || 0);
+  const qty = Number(item.quantity);
+
+  if (qty > available) {
+    return res.status(400).json({
+      message: `Not enough stock in ${warehouse.location.name}. Available: ${available}`,
+    });
+  }
+}
+
 
   
   
 
     for (let item of items) {
-      const resUpdate = await Product.findByIdAndUpdate(item.warehouseId, {
-        $inc: { totalQuantity: -Number(item.quantity) }
-      }, { new: true });
+  const product = await Product.findById(item.productId);
 
-      // Debug logs: show product id, decremented amount and new total
-      console.log(`Stock update for product ${item.warehouseId}: -${item.quantity}, newTotal: ${resUpdate ? resUpdate.totalQuantity : 'N/A'}`);
+  const warehouseIndex = product.warehouses.findIndex(
+    w => w.location.toString() === item.warehouseId
+  );
 
-      // Emit product_updated so clients can refresh availability immediately
-      try {
-        io.emit('product_updated', { productId: item.warehouseId, totalQuantity: resUpdate ? resUpdate.totalQuantity : null });
-      } catch (e) {
-        console.error('Failed to emit product_updated', e);
-      }
-    }
+  if (warehouseIndex === -1) continue;
+
+  product.warehouses[warehouseIndex].quantity -= Number(item.quantity);
+
+  await product.save();
+
+  // 🔔 Emit socket update (warehouse-based)
+  io.emit("product_updated", {
+    productId: product._id,
+  });
+}
+
 
     // Generate Order ID
     const orderId = await generateOrderId();
@@ -94,29 +110,36 @@ exports.createOrder = async (req, res) => {
 
     
     for (let item of items) {
-      const warehouseProduct = await Product.findById(item.warehouseId).populate("location");
+  const product = await Product.findById(item.productId)
+    .populate("warehouses.location");
 
-      const price = Number(item.price || 0);
-      const qty = Number(item.quantity || 0);
-      const totalPrice = qty * price;
+  const warehouse = product.warehouses.find(
+    w => w.location._id.toString() === item.warehouseId
+  );
 
-      totalAmount += totalPrice;
+  const price = Number(item.price || 0);
+  const qty = Number(item.quantity || 0);
+  const totalPrice = qty * price;
 
-      formattedItems.push({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: qty,
-        quantityValue: item.quantityValue,
-        quantityUnit:item.quantityUnit,
-        unitType: item.unitType,
-        price: price,
-        totalPrice: totalPrice,
+  totalAmount += totalPrice;
 
-        warehouseId: item.warehouseId,
-        warehouseName: warehouseProduct?.location?.name || "Unknown",
-        warehouseAddress: warehouseProduct?.location?.address || "Unknown",
-      });
-    }
+  formattedItems.push({
+    productId: item.productId,
+    productName: item.productName,
+
+    quantity: qty,
+    quantityValue: item.quantityValue,
+    quantityUnit: item.quantityUnit,
+
+    price,
+    totalPrice,
+
+    warehouseId: warehouse.location._id,
+    warehouseName: warehouse.location.name,
+    warehouseAddress: warehouse.location.address,
+  });
+}
+
 
 
    const paid = Math.max(Number(paymentDetails?.paidAmount) || 0, 0);
@@ -234,21 +257,15 @@ exports.getOrders = async (req, res) => {
       baseFilter.assignedBy = new mongoose.Types.ObjectId(user._id);
     }
 
-    // 👑 SuperAdmin → NO FILTER (see all orders)
-
     /* ---------------- LIST FILTER ---------------- */
     const listFilter = { ...baseFilter };
 
-    /* STATUS FILTER */
+    /* ---------------- STATUS FILTER ---------------- */
     if (req.query.status) {
-      if (req.query.status === "shipped") {
-        listFilter.status = { $in: ["processing", "shipped"] };
-      } else {
-        listFilter.status = req.query.status;
-      }
+      listFilter.status = req.query.status; // ✅ exact status only
     }
 
-    /* ---------------- DATE FILTER (FROM–TO) ---------------- */
+    /* ---------------- DATE FILTER ---------------- */
     if (req.query.from || req.query.to) {
       listFilter.createdAt = {};
       if (req.query.from) {
@@ -282,82 +299,110 @@ exports.getOrders = async (req, res) => {
       [
         { path: "clientId", select: "name phone address" },
         { path: "deliveryPersonId", select: "name phone email" },
-        { path: "assignedBy", select: "name role" }
+        { path: "assignedBy", select: "name role" },
       ]
     );
 
-    /* ---------------- STATUS COUNTS (ROLE-BASED) ---------------- */
+    /* ---------------- STATUS COUNTS ---------------- */
     const counts = await Order.aggregate([
       { $match: baseFilter },
-      { $group: { _id: "$status", count: { $sum: 1 } } }
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
-    const statusCounts = { pending: 0, shipped: 0, delivered: 0, completed: 0 };
+    const statusCounts = {
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      completed: 0,
+    };
 
-    counts.forEach(c => {
-      if (c._id === "processing" || c._id === "shipped") {
-        statusCounts.shipped += c.count;
-      } else if (statusCounts[c._id] !== undefined) {
-        statusCounts[c._id] = c.count;
+    counts.forEach((c) => {
+      if (statusCounts[c._id] !== undefined) {
+        statusCounts[c._id] = c.count; // ✅ direct mapping
       }
     });
 
     return res.json({
       role: user.role,
       statusCounts,
-      ...result
+      ...result,
     });
-
   } catch (err) {
     console.error("GetOrders Error:", err);
     res.status(500).json({ message: "Failed to retrieve orders" });
   }
 };
 
-
-
-
-
 exports.updateOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
     const { items, status, paymentDetails } = req.body;
 
+    /* ================= FIND ORDER ================= */
     const existingOrder = await Order.findById(orderId);
     if (!existingOrder) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // 🔒 Only admin can edit full order
+    /* ================= ROLE CHECK ================= */
     if (req.user.role === "delivery-boy") {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // -------------------------------
-    // ONLY PENDING ORDERS CAN CHANGE ITEMS
-    // -------------------------------
-    if (existingOrder.status !== "pending") {
+    /* ================= 🚫 COMPLETED ORDER LOCK ================= */
+    if (existingOrder.status === "completed") {
       return res.status(400).json({
-        message: "Only pending orders can be edited",
+        message: "Completed orders cannot be modified",
       });
     }
 
-    // Restore old stock
+    /* ============================================================
+       🔹 STATUS-ONLY UPDATE (NON-PENDING ORDERS)
+       ============================================================ */
+    if (existingOrder.status !== "pending") {
+      // Allow ONLY status change
+      existingOrder.status = status || existingOrder.status;
+      await existingOrder.save();
+
+      return res.json({
+        message: "Order status updated successfully",
+        order: existingOrder,
+      });
+    }
+
+    /* ============================================================
+       🔹 FULL UPDATE (PENDING ORDERS ONLY)
+       ============================================================ */
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        message: "Order items are required for pending orders",
+      });
+    }
+
+    /* ================= RESTORE OLD STOCK ================= */
     for (const oldItem of existingOrder.items) {
       await Product.findByIdAndUpdate(oldItem.productId, {
         $inc: { totalQuantity: oldItem.quantity },
       });
     }
 
-    // Deduct new stock
+    /* ================= DEDUCT NEW STOCK ================= */
     for (const newItem of items) {
       await Product.findByIdAndUpdate(newItem.productId, {
         $inc: { totalQuantity: -newItem.quantity },
       });
     }
 
-    // Recalculate totals
+    /* ================= RECALCULATE TOTAL ================= */
     let totalAmount = 0;
+
     const updatedItems = items.map((item) => {
       const price = Number(item.price || 0);
       const qty = Number(item.quantity || 0);
@@ -373,8 +418,16 @@ exports.updateOrder = async (req, res) => {
     });
 
     const paid = Number(paymentDetails?.paidAmount || 0);
-    const balance = totalAmount - paid;
+    const balanceAmount = Math.max(totalAmount - paid, 0);
 
+    let paymentStatus = "cod";
+    if (status === "completed") {
+      if (paid === 0) paymentStatus = "unpaid";
+      else if (paid >= totalAmount) paymentStatus = "paid";
+      else paymentStatus = "partial";
+    }
+
+    /* ================= UPDATE ORDER ================= */
     const updatedOrder = await Order.findByIdAndUpdate(
       orderId,
       {
@@ -383,40 +436,39 @@ exports.updateOrder = async (req, res) => {
         paymentDetails: {
           totalAmount,
           paidAmount: paid,
-          balanceAmount: balance < 0 ? 0 : balance,
-       paymentStatus:
-  (status === "completed" && paid === 0)
-    ? "unpaid"
-    : paid >= totalAmount
-    ? "paid"
-    : paid > 0
-    ? "partial"
-    : "cod",
-
-
+          balanceAmount,
+          paymentStatus,
         },
       },
       { new: true }
     );
+
+    /* ================= SOCKET EVENTS ================= */
     const io = req.app.get("io");
 
-const populatedOrder = await Order.findById(updatedOrder._id)
-  .populate("clientId", "name phone address")
-  .populate("deliveryPersonId", "name phone email")
-  .populate("assignedBy", "name role");
+    const populatedOrder = await Order.findById(updatedOrder._id)
+      .populate("clientId", "name phone address")
+      .populate("deliveryPersonId", "name phone email")
+      .populate("assignedBy", "name role");
 
-// Admin
-if (populatedOrder.assignedBy) {
-  io.to(`admin_${populatedOrder.assignedBy._id}`).emit("order_updated", populatedOrder);
-}
+    // Admin
+    if (populatedOrder.assignedBy) {
+      io.to(`admin_${populatedOrder.assignedBy._id}`).emit(
+        "order_updated",
+        populatedOrder
+      );
+    }
 
-// Delivery boy
-if (populatedOrder.deliveryPersonId) {
-  io.to(populatedOrder.deliveryPersonId._id.toString()).emit("order_updated", populatedOrder);
-}
+    // Delivery boy
+    if (populatedOrder.deliveryPersonId) {
+      io.to(populatedOrder.deliveryPersonId._id.toString()).emit(
+        "order_updated",
+        populatedOrder
+      );
+    }
 
-// SuperAdmin
-io.to("superadmins").emit("order_updated", populatedOrder);
+    // SuperAdmin
+    io.to("superadmins").emit("order_updated", populatedOrder);
 
     return res.json({
       message: "Order updated successfully",
@@ -424,14 +476,13 @@ io.to("superadmins").emit("order_updated", populatedOrder);
     });
   } catch (err) {
     console.error("updateOrder error", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
 
 // PUT /orders/:id/payment
-// PUT /api/orders/:id/payment
-// PUT /api/orders/:id/payment
+
 exports.updateOrderPayment = async (req, res) => {
   try {
     const { paidAmount } = req.body;
@@ -520,15 +571,42 @@ exports.collectOrder = async (req, res) => {
   try {
     const { id, itemId } = req.params;
 
+    // 🔐 Only delivery boy allowed
+    if (req.user.role !== "delivery-boy") {
+      return res.status(403).json({
+        message: "Only delivery boy can collect items",
+      });
+    }
+
     const order = await Order.findById(id);
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // 🚫 Must accept order first
+    if (!order.acceptedByDeliveryBoy) {
+      return res.status(400).json({
+        message: "Please accept the order first",
+      });
+    }
 
     const item = order.items.id(itemId);
-    if (!item) return res.status(404).json({ message: "Item not found" });
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
 
+    // 🚫 Prevent double collect
+    if (item.collected) {
+      return res.status(400).json({
+        message: "Item already collected",
+      });
+    }
+
+    // ✅ Collect item
     item.collected = true;
     await order.save();
 
+    // 🔄 Populate for response + socket
     const updatedOrder = await Order.findById(id)
       .populate("clientId", "name phone address")
       .populate("deliveryPersonId", "name phone")
@@ -536,10 +614,12 @@ exports.collectOrder = async (req, res) => {
 
     const io = req.app.get("io");
 
-    // Admin
+    // 🔔 Admin notification
     if (updatedOrder.assignedBy?._id) {
-      io.to(`admin_${updatedOrder.assignedBy._id}`)
-        .emit("order_collected", updatedOrder);
+      io.to(`admin_${updatedOrder.assignedBy._id}`).emit(
+        "order_collected",
+        updatedOrder
+      );
 
       await createNotification({
         io,
@@ -549,10 +629,12 @@ exports.collectOrder = async (req, res) => {
       });
     }
 
-    // Delivery boy
+    // 🔔 Delivery boy notification
     if (updatedOrder.deliveryPersonId?._id) {
-      io.to(updatedOrder.deliveryPersonId._id.toString())
-        .emit("order_collected", updatedOrder);
+      io.to(updatedOrder.deliveryPersonId._id.toString()).emit(
+        "order_collected",
+        updatedOrder
+      );
 
       await createNotification({
         io,
@@ -562,19 +644,21 @@ exports.collectOrder = async (req, res) => {
       });
     }
 
-    // SuperAdmins
+    // 🔔 SuperAdmins
     io.to("superadmins").emit("order_collected", updatedOrder);
 
-    res.json({
+    return res.json({
       message: "Item collected successfully",
       order: updatedOrder,
     });
   } catch (error) {
-    res.status(500).json({ message: "Failed to collect item", error });
+    console.error("collectOrder error", error);
+    res.status(500).json({
+      message: "Failed to collect item",
+      error: error.message,
+    });
   }
 };
-
-
 
 // Get order by id
 exports.getOrderById = async (req, res) => {
@@ -588,6 +672,79 @@ exports.getOrderById = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+// PUT /orders/:id/accept
+// PUT /orders/:id/accept
+exports.acceptOrder = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id)
+      .populate("assignedBy", "name role")
+      .populate("deliveryPersonId", "name");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // 🔐 Only delivery boy can accept
+    if (req.user.role !== "delivery-boy") {
+      return res.status(403).json({
+        message: "Only delivery boy can accept order",
+      });
+    }
+
+    // 🚫 Already accepted
+    if (order.acceptedByDeliveryBoy) {
+      return res.status(400).json({
+        message: "Order already accepted",
+      });
+    }
+
+    // ✅ ACCEPT ORDER
+    order.acceptedByDeliveryBoy = true;
+    order.status = "processing";
+    await order.save();
+
+    const io = req.app.get("io");
+
+    /* ================= 🔔 NOTIFICATIONS ================= */
+
+    // 🔔 Notify Admin
+    if (order.assignedBy?._id) {
+      io.to(`admin_${order.assignedBy._id}`).emit(
+        "order_accepted",
+        order
+      );
+
+      await createNotification({
+        io,
+        message: `Order ${order.orderId} accepted by delivery boy`,
+        targetUser: order.assignedBy._id,
+        data: { orderId: order._id },
+      });
+    }
+
+    // 🔔 Notify SuperAdmins
+    io.to("superadmins").emit("order_accepted", order);
+
+    await createNotification({
+      io,
+      message: `Order ${order.orderId} accepted`,
+      targetRole: "superadmins",
+      data: { orderId: order._id },
+    });
+
+    // 🔔 Optional: Notify Delivery Boy himself
+    io.to(req.user._id.toString()).emit("order_accepted", order);
+
+    return res.json({
+      message: "Order accepted successfully",
+      order,
+    });
+  } catch (error) {
+    console.error("acceptOrder error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 
 // Update order status (optional)
 exports.updateOrderStatus = async (req, res) => {
@@ -600,99 +757,144 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: "Status is required" });
     }
 
-    // All valid statuses
-    const allStatuses = ["pending", "shipped", "delivered", "completed", "cancelled"];
+    /* ================= VALID STATUSES ================= */
+    const allStatuses = [
+      "pending",
+      "processing",
+      "shipped",
+      "delivered",
+      "completed",
+      "cancelled",
+    ];
 
     if (!allStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
 
-    // 🚫 Delivery boy allowed statuses
+    /* ================= DELIVERY BOY RULES ================= */
     const deliveryBoyAllowed = ["shipped", "delivered", "completed"];
 
-    // Delivery boy MUST NOT set anything outside these
     if (user.role === "delivery-boy" && !deliveryBoyAllowed.includes(status)) {
       return res.status(403).json({
-        message: `Delivery boy can only update status to shipped, delivered or completed`,
+        message:
+          "Delivery boy can only update status to shipped, delivered or completed",
       });
     }
 
-    // Delivery boy can update only his orders
+    /* ================= FIND ORDER ================= */
     let filter = { _id: id };
 
     if (user.role === "delivery-boy") {
       filter.deliveryPersonId = user._id;
     }
 
-    const updatedOrder = await Order.findOneAndUpdate(
-      filter,
-      { status },
-      { new: true }
-    );
-    // 🔥 PAYMENT STATUS FIX ON COMPLETION
-if (status === "completed") {
-  const total = updatedOrder.paymentDetails?.totalAmount || 0;
-  const paid = updatedOrder.paymentDetails?.paidAmount || 0;
+    const order = await Order.findOne(filter);
 
-  let paymentStatus = "unpaid";
-
-  if (paid >= total && total > 0) {
-    paymentStatus = "paid";
-  } else if (paid > 0) {
-    paymentStatus = "partial";
-  }
-
-  updatedOrder.paymentDetails.paymentStatus = paymentStatus;
-  updatedOrder.paymentDetails.balanceAmount = Math.max(total - paid, 0);
-
-  await updatedOrder.save();
-}
-
- 
-    if (!updatedOrder) {
+    if (!order) {
       return res.status(404).json({
         message: "Order not found or unauthorized",
       });
     }
+
+    const previousStatus = order.status;
+
+    /* ================= 🚫 BLOCK CANCEL AFTER DELIVERY ================= */
+    if (previousStatus === "delivered" && status === "cancelled") {
+      return res.status(400).json({
+        message: "Delivered order cannot be cancelled",
+      });
+    }
+
+    /* ================= UPDATE STATUS ================= */
+    order.status = status;
+    const updatedOrder = await order.save();
+
+    /* ================= 🔁 RESTORE STOCK ON CANCEL ================= */
+    if (status === "cancelled" && previousStatus !== "cancelled") {
+      for (const item of updatedOrder.items) {
+        await Product.findByIdAndUpdate(
+          item.productId,
+          { $inc: { quantity: item.quantity } }, // restore stock
+          { new: true }
+        );
+      }
+    }
+
+    /* ================= 💳 PAYMENT STATUS FIX ================= */
+    if (status === "completed") {
+      const total = updatedOrder.paymentDetails?.totalAmount || 0;
+      const paid = updatedOrder.paymentDetails?.paidAmount || 0;
+
+      let paymentStatus = "unpaid";
+
+      if (paid >= total && total > 0) {
+        paymentStatus = "paid";
+      } else if (paid > 0) {
+        paymentStatus = "partial";
+      }
+
+      updatedOrder.paymentDetails.paymentStatus = paymentStatus;
+      updatedOrder.paymentDetails.balanceAmount = Math.max(total - paid, 0);
+
+      await updatedOrder.save();
+    }
+
+    /* ================= SOCKET & NOTIFICATIONS ================= */
     const io = req.app.get("io");
 
-    // First, populate the order to get assignedBy field
     await updatedOrder.populate("assignedBy", "name role");
 
-    // Notify the specific admin who assigned this order
+    // Notify assigning admin
     if (updatedOrder.assignedBy) {
-      io.to(`admin_${updatedOrder.assignedBy._id.toString()}`).emit("order_status_updated", updatedOrder);
-      try { await createNotification({ io, message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`, targetUser: updatedOrder.assignedBy._id, data: { orderId: updatedOrder._id } }); } catch(e){console.error('notify admin failed', e);}
+      io.to(`admin_${updatedOrder.assignedBy._id}`).emit(
+        "order_status_updated",
+        updatedOrder
+      );
+
+      try {
+        await createNotification({
+          io,
+          message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`,
+          targetUser: updatedOrder.assignedBy._id,
+          data: { orderId: updatedOrder._id },
+        });
+      } catch (e) {
+        console.error("notify admin failed", e);
+      }
     }
 
-    // Notify delivery boy assigned to this order
+    // Notify delivery boy
     if (updatedOrder.deliveryPersonId) {
-      io.to(updatedOrder.deliveryPersonId.toString())
-        .emit("order_status_updated", updatedOrder);
-      try { await createNotification({ io, message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`, targetUser: updatedOrder.deliveryPersonId, data: { orderId: updatedOrder._id } }); } catch(e){console.error('notify dp failed', e);}
+      io.to(updatedOrder.deliveryPersonId.toString()).emit(
+        "order_status_updated",
+        updatedOrder
+      );
+
+      try {
+        await createNotification({
+          io,
+          message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`,
+          targetUser: updatedOrder.deliveryPersonId,
+          data: { orderId: updatedOrder._id },
+        });
+      } catch (e) {
+        console.error("notify delivery boy failed", e);
+      }
     }
-
-    // // Optional global event
-    // io.emit("order_status_updated_global", updatedOrder);
-
 
     return res.json({
       message: "Status updated successfully",
       order: updatedOrder,
     });
-    
-    // 🔥 Real-time event
- 
-    
-
   } catch (error) {
     console.error("updateOrderStatus Error:", error);
     return res.status(500).json({
-      error: error.message,
       message: "Server error",
+      error: error.message,
     });
   }
 };
+
 
 
 // Delete order
@@ -896,7 +1098,8 @@ exports.deliverySummary = async (req, res) => {
         _id: "$deliveryPersonId",
         totalOrders: { $sum: 1 },
         pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
-        shipped: { $sum: { $cond: [{ $in: ["$status", ["processing", "shipped"]] }, 1, 0] } },
+        processing: { $sum: { $cond: [{ $eq: ["$status", "processing"] }, 1, 0] }},
+        shipped: { $sum: { $cond: [{ $eq: ["$status", "shipped"] }, 1, 0] }},      
         delivered: { $sum: { $cond: [{ $eq: ["$status", "delivered"] }, 1, 0] } },
         completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } }
       }
@@ -917,6 +1120,7 @@ exports.deliverySummary = async (req, res) => {
         deliveryBoyName: "$deliveryBoy.name",
         totalOrders: 1,
         pending: 1,
+        processing: 1,
         shipped: 1,
         delivered: 1,
         completed: 1
@@ -987,15 +1191,14 @@ exports.agentDashboardSummary = async (req, res) => {
 
     const statusCounts = {
       pending: 0,
+      processing: 0,
       shipped: 0,
       delivered: 0,
       completed: 0
     };
 
     counts.forEach(c => {
-      if (c._id === "processing" || c._id === "shipped") {
-        statusCounts.shipped += c.count;
-      } else if (statusCounts[c._id] !== undefined) {
+      if (statusCounts[c._id] !== undefined) {
         statusCounts[c._id] = c.count;
       }
     });

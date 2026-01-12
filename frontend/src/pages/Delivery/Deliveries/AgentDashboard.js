@@ -21,6 +21,7 @@ const AgentDashboard = () => {
   const [greeting, setGreeting] = useState("");
   const [statusCounts, setStatusCounts] = useState({
     pending: 0,
+    processing: 0,
     shipped: 0,
     delivered: 0,
     completed: 0,
@@ -84,6 +85,15 @@ const AgentDashboard = () => {
       color: "bg-orange-50 border-orange-300",
       path: "/agent/deliveries/pending",
     },
+    {
+  key: "processing",
+  label: "Processing",
+  count: statusCounts.processing,
+  icon: <PackageCheck className="w-6 h-6 text-indigo-600" />,
+  color: "bg-indigo-50 border-indigo-300",
+  path: "/agent/deliveries/processing",
+},
+
     {
       key: "shipped",
       label: "Shipped",

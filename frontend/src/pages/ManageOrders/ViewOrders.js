@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect , useCallback} from "react";
 import { Eye, Edit2, Trash2, X, Filter } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import EditOrderModal from "./EditOrderModel";
@@ -28,7 +28,7 @@ const formatPaymentStatus = (status) => {
 const getStatusBadge = (status) => {
   const styles = {
     pending: "bg-yellow-100 text-yellow-700",
-    processing: "bg-blue-100 text-blue-700",
+    processing: "bg-blue-100 text-orange-700",
     shipped: "bg-blue-100 text-blue-700",
     delivered: "bg-purple-100 text-purple-700",
     completed: "bg-green-100 text-green-700",
@@ -39,9 +39,25 @@ const getStatusBadge = (status) => {
 
 const formatStatus = (status) => {
   if (!status) return "";
-  if (status === "processing" || status === "shipped") return "Shipped";
-  return status[0].toUpperCase() + status.slice(1);
+
+  switch (status) {
+    case "pending":
+      return "Pending";
+    case "processing":
+      return "Processing";
+    case "shipped":
+      return "Shipped";
+    case "delivered":
+      return "Delivered";
+    case "completed":
+      return "Completed";
+    case "cancelled":
+      return "Cancelled";
+    default:
+      return status;
+  }
 };
+
 
 /* ================= COMPONENT ================= */
 
@@ -51,6 +67,7 @@ const ViewOrders = () => {
 
   const [statusCounts, setStatusCounts] = useState({
     pending: 0,
+    processing: 0,
     shipped: 0,
     delivered: 0,
     completed: 0,
@@ -69,9 +86,6 @@ const ViewOrders = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [fromDate, setFromDate] = useState("");
 const [toDate, setToDate] = useState("");
-const [month, setMonth] = useState("");
-const [year, setYear] = useState("");
-const [collected, setCollected] = useState("");
 const [collectedFilter, setCollectedFilter] = useState("");
 const handleDateApply = (from, to) => {
   setFromDate(from);
@@ -90,49 +104,50 @@ const handleDateClear = () => {
 
   /* ================= LOAD ORDERS ================= */
 
-const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
-  try {
-    setLoading(true);
+const loadOrders = useCallback(
+  async (page = 1, lim = limit, status = activeTab) => {
+    try {
+      setLoading(true);
 
-    let url = `/orders?page=${page}&limit=${lim}`;
+      let url = `/orders?page=${page}&limit=${lim}`;
 
-    if (status) url += `&status=${status}`;
-    if (fromDate) url += `&from=${fromDate}`;
-    if (toDate) url += `&to=${toDate}`;
+      if (status) url += `&status=${status}`;
+      if (fromDate) url += `&from=${fromDate}`;
+      if (toDate) url += `&to=${toDate}`;
 
-    const res = await apiClient.get(url);
+      const res = await apiClient.get(url);
 
-    setOrders(res.data.data || []);
-    setTotalPages(res.data.totalPages || 1);
-    setCurrentPage(res.data.page || 1);
+      setOrders(res.data.data || []);
+      setTotalPages(res.data.totalPages || 1);
+      setCurrentPage(res.data.page || 1);
 
-    if (res.data.statusCounts) {
-      setStatusCounts(res.data.statusCounts);
+      if (res.data.statusCounts) {
+        setStatusCounts(res.data.statusCounts);
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  },
+  [activeTab, fromDate, toDate, limit]
+);
 
-
-
-  /* ================= EFFECTS ================= */
 
   // tab change
   useEffect(() => {
-    setCurrentPage(1);
-    loadOrders(1, limit, activeTab);
-  }, [activeTab]);
+  setCurrentPage(1);
+  loadOrders(1, limit, activeTab);
+}, [activeTab, limit, loadOrders]);
+
 
   useEffect(() => {
   setCurrentPage(1);
   loadOrders(1, limit, activeTab);
-}, [fromDate, toDate]);
+}, [fromDate, toDate, limit, activeTab, loadOrders]);
 
   // page change
   useEffect(() => {
     loadOrders(currentPage, limit, activeTab);
-  }, [currentPage]);
+  }, [currentPage, limit, activeTab, loadOrders]);
 
   useEffect(() => {
   const onRealtimeEvent = () => {
@@ -148,6 +163,7 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
   socket.on("order_updated", onRealtimeEvent);
   socket.on("order_collected", onRealtimeEvent);
   socket.on("order_status_updated", onRealtimeEvent);
+  socket.on("order_processed", onRealtimeEvent);
 
   socket.on("connect", () => {
     loadOrders(1, limit, activeTab);
@@ -159,9 +175,11 @@ const loadOrders = async (page = 1, lim = limit, status = activeTab) => {
     socket.off("order_updated", onRealtimeEvent);
     socket.off("order_collected", onRealtimeEvent);
     socket.off("order_status_updated", onRealtimeEvent);
+    socket.off("order_processed", onRealtimeEvent);
     socket.off("connect");
+
   };
-}, [currentPage, activeTab]);
+}, [currentPage, activeTab, limit, loadOrders]);
 
   // products
   useEffect(() => {
@@ -193,7 +211,7 @@ useEffect(() => {
   return () => {
     document.removeEventListener("visibilitychange", handleVisibilityChange);
   };
-}, [needsRefresh, currentPage, activeTab]);
+}, [needsRefresh, currentPage, activeTab, limit, loadOrders]);
 
   /* ================= DELETE ================= */
 
@@ -302,7 +320,16 @@ useEffect(() => {
     >
       Pending ({statusCounts.pending})
     </button>
-
+    <button
+      onClick={() => setActiveTab("processing")}
+      className={`px-4 py-2 rounded-lg font-medium ${
+        activeTab === "processing"
+          ? "bg-orange-100 text-orange-800"
+          : "bg-orange-50 text-orange-700"
+      }`}
+    >
+      Processing ({statusCounts.processing})
+    </button>
     <button
       onClick={() => setActiveTab("shipped")}
       className={`px-4 py-2 rounded-lg font-medium ${

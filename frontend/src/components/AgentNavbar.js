@@ -1,28 +1,16 @@
-import React, { useContext, useEffect, useState, useRef } from "react";
+import React, { useEffect, useState} from "react";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { NotificationContext } from "../context/NotificationContext";
 import NotificationBell from "./NotificationBell";
 import socket from "../socket/socketClient";
 import { apiClient } from "../apiclient/apiclient";
 
-/* ================= GREETING ================= */
-const getGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
-  return "Good Evening";
-};
+
 
 const AgentNavbar = () => {
   const navigate = useNavigate();
-  const { notifications = [] } = useContext(NotificationContext) || {};
   const [company, setCompany] = useState(null);
-  const [greeting, setGreeting] = useState("");
-  const ref = useRef(null);
-
-  const user = JSON.parse(localStorage.getItem("user"));
-  const userName = user?.name || "Agent";
+ 
 
   /* ================= LOAD COMPANY ================= */
   useEffect(() => {
@@ -37,20 +25,19 @@ const AgentNavbar = () => {
     loadCompany();
   }, []);
 
-  /* ================= GREETING LOGIC ================= */
-  useEffect(() => {
-    const today = new Date().toDateString();
-    const lastVisit = localStorage.getItem("agentDashboardLastVisit");
 
-    if (lastVisit !== today) {
-      setGreeting(getGreeting());
-      localStorage.setItem("agentDashboardLastVisit", today);
-    } else {
-      setGreeting("Welcome back");
-    }
-  }, []);
+  // useEffect(() => {
+  //   const today = new Date().toDateString();
+  //   const lastVisit = localStorage.getItem("agentDashboardLastVisit");
 
-  /* ================= LOGOUT ================= */
+  //   if (lastVisit !== today) {
+  //     setGreeting(getGreeting());
+  //     localStorage.setItem("agentDashboardLastVisit", today);
+  //   } else {
+  //     setGreeting("Welcome back");
+  //   }
+  // }, []);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");

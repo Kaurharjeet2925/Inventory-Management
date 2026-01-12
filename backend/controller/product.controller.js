@@ -1,89 +1,69 @@
 const Product = require("../models/product.model");
  
-// helper to normalize numeric-like inputs
+/* ================= HELPERS ================= */
 const normalizeNumber = (v) => {
-  if (v === "" || v === undefined || v === null) return null;
+  if (v === "" || v === undefined || v === null) return 0;
   const n = Number(v);
-  return Number.isNaN(n) ? null : n;
+  return Number.isNaN(n) ? 0 : n;
 };
-// ADD PRODUCT
+
+/* ================= ADD PRODUCT ================= */
 exports.addProduct = async (req, res) => {
   try {
-    console.log("[addProduct] === START ===");
-    console.log("[addProduct] req.body:", req.body);
-    console.log("[addProduct] req.files keys:", req.files ? Object.keys(req.files) : "NO FILES OBJECT");
-    
-    if (req.files) {
-      console.log("[addProduct] File details:", {
-        thumbnail: req.files.thumbnail ? req.files.thumbnail.map(f => ({ filename: f.filename, fieldname: f.fieldname })) : null,
-        images: req.files.images ? req.files.images.map(f => ({ filename: f.filename, fieldname: f.fieldname })) : null,
-      });
-    }
-    
     const {
       name,
-      category,
       brand,
+      category,
       quantityValue,
       quantityUnit,
-      totalQuantity,
       mrp,
       price,
       description,
-      location,
       rating,
     } = req.body;
 
-    // validation (required fields)
-    if (!name || !brand || !category) {
-      return res.status(400).json({ message: "Name, brand, and category are required" });
+    let warehouses = req.body.warehouses;
+
+    /* ✅ FIX: parse warehouses correctly */
+    if (typeof warehouses === "string") {
+      warehouses = JSON.parse(warehouses);
     }
 
-    // normalize numeric and optional fields — accept empty strings and convert to null
-    const qValue = normalizeNumber(quantityValue);
-    const tq = normalizeNumber(totalQuantity);
-    const m = normalizeNumber(mrp);
-    const p = normalizeNumber(price);
-    const r = normalizeNumber(rating);
-    const qUnit = quantityUnit === "" || quantityUnit === undefined ? null : quantityUnit;
+    if (!Array.isArray(warehouses) || warehouses.length === 0) {
+      return res.status(400).json({
+        message: "At least one warehouse is required",
+      });
+    }
 
-    // Thumbnail (single)
-    const thumbnail = req.files?.thumbnail
-      ? req.files.thumbnail[0].filename
-      : null;
+    /* ✅ SANITIZE WAREHOUSES */
+    const cleanedWarehouses = warehouses
+      .filter(w => w.locationId && w.quantity >= 0)
+      .map(w => ({
+        location: w.locationId,
+        quantity: normalizeNumber(w.quantity),
+      }));
 
-    // Upload image (single)
-    const uploadImage = req.files?.uploadImage
-      ? req.files.uploadImage[0].filename
-      : null;
+    /* ================= FILES ================= */
+    const thumbnail = req.files?.thumbnail?.[0]?.filename || null;
 
-    // Product images (multiple)
     const images = req.files?.images
-      ? req.files.images.map((img) => img.filename)
+      ? req.files.images.map(f => f.filename)
       : [];
 
-    console.log("[addProduct] Extracted - thumbnail:", thumbnail, "images:", images);
-
-    const productData = {
+    const product = await Product.create({
       name,
-      category,
       brand,
-      quantityValue: qValue,
-      quantityUnit: qUnit,
-      totalQuantity: tq,
-      mrp: m,
-      price: p,
+      category,
+      quantityValue: normalizeNumber(quantityValue),
+      quantityUnit: quantityUnit || null,
+      mrp: normalizeNumber(mrp),
+      price: normalizeNumber(price),
       description,
-      location,
-      rating: r,
+      rating: normalizeNumber(rating),
+      warehouses: cleanedWarehouses,
       thumbnail,
       images,
-    };
-
-    const product = await Product.create(productData);
-
-    console.log("[addProduct] Product created:", { id: product._id, thumbnail: product.thumbnail, images: product.images });
-    console.log("[addProduct] === END ===");
+    });
 
     res.status(201).json({
       message: "Product added successfully",
@@ -95,22 +75,22 @@ exports.addProduct = async (req, res) => {
   }
 };
 
+
 // GET ALL PRODUCTS
 exports.getProducts = async (req, res) => {
   try {
-    console.log("[getProducts] Fetching all products...");
     const products = await Product.find()
       .populate("brand", "name")
       .populate("category", "name")
-      .populate("location", "name address")
+      .populate("warehouses.location", "name address")
       .sort({ createdAt: -1 });
-    console.log("[getProducts] Found", products.length, "products");
+
     res.json(products);
   } catch (error) {
-    console.error("[getProducts] Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
+
 
 // UPDATE PRODUCT
 const fs = require("fs");
@@ -119,69 +99,58 @@ const path = require("path");
 exports.updateProduct = async (req, res) => {
   try {
     const id = req.params.id;
-
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
     let updateData = { ...req.body };
 
-    /* ---------------- THUMBNAIL UPDATE ---------------- */
-    if (req.files?.thumbnail?.length) {
-      // delete old thumbnail
-      if (product.thumbnail) {
-        const oldThumbPath = path.join(__dirname, "../uploads", product.thumbnail);
-        if (fs.existsSync(oldThumbPath)) fs.unlinkSync(oldThumbPath);
-      }
+    /* ---------------- NORMALIZE NUMBERS ---------------- */
+    const numericFields = [
+      "mrp",
+      "price",
+      "quantityValue",
+      "totalQuantity",
+      "rating",
+    ];
 
-      updateData.thumbnail = req.files.thumbnail[0].filename;
-    }
-
-    /* ---------------- HANDLE DELETED IMAGES ---------------- */
-    const deletedImages = req.body.deletedImages
-      ? JSON.parse(req.body.deletedImages)
-      : [];
-
-    let updatedImages = [...(product.images || [])];
-
-    if (deletedImages.length) {
-      updatedImages = updatedImages.filter((img) => !deletedImages.includes(img));
-
-      // delete from filesystem
-      deletedImages.forEach((img) => {
-        const imgPath = path.join(__dirname, "../uploads", img);
-        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
-      });
-    }
-
-    /* ---------------- HANDLE NEW IMAGES ---------------- */
-    if (req.files?.images?.length) {
-      const newImages = req.files.images.map((img) => img.filename);
-      updatedImages = [...updatedImages, ...newImages];
-    }
-
-    updateData.images = updatedImages;
-
-    /* ---------------- NORMALIZE NUMERIC FIELDS ---------------- */
-    const numericFields = ["mrp", "price", "quantityValue", "totalQuantity", "rating"];
     numericFields.forEach((field) => {
       if (Object.prototype.hasOwnProperty.call(updateData, field)) {
         updateData[field] = normalizeNumber(updateData[field]);
       }
     });
 
+    /* ---------------- NORMALIZE UNIT ---------------- */
     if (Object.prototype.hasOwnProperty.call(updateData, "quantityUnit")) {
       updateData.quantityUnit =
-        updateData.quantityUnit === "" ? null : updateData.quantityUnit;
+        updateData.quantityUnit === "" || updateData.quantityUnit === "null"
+          ? null
+          : updateData.quantityUnit;
     }
 
-    /* ---------------- UPDATE PRODUCT ---------------- */
-    const updatedProduct = await Product.findByIdAndUpdate(id, updateData, {
-      new: true,
-    })
+    /* ---------------- WAREHOUSES ---------------- */
+    if (updateData.warehouses && typeof updateData.warehouses === "string") {
+      updateData.warehouses = JSON.parse(updateData.warehouses);
+    }
+
+    if (Array.isArray(updateData.warehouses)) {
+      updateData.warehouses = updateData.warehouses.map((w) => ({
+        location: w.locationId || w.location,
+        quantity: normalizeNumber(w.quantity) || 0,
+      }));
+
+      // ✅ auto-calc totalQuantity from warehouses
+      updateData.totalQuantity = updateData.warehouses.reduce(
+        (sum, w) => sum + (w.quantity || 0),
+        0
+      );
+    }
+
+    /* ---------------- UPDATE ---------------- */
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    )
       .populate("brand", "name")
-      .populate("category", "name");
+      .populate("category", "name")
+      .populate("warehouses.location", "name address");
 
     res.json({
       message: "Product updated successfully",
@@ -192,6 +161,48 @@ exports.updateProduct = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+exports.transferStock = async (req, res) => {
+  const { fromLocationId, toLocationId, quantity } = req.body;
+  const product = await Product.findById(req.params.productId);
+
+  if (!product) {
+    return res.status(404).json({ message: "Product not found" });
+  }
+
+  if (fromLocationId === toLocationId) {
+    return res.status(400).json({ message: "Same source & destination" });
+  }
+
+  const fromWarehouse = product.warehouses.find(
+    w => w.locationId.toString() === fromLocationId
+  );
+
+  if (!fromWarehouse || fromWarehouse.quantity < quantity) {
+    return res.status(400).json({ message: "Insufficient stock" });
+  }
+
+  // deduct from source
+  fromWarehouse.quantity -= quantity;
+
+  // add to destination
+  const toWarehouse = product.warehouses.find(
+    w => w.locationId.toString() === toLocationId
+  );
+
+  if (toWarehouse) {
+    toWarehouse.quantity += quantity;
+  } else {
+    product.warehouses.push({
+      locationId: toLocationId,
+      quantity
+    });
+  }
+
+  await product.save();
+
+  res.json({ message: "Stock transferred successfully" });
+};
+
 
 
 // DELETE PRODUCT

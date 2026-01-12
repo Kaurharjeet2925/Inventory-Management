@@ -79,17 +79,29 @@ const [currentPage, setCurrentPage] = useState(1);
     setTopProducts(res.data.topProducts || []);
     setTable(res.data.table || []);
   };
-  const filteredTable = table.filter((row) => {
-  const q = search.toLowerCase();
-  
+  const safeLower = (value) =>
+  String(value ?? "").toLowerCase();
+
+const getProductSearchText = (productName) => {
+  if (Array.isArray(productName)) {
+    // join all product names into one searchable string
+    return productName.join(" ");
+  }
+  return productName;
+};
+
+const filteredTable = table.filter((row) => {
+  const q = safeLower(search);
+
   return (
-    row.orderId?.toLowerCase().includes(q) ||
-    row.clientName?.toLowerCase().includes(q) ||
-    row.productName?.toLowerCase().includes(q) ||
-    row.orderStatus?.toLowerCase().includes(q) ||
-    row.paymentStatus?.toLowerCase().includes(q)
+    safeLower(row.orderId).includes(q) ||
+    safeLower(row.clientName).includes(q) ||
+    safeLower(getProductSearchText(row.productName)).includes(q) ||
+    safeLower(row.orderStatus).includes(q) ||
+    safeLower(row.paymentStatus).includes(q)
   );
 });
+
 const totalPages = Math.ceil(filteredTable.length / pageSize);
 
 const paginatedTable = filteredTable.slice(

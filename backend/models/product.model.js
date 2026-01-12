@@ -3,27 +3,62 @@ const mongoose = require("mongoose");
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    brand: { type: mongoose.Schema.Types.ObjectId, ref: "Brand" },
-    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category" },
-    quantityValue: { type: Number, default: 0 },
+
+    brand: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Brand",
+      required: true,
+    },
+
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      required: true,
+    },
+
+    quantityValue: { type: Number },
     quantityUnit: { type: String },
-    totalQuantity: { type: Number, default: 1 },
+
+    /* ✅ MULTI WAREHOUSE STOCK */
+    warehouses: [
+      {
+        location: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Location",
+          required: true,
+        },
+        quantity: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+      },
+    ],
+
+    /* ✅ DERIVED FIELD */
+    totalQuantity: {
+      type: Number,
+      default: 0,
+    },
+
     mrp: { type: Number },
     price: { type: Number },
     description: { type: String },
     rating: { type: Number, default: 0 },
-//     location: {
-//   type: String,
-//   enum: ["WAREHOUSE-A", "WAREHOUSE-B", "WAREHOUSE-C", "WAREHOUSE-D"],
-//   default: "WAREHOUSE-A"
-// }
-location: { type: mongoose.Schema.Types.ObjectId, ref: "Location" },
 
-
-    thumbnail: { type: String }, 
-    images: [String],            
+    thumbnail: { type: String },
+    images: [String],
   },
   { timestamps: true }
 );
+
+/* ✅ AUTO CALCULATE TOTAL STOCK */
+productSchema.pre("save", function (next) {
+  this.totalQuantity = this.warehouses.reduce(
+    (sum, w) => sum + Number(w.quantity || 0),
+    0
+  );
+  next();
+});
 
 module.exports = mongoose.model("Product", productSchema);
