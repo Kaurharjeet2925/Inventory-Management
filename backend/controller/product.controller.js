@@ -162,48 +162,54 @@ exports.updateProduct = async (req, res) => {
   }
 };
 exports.transferStock = async (req, res) => {
-  const { fromLocationId, toLocationId, quantity } = req.body;
-  const product = await Product.findById(req.params.productId);
+  try {
+    const { fromLocationId, toLocationId, quantity } = req.body;
+    const product = await Product.findById(req.params.productId);
 
-  if (!product) {
-    return res.status(404).json({ message: "Product not found" });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    if (fromLocationId === toLocationId) {
+      return res.status(400).json({ message: "Same source & destination" });
+    }
+
+    const fromWarehouse = product.warehouses.find(
+      w =>
+        w.locationId?.toString() === fromLocationId ||
+        w.location?._id?.toString() === fromLocationId
+    );
+
+    if (!fromWarehouse || fromWarehouse.quantity < quantity) {
+      return res.status(400).json({ message: "Insufficient stock" });
+    }
+
+    // deduct stock
+    fromWarehouse.quantity -= quantity;
+
+    const toWarehouse = product.warehouses.find(
+      w =>
+        w.locationId?.toString() === toLocationId ||
+        w.location?._id?.toString() === toLocationId
+    );
+
+    if (toWarehouse) {
+      toWarehouse.quantity += quantity;
+    } else {
+      product.warehouses.push({
+        locationId: toLocationId,
+        quantity,
+      });
+    }
+
+    await product.save();
+
+    res.json({ message: "Stock transferred successfully" });
+  } catch (err) {
+    console.error("Transfer error:", err);
+    res.status(500).json({ message: "Transfer failed" });
   }
-
-  if (fromLocationId === toLocationId) {
-    return res.status(400).json({ message: "Same source & destination" });
-  }
-
-  const fromWarehouse = product.warehouses.find(
-    w => w.locationId.toString() === fromLocationId
-  );
-
-  if (!fromWarehouse || fromWarehouse.quantity < quantity) {
-    return res.status(400).json({ message: "Insufficient stock" });
-  }
-
-  // deduct from source
-  fromWarehouse.quantity -= quantity;
-
-  // add to destination
-  const toWarehouse = product.warehouses.find(
-    w => w.locationId.toString() === toLocationId
-  );
-
-  if (toWarehouse) {
-    toWarehouse.quantity += quantity;
-  } else {
-    product.warehouses.push({
-      locationId: toLocationId,
-      quantity
-    });
-  }
-
-  await product.save();
-
-  res.json({ message: "Stock transferred successfully" });
 };
-
-
 
 // DELETE PRODUCT
 exports.deleteProduct = async (req, res) => {

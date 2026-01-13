@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { Package, AlertTriangle, XCircle, BarChart3,Move } from "lucide-react";
 import AddLocationModal from "./components/AddLocation";
 import AddProducts from "./components/AddProducts";
+import TransferStockModal from "./components/TransferStockModal";
 const DEFAULT_UNITS = ["piece", "packet", "kg", "ltr", "gm"];
 
 const Product = () => {
@@ -17,11 +18,6 @@ const Product = () => {
   const [locations, setLocations] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-const [mode, setMode] = useState("add"); // add | transfer
-const [transferProduct, setTransferProduct] = useState(null);
-const [transferFrom, setTransferFrom] = useState("");
-const [transferTo, setTransferTo] = useState("");
-const [transferQty, setTransferQty] = useState("");
 
   const [thumbnailPreview, setThumbnailPreview] = useState("");
   const [imagesPreview, setImagesPreview] = useState([]);
@@ -29,6 +25,14 @@ const [transferQty, setTransferQty] = useState("");
   const [newLocationName, setNewLocationName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [deletedImages, setDeletedImages] = useState([]);
+
+  // 🔥 TRANSFER MODAL STATES
+const [showTransferModal, setShowTransferModal] = useState(false);
+const [transferProduct, setTransferProduct] = useState(null);
+const [transferFrom, setTransferFrom] = useState("");
+const [transferTo, setTransferTo] = useState("");
+const [transferQty, setTransferQty] = useState("");
+
 const getTotalStock = (warehouses = []) =>
   warehouses.reduce((sum, w) => sum + Number(w.quantity || 0), 0);
 
@@ -230,34 +234,6 @@ const handleImages = (e) => {
   // reset input so same file can be reselected
   e.target.value = "";
 };
-const handleTransferStock = async () => {
-  if (!transferFrom || !transferTo || !transferQty) {
-    toast.error("All fields are required");
-    return;
-  }
-
-  if (transferFrom === transferTo) {
-    toast.error("Source and destination cannot be same");
-    return;
-  }
-
-  try {
-    await apiClient.put(`/product/transfer/${transferProduct._id}`, {
-      fromLocationId: transferFrom,
-      toLocationId: transferTo,
-      quantity: Number(transferQty),
-    });
-
-    toast.success("Stock transferred successfully");
-    setShowLocationModal(false);
-    setTransferFrom("");
-    setTransferTo("");
-    setTransferQty("");
-    fetchAll();
-  } catch (err) {
-    toast.error(err.response?.data?.message || "Transfer failed");
-  }
-};
 
 const removeImage = (index) => {
   const img = imagesPreview[index];
@@ -338,6 +314,40 @@ const removeImage = (index) => {
   }
 };
 
+const handleTransferStock = async () => {
+  if (!transferFrom || !transferTo || !transferQty) {
+    toast.error("All fields are required");
+    return;
+  }
+
+  if (transferFrom === transferTo) {
+    toast.error("Source and destination cannot be same");
+    return;
+  }
+
+  try {
+    await apiClient.put(
+      `/product/transfer/${transferProduct._id}`,
+      {
+        fromLocationId: transferFrom,
+        toLocationId: transferTo,
+        quantity: Number(transferQty),
+      }
+    );
+
+    toast.success("Stock transferred successfully");
+    fetchAll();
+
+    setShowTransferModal(false);
+    setTransferProduct(null);
+    setTransferFrom("");
+    setTransferTo("");
+    setTransferQty("");
+
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Transfer failed");
+  }
+};
 
 
   return (
@@ -575,18 +585,19 @@ if (sortBy === "qty-high")
                     {/* ACTIONS */}
                     <td className="p-2 sm:p-4">
                       <div className="flex justify-center gap-2">
-            <button
-  onClick={() => {
-    setTransferProduct(p);
-    setMode("transfer");
-    setShowLocationModal(true);
-  }}
+                        <button
+ 
+   onClick={() => {
+  setTransferProduct(p);
+  setShowTransferModal(true);
+}}
+
+
   className="p-1.5 sm:p-2 rounded-full text-purple-600 hover:bg-purple-100 transition border border-purple-200"
   title="Transfer Stock"
 >
-  <Move className="w-4 h-4" />
+  <Move />
 </button>
-
 
                         <button
                           onClick={() => openEdit(p)}
@@ -643,38 +654,21 @@ if (sortBy === "qty-high")
   isEdit={!!editingId}             // ✅ ADD vs EDIT
 />
 
-     {showLocationModal && (
-  <AddLocationModal
-    show={showLocationModal}
-    onClose={() => {
-      setShowLocationModal(false);
-      setMode("add");
-      setNewLocationName("");
-      setNewAddress("");
-    }}
-
-    /* ADD / EDIT */
-    locationName={newLocationName}
-    address={newAddress}
-    setLocationName={setNewLocationName}
-    setAddress={setNewAddress}
-    isEdit={false}
-
-    /* 🔥 TRANSFER */
-    mode={mode}
-    locations={locations}
-    product={transferProduct}
-    transferFrom={transferFrom}
-    transferTo={transferTo}
-    transferQty={transferQty}
-    setTransferFrom={setTransferFrom}
-    setTransferTo={setTransferTo}
-    setTransferQty={setTransferQty}
-
-    onSave={mode === "transfer" ? handleTransferStock : handleAddLocationFromProduct}
-  />
-)}
-
+      {showLocationModal && (
+        <AddLocationModal
+          show={showLocationModal}
+          onClose={() => {
+            setShowLocationModal(false);
+            setNewLocationName("");
+            setNewAddress("");
+          }}
+          locationName={newLocationName}
+          address={newAddress}
+          setLocationName={setNewLocationName}
+          setAddress={setNewAddress}
+          onSave={handleAddLocationFromProduct}
+        />
+      )}
 
       {/* FOOTER */}
       {/* <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
@@ -695,6 +689,33 @@ if (sortBy === "qty-high")
 
     </div>
   </div>
+)}
+   {/* ================= TRANSFER STOCK MODAL ================= */}
+{showTransferModal && (
+  <TransferStockModal
+    show={showTransferModal}
+    product={transferProduct}
+    locations={locations}
+
+    transferFrom={transferFrom}
+    setTransferFrom={setTransferFrom}
+
+    transferTo={transferTo}
+    setTransferTo={setTransferTo}
+
+    transferQty={transferQty}
+    setTransferQty={setTransferQty}
+
+    onClose={() => {
+      setShowTransferModal(false);
+      setTransferProduct(null);
+      setTransferFrom("");
+      setTransferTo("");
+      setTransferQty("");
+    }}
+
+    onTransfer={handleTransferStock}
+  />
 )}
 
     </div>
