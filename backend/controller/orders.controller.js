@@ -142,17 +142,37 @@ exports.createOrder = async (req, res) => {
 
 
 
-   const paid = Math.max(Number(paymentDetails?.paidAmount) || 0, 0);
-const balance = Math.max(totalAmount - paid, 0);
+ // ---------------- PAYMENT DETAILS ----------------
+const discount = Math.max(Number(paymentDetails?.discount || 0), 0);
 
+// ensure payments array
+const payments = Array.isArray(paymentDetails?.payments)
+  ? paymentDetails.payments
+  : [];
+
+// calculate paid from payment modes
+const paid = payments.reduce(
+  (sum, p) => sum + Number(p.amount || 0),
+  0
+);
+
+// payable after discount
+const payable = Math.max(totalAmount - discount, 0);
+
+// balance
+const balance = Math.max(payable - paid, 0);
+
+// final payment object (ENUM SAFE ✅)
 const finalPaymentDetails = {
   totalAmount,
+  discount,
+  payments,
   paidAmount: paid,
   balanceAmount: balance,
   paymentStatus:
     paid === 0
-      ? "cod"
-      : paid >= totalAmount
+      ? "unpaid"
+      : paid >= payable
       ? "paid"
       : "partial",
 };
@@ -485,81 +505,122 @@ exports.updateOrder = async (req, res) => {
 
 exports.updateOrderPayment = async (req, res) => {
   try {
-    const { paidAmount } = req.body;
+    const { payment, discount } = req.body;
     const orderId = req.params.id;
 
-    if (!paidAmount || Number(paidAmount) <= 0) {
-      return res.status(400).json({ message: "Invalid payment amount" });
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
     }
 
-    const order = await Order.findById(orderId)
-      .populate("clientId", "name phone address")
-      .populate("deliveryPersonId", "name phone")
-      .populate("assignedBy", "name role");
-
-    if (!order) return res.status(404).json({ message: "Order not found" });
-
-    // ✅ Ensure paymentDetails exists
+    /* ================= ENSURE PAYMENT STRUCTURE ================= */
     if (!order.paymentDetails) {
-      const calculatedTotal = order.items.reduce(
-        (sum, item) => sum + Number(item.totalPrice || item.price * item.quantity || 0),
+      const total = order.items.reduce(
+        (sum, i) =>
+          sum + Number(i.totalPrice || i.price * i.quantity || 0),
         0
       );
 
       order.paymentDetails = {
-        totalAmount: calculatedTotal,
+        totalAmount: total,
+        discount: 0,
+        payments: [],
         paidAmount: 0,
-        balanceAmount: calculatedTotal,
-        paymentStatus: "unpaid",
+        balanceAmount: total,
+        paymentStatus: "unpaid"
       };
     }
 
-    const totalAmount = Number(order.paymentDetails.totalAmount);
-    const previousPaid = Number(order.paymentDetails.paidAmount || 0);
-    const addedPaid = Number(paidAmount);
+    if (!Array.isArray(order.paymentDetails.payments)) {
+      order.paymentDetails.payments = [];
+    }
 
-    const finalPaid = previousPaid + addedPaid;
-    const balance = Math.max(totalAmount - finalPaid, 0);
+    /* ================= APPLY DISCOUNT ================= */
+    if (discount !== undefined) {
+      const discountValue = Number(discount) || 0;
 
-  let paymentStatus = order.status === "completed" ? "unpaid" : "cod";
+      if (discountValue < 0) {
+        return res.status(400).json({
+          message: "Discount cannot be negative"
+        });
+      }
 
-   if (finalPaid >= totalAmount) paymentStatus = "paid";
-   else if (finalPaid > 0) paymentStatus = "partial";
+      if (discountValue > order.paymentDetails.totalAmount) {
+        return res.status(400).json({
+          message: "Discount cannot exceed total amount"
+        });
+      }
 
+      order.paymentDetails.discount = discountValue;
+    }
 
-    order.paymentDetails = {
-      totalAmount,
-      paidAmount: finalPaid,
-      balanceAmount: balance,
-      paymentStatus,
-    };
+    /* ================= ADD PAYMENT ================= */
+    if (payment) {
+      const amount = Number(payment.amount);
+
+      if (!payment.mode || !amount || amount <= 0) {
+        return res.status(400).json({
+          message: "Invalid payment data"
+        });
+      }
+
+      // calculate current payable
+      const payable =
+        order.paymentDetails.totalAmount -
+        order.paymentDetails.discount;
+
+      const alreadyPaid = order.paymentDetails.payments.reduce(
+        (sum, p) => sum + Number(p.amount || 0),
+        0
+      );
+
+      if (alreadyPaid + amount > payable) {
+        return res.status(400).json({
+          message: `Cannot collect more than ₹${payable - alreadyPaid}`
+        });
+      }
+
+      order.paymentDetails.payments.push({
+        mode: payment.mode,
+        amount
+      });
+    }
+
+    /* ================= RE-CALCULATE TOTALS ================= */
+    const totalPaid = order.paymentDetails.payments.reduce(
+      (sum, p) => sum + Number(p.amount || 0),
+      0
+    );
+
+    const payable =
+      order.paymentDetails.totalAmount -
+      order.paymentDetails.discount;
+
+    order.paymentDetails.paidAmount = totalPaid;
+    order.paymentDetails.balanceAmount = Math.max(
+      payable - totalPaid,
+      0
+    );
+
+    order.paymentDetails.paymentStatus =
+      totalPaid === 0
+        ? "unpaid"
+        : totalPaid >= payable
+        ? "paid"
+        : "partial";
 
     await order.save();
 
-    const io = req.app.get("io");
-
-    // 🔔 Notify admin
-    if (order.assignedBy) {
-      io.to(`admin_${order.assignedBy._id}`).emit("order_updated", order);
-      try { await createNotification({ io, message: `Payment updated for ${order.orderId}`, targetUser: order.assignedBy._id, data: { orderId: order._id } }); } catch(e){console.error('notify admin failed', e);}
-    }
-
-    // 🔔 Notify delivery boy
-    if (order.deliveryPersonId) {
-      io.to(order.deliveryPersonId._id.toString()).emit("order_updated", order);
-      try { await createNotification({ io, message: `Payment updated for ${order.orderId}`, targetUser: order.deliveryPersonId._id, data: { orderId: order._id } }); } catch(e){console.error('notify dp failed', e);}
-    }
-
     return res.json({
       message: "Payment updated successfully",
-      order,
+      order
     });
 
   } catch (error) {
     console.error("updateOrderPayment error:", error);
     return res.status(500).json({
       message: "Payment update failed",
-      error: error.message,
+      error: error.message
     });
   }
 };

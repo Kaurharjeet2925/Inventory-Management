@@ -6,8 +6,7 @@ const inputClass =
   "w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 " +
   "focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 transition";
 
-const labelClass =
-  "block text-sm font-medium text-slate-600 mb-1";
+const labelClass = "block text-sm font-medium text-slate-600 mb-1";
 
 const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
   const [formData, setFormData] = useState({
@@ -20,24 +19,41 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     state: "",
     zipCode: "",
     country: "",
+    openingBalance: 0,
   });
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  /* ================= PREFILL ON EDIT ================= */
+  /* ================= PREFILL ================= */
   useEffect(() => {
     if (isEdit && clientData) {
-      setFormData({ ...clientData });
+      setFormData({
+        name: clientData.name || "",
+        email: clientData.email || "",
+        phone: clientData.phone || "",
+        companyName: clientData.companyName || "",
+        address: clientData.address || "",
+        city: clientData.city || "",
+        state: clientData.state || "",
+        zipCode: clientData.zipCode || "",
+        country: clientData.country || "",
+        openingBalance: clientData.openingBalance ?? 0,
+      });
     } else {
       resetForm();
     }
-  },  [isOpen, clientData, isEdit]);
+  }, [isOpen, clientData, isEdit]);
 
   /* ================= HANDLERS ================= */
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "openingBalance" ? Number(value || 0) : value,
+    }));
+
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -48,6 +64,8 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
       newErrors.email = "Invalid email";
     if (!formData.phone.trim()) newErrors.phone = "Phone is required";
+    if (formData.openingBalance < 0)
+      newErrors.openingBalance = "Opening balance cannot be negative";
     return newErrors;
   };
 
@@ -61,18 +79,15 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
 
     setLoading(true);
     try {
-      let response;
+      let res;
       if (isEdit) {
-        response = await apiClient.put(
-          `/clients/${clientData._id}`,
-          formData
-        );
+        res = await apiClient.put(`/clients/${clientData._id}`, formData);
         toast.success("Client updated successfully");
-        onAddClient(response.data?.client, true);
+        onAddClient(res.data?.client, true);
       } else {
-        response = await apiClient.post("/clients", formData);
+        res = await apiClient.post("/clients", formData);
         toast.success("Client added successfully");
-        onAddClient(response.data?.client, false);
+        onAddClient(res.data?.client, false);
       }
       resetForm();
       onClose();
@@ -94,6 +109,7 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
       state: "",
       zipCode: "",
       country: "",
+      openingBalance: 0,
     });
     setErrors({});
   };
@@ -106,17 +122,16 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
       <div className="bg-white rounded-xl shadow-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto">
 
         {/* HEADER */}
-        <div className="px-6 py-4 bg-gray-100 border-b border-slate-200 flex justify-between items-center sticky top-0">
+        <div className="px-6 py-4 bg-gray-100 border-b flex justify-between items-center sticky top-0">
           <h2 className="text-lg font-semibold text-slate-800">
             {isEdit ? "Edit Client" : "Add New Client"}
           </h2>
-
           <button
             onClick={() => {
               resetForm();
               onClose();
             }}
-            className="text-slate-500 hover:text-slate-700 text-xl"
+            className="text-xl text-slate-500 hover:text-slate-700"
           >
             ✕
           </button>
@@ -129,60 +144,28 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className={labelClass}>Name *</label>
-              <input
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className={`${inputClass} ${
-                  errors.name ? "border-red-500" : ""
-                }`}
-              />
-              {errors.name && (
-                <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-              )}
+              <input name="name" value={formData.name} onChange={handleChange} className={inputClass} />
+              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
             </div>
 
             <div>
               <label className={labelClass}>Email *</label>
-              <input
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                className={`${inputClass} ${
-                  errors.email ? "border-red-500" : ""
-                }`}
-              />
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-              )}
+              <input name="email" value={formData.email} onChange={handleChange} className={inputClass} />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
           </div>
 
           {/* ROW 2 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className={labelClass}>Company Name</label>
-              <input
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleChange}
-                className={inputClass}
-              />
+              <label className={labelClass}>Phone *</label>
+              <input name="phone" value={formData.phone} onChange={handleChange} className={inputClass} />
+              {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
             </div>
 
             <div>
-              <label className={labelClass}>Phone *</label>
-              <input
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className={`${inputClass} ${
-                  errors.phone ? "border-red-500" : ""
-                }`}
-              />
-              {errors.phone && (
-                <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
-              )}
+              <label className={labelClass}>Company Name</label>
+              <input name="companyName" value={formData.companyName} onChange={handleChange} className={inputClass} />
             </div>
           </div>
 
@@ -190,83 +173,58 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className={labelClass}>Address</label>
-              <input
-                name="address"
-                value={formData.address}
-                onChange={handleChange}
-                className={inputClass}
-              />
+              <input name="address" value={formData.address} onChange={handleChange} className={inputClass} />
             </div>
 
             <div>
               <label className={labelClass}>City</label>
-              <input
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className={inputClass}
-              />
+              <input name="city" value={formData.city} onChange={handleChange} className={inputClass} />
             </div>
           </div>
 
           {/* ROW 4 */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className={labelClass}>State</label>
-              <input
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                className={inputClass}
-              />
+              <input name="state" value={formData.state} onChange={handleChange} className={inputClass} />
             </div>
 
             <div>
               <label className={labelClass}>Zip Code</label>
-              <input
-                name="zipCode"
-                value={formData.zipCode}
-                onChange={handleChange}
-                className={inputClass}
-              />
+              <input name="zipCode" value={formData.zipCode} onChange={handleChange} className={inputClass} />
+            </div>
+          </div>
+
+          {/* ROW 5 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className={labelClass}>Country</label>
+              <input name="country" value={formData.country} onChange={handleChange} className={inputClass} />
             </div>
 
             <div>
-              <label className={labelClass}>Country</label>
+              <label className={labelClass}>Opening Balance</label>
               <input
-                name="country"
-                value={formData.country}
+                type="number"
+                min="0"
+                name="openingBalance"
+                value={formData.openingBalance}
                 onChange={handleChange}
                 className={inputClass}
               />
+              {errors.openingBalance && (
+                <p className="text-red-500 text-xs mt-1">{errors.openingBalance}</p>
+              )}
             </div>
           </div>
 
           {/* FOOTER */}
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                onClose();
-              }}
-              className="px-5 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100"
-            >
+            <button type="button" onClick={onClose} className="px-5 py-2 border rounded-md">
               Cancel
             </button>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-2 rounded-md bg-blue-900 text-white hover:bg-amber-500 disabled:opacity-50"
-            >
-              {loading
-                ? isEdit
-                  ? "Updating..."
-                  : "Adding..."
-                : isEdit
-                ? "Update Client"
-                : "Add Client"}
+            <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-900 text-white rounded-md">
+              {loading ? "Saving..." : isEdit ? "Update Client" : "Add Client"}
             </button>
           </div>
 

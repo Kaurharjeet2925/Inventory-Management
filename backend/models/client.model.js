@@ -13,6 +13,10 @@ const clientSchema = new Schema(
     zipCode: { type: String, trim: true },
     country: { type: String, trim: true },
     notes: { type: String },
+    openingBalance: {
+      type: Number,
+      default: 0
+    },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Users" },
   },
   { timestamps: true }

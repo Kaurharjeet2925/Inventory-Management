@@ -19,10 +19,15 @@ const CreateOrders = () => {
   const [rawProducts, setRawProducts] = useState([]);
   const [warehouseOptions, setWarehouseOptions] = useState([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
+   const [payments, setPayments] = useState([
+  { mode: "Cash", amount: 0 },
+]);
+
+const [discount, setDiscount] = useState(0);
 
   const [amountData, setAmountData] = useState({
     totalAmount: "",
-    paidAmount: "",
+  
     balanceAmount: "",
     paymentStatus: "COD",
   });
@@ -351,6 +356,21 @@ const selectedWarehouse = warehouseOptions.find(
   }));
 }, [amountData.totalAmount, amountData.paidAmount]);
 
+const totalPaid = payments.reduce(
+  (sum, p) => sum + Number(p.amount || 0),
+  0
+);
+
+const payable = Math.max(amountData.totalAmount - discount, 0);
+
+const balance = Math.max(payable - totalPaid, 0);
+
+const paymentStatus =
+  totalPaid === 0
+    ? "unpaid"
+    : totalPaid >= payable
+    ? "paid"
+    : "partial";
 
   /* -------------------------------------------------------
       SUBMIT ORDER
@@ -369,13 +389,19 @@ const selectedWarehouse = warehouseOptions.find(
   deliveryPersonId: selectedDeliveryPersonId,
 
   paymentDetails: {
-    paidAmount: Number(amountData.paidAmount) || 0,
+    totalAmount: amountData.totalAmount,
+    discount,
+    payments,              // [{ mode: "Cash", amount: 0 }]
+    paidAmount: totalPaid,
+    balanceAmount: balance,
+    paymentStatus,         // unpaid | partial | paid
   },
 
   items: orderItems,
   notes: formData.notes,
   status: "pending",
 };
+
 
     try {
       await apiClient.post("/orders", payload);
@@ -396,9 +422,10 @@ const selectedWarehouse = warehouseOptions.find(
         totalAmount: "",
         paidAmount: "",
         balanceAmount: "",
-        paymentStatus: "cod",
+       
       });
-
+      setPayments([{ mode: "Cash", amount: 0 }]);
+      setDiscount(0);
       setSelectedWarehouseId("");
       setWarehouseOptions([]);
 
@@ -677,62 +704,162 @@ const selectedWarehouse = warehouseOptions.find(
       </div>
 
       {/* PAYMENT */}
-<div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
-        <h2 className="text-lg font-semibold text-slate-800 ">Payment Details</h2>
+{/* PAYMENT SECTION */}
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
 
-           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end
-                        bg-gray-50  mb-4">
+  {/* LEFT — PAYMENTS COLLECTED */}
+  <div className="bg-white rounded-2xl p-6 shadow-md border">
 
-          <div className="md:col-span-3">
-                 <label className={labelClass}>Total Amount</label>
-              <input
-                type="number"
-                value={amountData.totalAmount}
-                onChange={(e) =>
-                  setAmountData({ ...amountData, totalAmount: e.target.value })
-                }
-                className={inputClass}
-              />
-            </div>
+    {/* HEADER */}
+    <div className="flex justify-between items-center mb-4">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-800">
+          Payments Collected
+        </h3>
+        <p className="text-xs text-slate-500">
+          Add multiple payment modes if applicable
+        </p>
+      </div>
 
-            <div className="md:col-span-3">
-                <label className={labelClass}>Paid Amount</label>
-              <input
-                type="number"
-                value={amountData.paidAmount}
-                onChange={(e) =>
-                 setAmountData({
-                   ...amountData,
-                paidAmount: Number(e.target.value) || 0,
-                })
-               }
+      <button
+        type="button"
+        onClick={() =>
+          setPayments([...payments, { mode: "Cash", amount: "" }])
+        }
+        className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700"
+      >
+        + Add Mode
+      </button>
+    </div>
 
-                className={inputClass}
-              />
-            </div>
+    {/* PAYMENT ROWS */}
+    <div className="space-y-3">
+      {payments.map((p, index) => (
+        <div
+          key={index}
+          className="flex items-center gap-3 bg-gray-50 p-3 rounded-xl border"
+        >
+          {/* MODE */}
+          <select
+            className="w-32 border rounded-md px-3 py-2 text-sm bg-white"
+            value={p.mode}
+            onChange={(e) => {
+              const copy = [...payments];
+              copy[index].mode = e.target.value;
+              setPayments(copy);
+            }}
+          >
+            <option>Cash</option>
+            <option>UPI</option>
+            <option>Card</option>
+            <option>Bank</option>
+          </select>
 
-             <div className="md:col-span-3">
-               <label className={labelClass}>Balance</label>
-              <input
-                type="number"
-                value={amountData.balanceAmount}
-                readOnly
-                className={inputClass}
-              />
-            </div>
-              <div className="md:col-span-3">
-               <label className={labelClass}>Payment Status</label>
-            <input
-              type="text"
-              value={amountData.paymentStatus}
-              readOnly
-              className={inputClass}
-            />
-          </div>
-          </div>
+          {/* AMOUNT */}
+          <input
+            type="number"
+            placeholder="Amount"
+            className="flex-1 border rounded-md px-3 py-2 text-sm"
+            value={p.amount}
+            onChange={(e) => {
+              const copy = [...payments];
+              copy[index].amount = e.target.value;
+              setPayments(copy);
+            }}
+          />
 
-         
+          {/* REMOVE */}
+          <button
+            type="button"
+            onClick={() =>
+              setPayments(payments.filter((_, i) => i !== index))
+            }
+            className="text-red-500 text-lg font-bold px-2"
+          >
+            ✕
+          </button>
         </div>
+      ))}
+    </div>
+
+    {/* DISCOUNT */}
+    <div className="mt-4">
+      <label className="text-sm text-slate-600">
+        ₹ Discount Amount
+      </label>
+      <input
+        type="number"
+        value={discount}
+        onChange={(e) => setDiscount(Number(e.target.value || 0))}
+        className="w-full mt-1 border rounded-md px-3 py-2 text-sm"
+      />
+    </div>
+  </div>
+
+  {/* RIGHT — ORDER SUMMARY */}
+  <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg">
+
+    <p className="text-xs text-slate-400 mb-3">
+      ORDER SUMMARY
+    </p>
+
+    <div className="space-y-2 text-sm">
+      <div className="flex justify-between">
+        <span>Total Bill</span>
+        <span>₹{amountData.totalAmount}</span>
+      </div>
+
+      <div className="flex justify-between text-red-400">
+        <span>Discount Applied</span>
+        <span>- ₹{discount}</span>
+      </div>
+    </div>
+
+    <hr className="my-4 border-slate-700" />
+
+    <div className="flex justify-between items-center mb-3">
+      <span className="text-lg font-semibold">
+        Payable
+      </span>
+
+      <div className="flex items-center gap-2">
+        <span className="text-2xl font-bold text-amber-400">
+          ₹{payable}
+        </span>
+
+        {paymentStatus === "PAID" && (
+          <span className="bg-green-600 text-xs px-3 py-1 rounded-full">
+            PAID
+          </span>
+        )}
+      </div>
+    </div>
+
+    {/* STATUS BAR */}
+    <div className="h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
+      <div
+        className={`h-full transition-all ${
+          paymentStatus === "PAID"
+            ? "bg-green-500 w-full"
+            : paymentStatus === "PARTIAL"
+            ? "bg-yellow-400 w-1/2"
+            : "bg-red-500 w-1/4"
+        }`}
+      />
+    </div>
+
+    <div className="flex justify-between text-sm">
+      <span>Balance Due</span>
+      <span className="text-green-400 font-semibold">
+        ₹{balance}
+      </span>
+    </div>
+  </div>
+
+</div>
+
+
+
 
       {/* ACTIONS */}
    <div className="flex flex-col sm:flex-row justify-end gap-3">

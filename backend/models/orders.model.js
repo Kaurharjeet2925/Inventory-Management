@@ -36,16 +36,23 @@ const orderSchema = new mongoose.Schema(
       }
 
     ],
-    paymentDetails: {
+   paymentDetails: {
   totalAmount: { type: Number, required: true },
+  discount: { type: Number, default: 0 },
+
+  payments: [
+    {
+      mode: { type: String, enum: ["Cash", "UPI", "Card", "Bank"], required: true },
+      amount: { type: Number, required: true },
+      paidAt: { type: Date, default: Date.now }
+    }
+  ],
+
   paidAmount: { type: Number, default: 0 },
   balanceAmount: { type: Number, default: 0 },
-  paymentStatus: {
-    type: String,
-    enum: ["paid", "partial", "unpaid", "cod"],
-    default: "cod",
-  },
+  paymentStatus: { type: String, enum: ["unpaid", "partial", "paid"], default: "unpaid" }
 },
+
 
     collected: { type: Boolean, default: false },
     notes: String,

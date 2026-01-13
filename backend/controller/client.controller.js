@@ -38,7 +38,7 @@ exports.getClientById = async (req, res) => {
 // Create new client
 exports.createClient = async (req, res) => {
   try {
-    const { name, email, phone, companyName, address, city, state, zipCode, country, notes } = req.body;
+    const { name, email, phone, companyName, address, city, state, zipCode, country, notes, openingBalance=0 } = req.body;
 
     // Validate required fields
     if (!name || !email || !phone) {
@@ -62,6 +62,7 @@ exports.createClient = async (req, res) => {
       zipCode,
       country,
       notes,
+      openingBalance,
       createdBy: req.user?._id,
     });
 
@@ -79,11 +80,11 @@ exports.createClient = async (req, res) => {
 // Update client
 exports.updateClient = async (req, res) => {
   try {
-    const { name, email, phone, companyName, address, city, state, zipCode, country, notes } = req.body;
+    const { name, email, phone, companyName, address, city, state, zipCode, country, notes, openingBalance } = req.body;
 
     const client = await Client.findByIdAndUpdate(
       req.params.id,
-      { name, email, phone, companyName, address, city, state, zipCode, country, notes },
+      { name, email, phone, companyName, address, city, state, zipCode, country, notes, openingBalance },
       { new: true, runValidators: true }
     ).populate("createdBy", "name email");
 
