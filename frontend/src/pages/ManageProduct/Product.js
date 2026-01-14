@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Search, Plus, Pencil, Trash2 } from "lucide-react";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
-import { Package, AlertTriangle, XCircle, BarChart3,Move } from "lucide-react";
+import { Package, AlertTriangle, XCircle, BarChart3,ArrowRightLeftIcon } from "lucide-react";
 import AddLocationModal from "./components/AddLocation";
 import AddProducts from "./components/AddProducts";
+
 import TransferStockModal from "./components/TransferStockModal";
 const DEFAULT_UNITS = ["piece", "packet", "kg", "ltr", "gm"];
 
@@ -596,7 +597,7 @@ if (sortBy === "qty-high")
   className="p-1.5 sm:p-2 rounded-full text-purple-600 hover:bg-purple-100 transition border border-purple-200"
   title="Transfer Stock"
 >
-  <Move />
+  <ArrowRightLeftIcon className="w-4 h-4" />
 </button>
 
                         <button

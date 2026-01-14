@@ -59,22 +59,31 @@ exports.generateDailySalesReport = async (req, res) => {
       const workbook = new ExcelJS.Workbook();
       const sheet = workbook.addWorksheet("Daily Sales Report");
 
-      sheet.addRow([
-        "Date",
-        "Order ID",
-        "Admin Name",
-        "Client Name",
-        "Company Name",
-        "Client Address",
-        "Agent",
-        "Product",
-        "Qty",
-        "Warehouse",
-        "Order Status",
-        "Amount",
-        "Balance",
-        "Payment Status",
-      ]);
+   sheet.addRow([
+  "Date",
+  "Order ID",
+  "Admin Name",
+  "Client Name",
+  "Company Name",
+  "Client Address",
+  "Agent",
+  "Product",
+  "Qty",
+  "Rate",
+  "Line Total",
+  "Warehouse",
+  "Order Status",
+  "Amount",
+  "Discount",
+  "Balance",
+  "Amount Received",  
+  "Payment Status",
+  "Cash Received",
+  "UPI Received",
+  "Card Received",
+  "Bank Received",
+]);
+
 
       sheet.getRow(1).eachCell((cell) => {
         cell.font = { bold: true };
@@ -82,6 +91,13 @@ exports.generateDailySalesReport = async (req, res) => {
 
       let grandTotalAmount = 0;
       let grandTotalBalance = 0;
+      let grandTotalReceived = 0;
+     const grandPaymentSummary = {
+  Cash: 0,
+  UPI: 0,
+  Card: 0,
+  Bank: 0,
+};
 
       searchedOrders.forEach((order) => {
         const items = order.items || [];
@@ -95,53 +111,87 @@ exports.generateDailySalesReport = async (req, res) => {
           );
 
         const paidAmount = order.paymentDetails?.paidAmount ?? 0;
-        const balanceAmount =
-          order.paymentDetails?.balanceAmount ??
-          orderAmount - paidAmount;
+       const discount = order.paymentDetails?.discount ?? 0;
+const balanceAmount =
+  order.paymentDetails?.balanceAmount ??
+  Math.max(orderAmount - discount - paidAmount, 0);
+
 
         // ✅ Accumulate totals ONCE per order
         grandTotalAmount += orderAmount;
         grandTotalBalance += balanceAmount;
+        grandTotalReceived+= paidAmount;
+      const payments = order.paymentDetails?.payments || [];
 
-        items.forEach((item, index) => {
-          sheet.addRow([
-            index === 0 ? moment(order.createdAt).format("DD-MM-YYYY") : "",
-            index === 0 ? order.orderId : "",
-            index === 0 ? order.assignedBy?.name || "N/A" : "",
-            index === 0 ? order.clientId?.name || "N/A" : "",
-            index === 0 ? order.clientId?.companyName || "N/A" : "",
-            index === 0 ? order.clientId?.address || "N/A" : "",
-            index === 0 ? order.deliveryPersonId?.name || "N/A" : "",
-            `${item.productName} (${item.quantityValue}${item.quantityUnit})`,
-            item.quantity,
-            item.warehouseName || "N/A",
-            index === 0 ? order.status : "",
-            index === 0 ? orderAmount : "",
-            index === 0 ? balanceAmount : "",
-            index === 0
-              ? order.paymentDetails?.paymentStatus || "cod"
-              : "",
-          ]);
-        });
+const paymentSummary = {
+  Cash: 0,
+  UPI: 0,
+  Card: 0,
+  Bank: 0,
+};
+
+payments.forEach(p => {
+  if (paymentSummary[p.mode] !== undefined) {
+    paymentSummary[p.mode] += Number(p.amount || 0);
+  }
+});
+grandPaymentSummary.Cash += paymentSummary.Cash;
+grandPaymentSummary.UPI += paymentSummary.UPI;
+grandPaymentSummary.Card += paymentSummary.Card;
+grandPaymentSummary.Bank += paymentSummary.Bank;
+
+
+       items.forEach((item, index) => {
+  sheet.addRow([
+    index === 0 ? moment(order.createdAt).format("DD-MM-YYYY") : "",
+    index === 0 ? order.orderId : "",
+    index === 0 ? order.assignedBy?.name || "N/A" : "",
+    index === 0 ? order.clientId?.name || "N/A" : "",
+    index === 0 ? order.clientId?.companyName || "N/A" : "",
+    index === 0 ? order.clientId?.address || "N/A" : "",
+    index === 0 ? order.deliveryPersonId?.name || "N/A" : "",
+
+    `${item.productName} (${item.quantityValue}${item.quantityUnit})`,
+    item.quantity,
+    item.price || 0,
+    (item.price || 0) * (item.quantity || 0),
+    item.warehouseName || "N/A",
+
+    index === 0 ? order.status : "",
+    index === 0 ? orderAmount : "",
+    index === 0 ? (order.paymentDetails?.discount || 0) : "",
+    index === 0 ? balanceAmount : "",
+    index === 0 ? paidAmount : "",
+    index === 0 ? (order.paymentDetails?.paymentStatus || "cod") : "",
+
+    index === 0 ? paymentSummary.Cash : "",
+    index === 0 ? paymentSummary.UPI : "",
+    index === 0 ? paymentSummary.Card : "",
+    index === 0 ? paymentSummary.Bank : "",
+  ]);
+});
+
       });
 
       /* ================= TOTAL ROW ================= */
-      const totalRow = sheet.addRow([
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "TOTAL",
-        "",
-        "",
-        "",
-        grandTotalAmount,
-        grandTotalBalance,
-        "",
-      ]);
+    const totalRow = sheet.addRow([
+  "", "", "", "", "", "", "",
+  "TOTAL",
+  "", "", "",
+  "",
+  "",
+  grandTotalAmount,
+  "",
+  grandTotalBalance,
+  grandTotalReceived,
+  "",
+  "",
+  grandPaymentSummary.Cash,
+  grandPaymentSummary.UPI,
+  grandPaymentSummary.Card,
+  grandPaymentSummary.Bank,
+]);
+
 
       totalRow.eachCell((cell) => {
         cell.font = { bold: true };
@@ -332,7 +382,10 @@ exports.generateInventoryReport = async (req, res) => {
     const products = await Product.find()
       .populate("category", "name")
       .populate("brand", "name")
-      .populate("location", "name address"); // ✅ ADDRESS ADDED
+       .populate({
+    path: "warehouses.location",
+    select: "name address",
+  }); // ✅ ADDRESS ADDED
 
     let totalProducts = products.length;
     let totalStock = 0;
@@ -349,45 +402,63 @@ exports.generateInventoryReport = async (req, res) => {
     const table = [];
 
     products.forEach((p) => {
-      const qty = Number(p.totalQuantity ?? 0);
-      totalStock += qty;
+  // product total (optional – for cards & charts)
+  const productTotalQty = p.warehouses.reduce(
+    (sum, w) => sum + Number(w.quantity || 0),
+    0
+  );
 
-      let status = "In Stock";
+  totalStock += productTotalQty;
 
-      if (qty === 0) {
-        status = "Out of Stock";
-        outOfStockCount++;
-        statusChart.outOfStock++;
-      } else if (qty <= 10) {
-        status = "Low Stock";
-        lowStockCount++;
-        statusChart.lowStock++;
-      } else {
-        statusChart.inStock++;
-      }
+  // chart (product-wise total)
+  productChart.push({
+    name: p.quantityValue && p.quantityUnit
+      ? `${p.name} (${p.quantityValue} ${p.quantityUnit})`
+      : p.name,
+    quantity: productTotalQty,
+  });
 
-      productChart.push({
-        name: p.name,
-        quantity: qty,
-      });
+  // 🔥 MULTI-WAREHOUSE ROWS
+  p.warehouses.forEach((w) => {
+    const qty = Number(w.quantity || 0);
 
-      table.push({
-        productName: p.name,
-        category: p.category?.name || "N/A",
-        brand: p.brand?.name || "N/A",
-        quantity: qty,
-        unit: p.quantityValue
-          ? `${p.quantityValue} ${p.quantityUnit}`
-          : "-",
-        price: p.price || 0,
+    let status = "In Stock";
+    if (qty === 0) {
+      status = "Out of Stock";
+      outOfStockCount++;
+      statusChart.outOfStock++;
+    } else if (qty <= 10) {
+      status = "Low Stock";
+      lowStockCount++;
+      statusChart.lowStock++;
+    } else {
+      statusChart.inStock++;
+    }
 
-        // ✅ LOCATION DETAILS
-        locationName: p.location?.name || "N/A",
-        locationAddress: p.location?.address || "N/A",
+    table.push({
+      productName:
+        p.quantityValue && p.quantityUnit
+          ? `${p.name} (${p.quantityValue} ${p.quantityUnit})`
+          : p.name,
 
-        status,
-      });
+      category: p.category?.name || "N/A",
+      brand: p.brand?.name || "N/A",
+
+      quantity: qty,
+      unit: p.quantityValue
+        ? `${p.quantityValue} ${p.quantityUnit}`
+        : "-",
+
+      price: p.price || 0,
+
+      // ✅ EACH WAREHOUSE
+      locationName: w.location?.name || "N/A",
+      locationAddress: w.location?.address || "N/A",
+
+      status,
     });
+  });
+});
 
     /* ================= EXCEL DOWNLOAD ================= */
     if (req.query.download === "true") {

@@ -273,9 +273,9 @@ exports.getOrders = async (req, res) => {
     }
 
     // 🧑‍💼 Admin → only orders created by him
-    if (user.role === "admin") {
-      baseFilter.assignedBy = new mongoose.Types.ObjectId(user._id);
-    }
+    // if (user.role === "admin") {
+    //   baseFilter.assignedBy = new mongoose.Types.ObjectId(user._id);
+    // }
 
     /* ---------------- LIST FILTER ---------------- */
     const listFilter = { ...baseFilter };
@@ -340,6 +340,7 @@ exports.getOrders = async (req, res) => {
       shipped: 0,
       delivered: 0,
       completed: 0,
+      cancelled: 0,
     };
 
     counts.forEach((c) => {
@@ -437,15 +438,16 @@ exports.updateOrder = async (req, res) => {
       };
     });
 
-    const paid = Number(paymentDetails?.paidAmount || 0);
-    const balanceAmount = Math.max(totalAmount - paid, 0);
+   const discount = Number(paymentDetails?.discount || 0);
+const paid = Number(paymentDetails?.paidAmount || 0);
 
-    let paymentStatus = "cod";
-    if (status === "completed") {
-      if (paid === 0) paymentStatus = "unpaid";
-      else if (paid >= totalAmount) paymentStatus = "paid";
-      else paymentStatus = "partial";
-    }
+const payable = Math.max(totalAmount - discount, 0);
+const balanceAmount = Math.max(payable - paid, 0);
+
+let paymentStatus = "unpaid";
+if (paid >= payable && payable > 0) paymentStatus = "paid";
+else if (paid > 0) paymentStatus = "partial";
+
 
     /* ================= UPDATE ORDER ================= */
     const updatedOrder = await Order.findByIdAndUpdate(
@@ -454,11 +456,12 @@ exports.updateOrder = async (req, res) => {
         status: status || "pending",
         items: updatedItems,
         paymentDetails: {
-          totalAmount,
-          paidAmount: paid,
-          balanceAmount,
-          paymentStatus,
-        },
+  totalAmount,
+  discount,
+  paidAmount: paid,
+  balanceAmount,
+  paymentStatus,
+},
       },
       { new: true }
     );
@@ -882,23 +885,23 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     /* ================= 💳 PAYMENT STATUS FIX ================= */
-    if (status === "completed") {
-      const total = updatedOrder.paymentDetails?.totalAmount || 0;
-      const paid = updatedOrder.paymentDetails?.paidAmount || 0;
+    // if (status === "completed") {
+    //   const total = updatedOrder.paymentDetails?.totalAmount || 0;
+    //   const paid = updatedOrder.paymentDetails?.paidAmount || 0;
 
-      let paymentStatus = "unpaid";
+    //   let paymentStatus = "unpaid";
 
-      if (paid >= total && total > 0) {
-        paymentStatus = "paid";
-      } else if (paid > 0) {
-        paymentStatus = "partial";
-      }
+    //   if (paid >= total && total > 0) {
+    //     paymentStatus = "paid";
+    //   } else if (paid > 0) {
+    //     paymentStatus = "partial";
+    //   }
 
-      updatedOrder.paymentDetails.paymentStatus = paymentStatus;
-      updatedOrder.paymentDetails.balanceAmount = Math.max(total - paid, 0);
+    //   updatedOrder.paymentDetails.paymentStatus = paymentStatus;
+    //   updatedOrder.paymentDetails.balanceAmount = Math.max(total - paid, 0);
 
-      await updatedOrder.save();
-    }
+    //   await updatedOrder.save();
+    // }
 
     /* ================= SOCKET & NOTIFICATIONS ================= */
     const io = req.app.get("io");

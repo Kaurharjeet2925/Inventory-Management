@@ -12,7 +12,6 @@ import {
   CartesianGrid,
 } from "recharts";
 import { apiClient } from "../../apiclient/apiclient";
-import { Download } from "lucide-react";
 import Pagination from "../../components/Pagination";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";

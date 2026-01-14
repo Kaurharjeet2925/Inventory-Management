@@ -4,7 +4,7 @@ import { apiClient } from "../../apiclient/apiclient";
 import EditOrderModal from "./EditOrderModel";
 import socket from "../../socket/socketClient";
 import Pagination from "../../components/Pagination";
-import { FaFileInvoice } from "react-icons/fa";
+import { LiaFileInvoiceSolid } from "react-icons/lia";
 import OrderDateFilter from "../../components/OrderDateFilter";
 import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 import ThemedTable from "../../components/ThemedTable";
@@ -71,6 +71,7 @@ const ViewOrders = () => {
     shipped: 0,
     delivered: 0,
     completed: 0,
+    cancelled: 0,
   });
 
   const [loading, setLoading] = useState(true);
@@ -306,7 +307,7 @@ useEffect(() => {
 
   {/* ================= TABS ================= */}
 
-<div className="flex items-center gap-4 w-full">
+<div className="flex items-center gap-5 w-full">
 
   {/* LEFT: STATUS TABS */}
   <div className="flex gap-2">
@@ -361,6 +362,16 @@ useEffect(() => {
       }`}
     >
       Completed ({statusCounts.completed})
+    </button>
+    <button
+      onClick={() => setActiveTab("cancelled")}
+      className={`px-4 py-2 rounded-lg font-medium ${
+        activeTab === "cancelled"
+          ? "bg-yellow-100 text-yellow-800"
+          : "bg-yellow-50 text-yellow-700"
+      }`}
+    >
+      Cancelled ({statusCounts.cancelled})
     </button>
   </div>
 
@@ -458,22 +469,36 @@ useEffect(() => {
         </tr>
       ) : (
         filteredOrders.map((order) => {
-         const calculatedTotal = order.items.reduce(
+        const calculatedTotal = order.items.reduce(
   (sum, i) => sum + Number(i.price || 0) * Number(i.quantity || 0),
   0
 );
 
+const paymentDetails = order.paymentDetails || {};
+
 const totalAmount =
-  order.paymentDetails?.totalAmount ?? calculatedTotal;
+  typeof paymentDetails.totalAmount === "number"
+    ? paymentDetails.totalAmount
+    : calculatedTotal;
 
-const paidAmount = order.paymentDetails?.paidAmount ?? 0;
+const discount =
+  typeof paymentDetails.discount === "number"
+    ? paymentDetails.discount
+    : 0;
 
+const paidAmount =
+  typeof paymentDetails.paidAmount === "number"
+    ? paymentDetails.paidAmount
+    : 0;
+
+// ✅ TRUST BACKEND
 const balanceAmount =
-  order.paymentDetails?.balanceAmount ??
-  Math.max(totalAmount - paidAmount, 0);
+  typeof paymentDetails.balanceAmount === "number"
+    ? paymentDetails.balanceAmount
+    : Math.max(totalAmount - discount - paidAmount, 0);
 
 const paymentStatus =
-  order.paymentDetails?.paymentStatus || "cod";
+  paymentDetails.paymentStatus || "cod";
 
           return (
             <tr
@@ -581,7 +606,14 @@ const paymentStatus =
                   </button>
 
                   <button
-                    onClick={() => setEditModal(order)}
+                    onClick={() =>
+               setEditModal(
+                ["completed", "cancelled"].includes(order.status)
+                 ? { ...order, viewOnly: true }
+                 : order
+                 )
+                 }
+
                     className="text-green-600 hover:text-green-800"
                   >
                     <Edit2 size={18} />
@@ -593,18 +625,34 @@ const paymentStatus =
       "_blank"
     )
   }
-  className="text-purple-600 hover:text-purple-800"
+  // className="text-purple-600 hover:text-purple-800"
   title="Download Invoice"
 >
- <FaFileInvoice/>
+ <LiaFileInvoiceSolid size={18}/>
 </button>
 
-                  <button
-                    onClick={() => setDeleteModal(order)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                 <button
+  onClick={() => {
+    if (order.status !== "completed" && order.status !== "cancelled") {
+      setDeleteModal(order);
+    }
+  }}
+  disabled={order.status === "completed" || order.status === "cancelled"}
+  title={
+    order.status === "completed" || order.status === "cancelled"
+      ? "Completed or cancelled orders cannot be deleted"
+      : "Delete order"
+  }
+  className={`${
+    order.status === "completed" || order.status === "cancelled"
+      ? "text-gray-400 cursor-not-allowed"
+      : "text-red-600 hover:text-red-800"
+  }`}
+>
+  <Trash2 size={18} />
+</button>
+
+
                 </div>
               </td>
             </tr>

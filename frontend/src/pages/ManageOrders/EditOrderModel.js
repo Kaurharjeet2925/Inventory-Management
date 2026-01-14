@@ -36,66 +36,45 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       _id: p._id,
       name: p.name,
       displayName: `${p.name} – ${p.quantityValue}${p.quantityUnit}`,
-      unitType: p.quantityUnit,
-      size: p.quantityValue,
+      quantityUnit: p.quantityUnit,
+      quantityValue: p.quantityValue,
       price: p.price,
     }));
 
-  const getWarehouses = (name, size, unit) =>
-    rawProducts
-      .filter(
-        (p) =>
-          p.name === name &&
-          p.quantityValue === size &&
-          p.quantityUnit === unit
-      )
-      .map((p) => ({
-        id: p._id,
-        warehouseName: p.location?.name || "Unknown",
-        warehouseAddress: p.location?.address || "NA",
-        stock: p.totalQuantity || 0,
-      }));
-
   /* ================= INIT FORM ================= */
   useEffect(() => {
-    if (!order || rawProducts.length === 0) return;
+    if (!order) return;
 
-    const rebuilt = order.items.map((it) => {
-      const whList = it?.productName
-        ? getWarehouses(it.productName, it.quantityValue, it.unitType)
-        : [];
-
-      return {
-        ...it,
-        warehouseOptions: whList,
-        warehouseId: it.warehouseId || whList[0]?.id || "",
-      };
-    });
+    const rebuiltItems = order.items.map((it) => ({
+      ...it,
+      warehouseId: it.warehouseId || "",
+    }));
 
     setForm({
       ...order,
       newStatus: order.status,
-      items: rebuilt,
-      paymentDetails:
-        order.paymentDetails || {
-          totalAmount: 0,
-          paidAmount: 0,
-          balanceAmount: 0,
-          paymentStatus: "unpaid",
-        },
+      items: rebuiltItems,
+      paymentDetails: {
+        totalAmount: order.paymentDetails?.totalAmount || 0,
+        discount: order.paymentDetails?.discount || 0,
+        paidAmount: order.paymentDetails?.paidAmount || 0,
+        balanceAmount: order.paymentDetails?.balanceAmount || 0,
+        paymentStatus: order.paymentDetails?.paymentStatus || "unpaid",
+      },
     });
 
-    setOriginalItems(JSON.parse(JSON.stringify(rebuilt)));
-  }, [order, rawProducts]);
+    setOriginalItems(JSON.parse(JSON.stringify(rebuiltItems)));
+  }, [order]);
 
   if (!form) return null;
 
-  /* ================= RULES ================= */
-  const itemsEditable =
-    order.status === "pending" && !viewOnly;
 
-  const statusEditable =
-    order.status !== "completed" && !viewOnly;
+const isLocked = ["completed", "cancelled"].includes(order.status);
+
+const itemsEditable = !viewOnly && !isLocked && order.status === "pending";
+const statusEditable = !viewOnly && !isLocked;
+const paymentEditable = !viewOnly && !isLocked;
+
 
   /* ================= HELPERS ================= */
   const updateField = (index, field, value) => {
@@ -116,13 +95,12 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           productName: "",
           quantity: 1,
           quantityValue: "",
-          unitType: "",
+          quantityUnit: "",
           price: 0,
           totalPrice: 0,
           warehouseId: "",
           warehouseName: "",
           warehouseAddress: "",
-          warehouseOptions: [],
         },
       ],
     });
@@ -155,7 +133,8 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
 
   /* ================= SAVE ================= */
   const saveOrder = () => {
-    // 🔒 STATUS-ONLY UPDATE
+  if (isLocked) return;
+    // 🔒 STATUS ONLY UPDATE
     if (!itemsEditable) {
       onSave({ _id: form._id, status: form.newStatus });
       return;
@@ -170,7 +149,7 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
         productName: item.productName,
         quantity: qty,
         quantityValue: item.quantityValue,
-        unitType: item.unitType,
+        quantityUnit: item.quantityUnit, // ✅ SAME AS CREATE ORDER
         price,
         totalPrice: price * qty,
         warehouseId: item.warehouseId,
@@ -184,11 +163,33 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
       status: form.newStatus,
       items: updatedItems,
       paymentDetails: {
-        ...form.paymentDetails,
-        paidAmount: Number(form.paymentDetails?.paidAmount || 0),
+        discount: Number(form.paymentDetails.discount || 0),
+        paidAmount: Number(form.paymentDetails.paidAmount || 0),
       },
     });
   };
+const getWarehouseOptions = (productId, index) => {
+  const product = rawProducts.find(p => p._id === productId);
+  if (!product) return [];
+
+  return (product.warehouses || []).map(w => {
+    const alreadyUsed = form.items
+      .filter(
+        (it, i) =>
+          i !== index &&
+          it.productId === productId &&
+          it.warehouseId === w.location._id
+      )
+      .reduce((sum, it) => sum + Number(it.quantity || 0), 0);
+
+    return {
+      warehouseId: w.location._id,
+      warehouseName: w.location.name,
+      warehouseAddress: w.location.address,
+      stock: Math.max(Number(w.quantity || 0) - alreadyUsed, 0),
+    };
+  });
+};
 
   /* ================= UI ================= */
   return (
@@ -235,17 +236,20 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
               className="border rounded p-2 w-full disabled:bg-gray-100"
             >
               <option value="pending">Pending</option>
+              <option value="pending">Processing</option>
               <option value="shipped">Shipped</option>
               <option value="delivered">Delivered</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
+            {isLocked && (
+  <p className="text-xs text-red-500 mt-1">
+    {order.status === "cancelled"
+      ? "Cancelled order cannot be modified."
+      : "Completed order cannot be modified."}
+  </p>
+)}
 
-            {!statusEditable && (
-              <p className="text-xs text-red-500 mt-1">
-                Completed orders cannot be modified.
-              </p>
-            )}
           </div>
 
           <div>
@@ -273,43 +277,75 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           {form.items.map((item, idx) => (
             <div key={idx} className="border-b pb-4">
               {editingIndex === idx && itemsEditable ? (
-                <div className="grid grid-cols-6 gap-3 items-center">
-                  <SearchableSelect
-                    options={productOptions}
-                    value={item.productId}
-                    onChange={(id) => {
-                      const p = productOptions.find((x) => x._id === id);
-                      updateField(idx, "productId", id);
-                      updateField(idx, "productName", p.name);
-                      updateField(idx, "price", p.price);
-                      updateField(idx, "unitType", p.unitType);
-                      updateField(idx, "quantityValue", p.size);
-                    }}
-                  />
+  <div className="grid grid-cols-4 gap-3 items-center">
 
-                  <input
-                    type="number"
-                    value={item.price}
-                    onChange={(e) =>
-                      updateField(idx, "price", e.target.value)
-                    }
-                  />
+    {/* PRODUCT */}
+    <SearchableSelect
+      options={productOptions}
+      value={item.productId}
+      onChange={(id) => {
+        const p = productOptions.find(x => x._id === id);
+        updateField(idx, "productId", id);
+        updateField(idx, "productName", p.name);
+        updateField(idx, "price", p.price);
+        updateField(idx, "quantityUnit", p.quantityUnit);
+        updateField(idx, "quantityValue", p.quantityValue);
+        updateField(idx, "warehouseId", "");
+        updateField(idx, "warehouseName", "");
+        updateField(idx, "warehouseAddress", "");
+      }}
+    />
 
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      updateField(idx, "quantity", e.target.value)
-                    }
-                  />
+    {/* ✅ WAREHOUSE */}
+    <select
+      value={item.warehouseId || ""}
+      onChange={(e) => {
+        const wh = getWarehouseOptions(item.productId, idx)
+          .find(w => w.warehouseId === e.target.value);
 
-                  <button onClick={() => setEditingIndex(null)}>✔</button>
-                  <button onClick={() => cancelInlineEdit(idx)}>✖</button>
-                </div>
-              ) : (
+        updateField(idx, "warehouseId", wh?.warehouseId || "");
+        updateField(idx, "warehouseName", wh?.warehouseName || "");
+        updateField(idx, "warehouseAddress", wh?.warehouseAddress || "");
+      }}
+      className="border rounded p-2 w-full"
+    >
+      <option value="">Select Warehouse</option>
+      {getWarehouseOptions(item.productId, idx).map(wh => (
+        <option key={wh.warehouseId} value={wh.warehouseId}>
+          {wh.warehouseName} (Stock: {wh.stock})
+        </option>
+      ))}
+    </select>
+
+    {/* PRICE */}
+    <input
+      type="number"
+      value={item.price}
+      onChange={(e) => updateField(idx, "price", e.target.value)}
+      className="border rounded p-2 w-full"
+    />
+
+    {/* QTY */}
+    <input
+      type="number"
+      value={item.quantity}
+      onChange={(e) => updateField(idx, "quantity", e.target.value)}
+      className="border rounded p-2 w-full"
+    />
+
+    {/* ACTIONS */}
+    <div className="flex gap-2">
+      <button onClick={() => setEditingIndex(null)}>✔</button>
+      <button onClick={() => cancelInlineEdit(idx)}>✖</button>
+    </div>
+
+  </div>
+) : (
+
                 <div className="flex justify-between">
                   <p>
-                    {item.productName} × {item.quantity}
+                    {item.productName} ({item.quantityValue}
+                    {item.quantityUnit}) × {item.quantity}
                   </p>
 
                   {itemsEditable && (
@@ -324,19 +360,88 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
           ))}
         </div>
 
+        {/* PAYMENT DETAILS */}
+        <div className="mt-6 border-t pt-4">
+          <h3 className="text-lg font-semibold mb-4">Payment Details</h3>
+
+          <div className="grid grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm text-gray-600">Total</label>
+              <input
+                disabled
+                value={form.paymentDetails.totalAmount}
+                className="border p-2 w-full bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">Discount</label>
+              <input
+                type="number"
+                disabled={!paymentEditable}
+                value={form.paymentDetails.discount}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    paymentDetails: {
+                      ...form.paymentDetails,
+                      discount: Number(e.target.value || 0),
+                    },
+                  })
+                }
+                className="border p-2 w-full"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">Amount Received</label>
+              <input
+                type="number"
+                disabled={!paymentEditable}
+                value={form.paymentDetails.paidAmount}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    paymentDetails: {
+                      ...form.paymentDetails,
+                      paidAmount: Number(e.target.value || 0),
+                    },
+                  })
+                }
+                className="border p-2 w-full"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600">Balance</label>
+              <input
+                disabled
+                value={Math.max(
+                  form.paymentDetails.totalAmount -
+                    form.paymentDetails.discount -
+                    form.paymentDetails.paidAmount,
+                  0
+                )}
+                className="border p-2 w-full bg-gray-100 text-red-600 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* FOOTER */}
         <div className="mt-6 flex gap-3">
           <button className="flex-1 bg-gray-300 py-3" onClick={onClose}>
             Cancel
           </button>
-          {!viewOnly && (
-            <button
-              className="flex-1 bg-green-600 text-white py-3"
-              onClick={saveOrder}
-            >
-              Save Order
-            </button>
-          )}
+         {!viewOnly && !isLocked && (
+  <button
+    className="flex-1 bg-green-600 text-white py-3"
+    onClick={saveOrder}
+  >
+    Save Order
+  </button>
+)}
+
         </div>
       </div>
     </div>

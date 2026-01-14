@@ -336,25 +336,25 @@ const selectedWarehouse = warehouseOptions.find(
   /* -------------------------------------------------------
       BALANCE CALCULATION
   -------------------------------------------------------- */
- useEffect(() => {
-  const total = Number(amountData.totalAmount || 0);
-  const paid = Number(amountData.paidAmount || 0);
+//  useEffect(() => {
+//   const total = Number(amountData.totalAmount || 0);
+//   const paid = Number(amountData.paidAmount || 0);
 
-  const balance = Math.max(total - paid, 0);
+//   const balance = Math.max(total - paid, 0);
 
-  let status = "COD";
-  if (paid >= total && total > 0) {
-    status = "PAID";
-  } else if (paid > 0 && paid < total) {
-    status = "PARTIAL";
-  }
+//   let status = "COD";
+//   if (paid >= total && total > 0) {
+//     status = "PAID";a
+//   } else if (paid > 0 && paid < total) {
+//     status = "PARTIAL";
+//   }
 
-  setAmountData(prev => ({
-    ...prev,
-    balanceAmount: balance,
-    paymentStatus: status,
-  }));
-}, [amountData.totalAmount, amountData.paidAmount]);
+//   setAmountData(prev => ({
+//     ...prev,
+//     balanceAmount: balance,
+//     paymentStatus: status,
+//   }));
+// }, [amountData.totalAmount, amountData.paidAmount]);
 
 const totalPaid = payments.reduce(
   (sum, p) => sum + Number(p.amount || 0),
@@ -827,7 +827,7 @@ const paymentStatus =
           ₹{payable}
         </span>
 
-        {paymentStatus === "PAID" && (
+        {paymentStatus === "paid" && (
           <span className="bg-green-600 text-xs px-3 py-1 rounded-full">
             PAID
           </span>
@@ -838,14 +838,15 @@ const paymentStatus =
     {/* STATUS BAR */}
     <div className="h-2 bg-slate-700 rounded-full overflow-hidden mb-3">
       <div
-        className={`h-full transition-all ${
-          paymentStatus === "PAID"
-            ? "bg-green-500 w-full"
-            : paymentStatus === "PARTIAL"
-            ? "bg-yellow-400 w-1/2"
-            : "bg-red-500 w-1/4"
-        }`}
-      />
+  className={`h-full transition-all ${
+    paymentStatus === "paid"
+      ? "bg-green-500 w-full"
+      : paymentStatus === "partial"
+      ? "bg-yellow-400 w-1/2"
+      : "bg-red-500 w-1/4"
+  }`}
+/>
+
     </div>
 
     <div className="flex justify-between text-sm">
