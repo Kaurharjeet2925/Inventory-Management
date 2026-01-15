@@ -1,5 +1,6 @@
 import React, { useState, useEffect , useCallback} from "react";
-import { Eye, Edit2, Trash2, X, Filter } from "lucide-react";
+import { Eye, Edit2, Trash2, Filter } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { apiClient } from "../../apiclient/apiclient";
 import EditOrderModal from "./EditOrderModel";
 import socket from "../../socket/socketClient";
@@ -8,6 +9,7 @@ import { LiaFileInvoiceSolid } from "react-icons/lia";
 import OrderDateFilter from "../../components/OrderDateFilter";
 import { formatAnyDateToDDMMYYYY } from "../../utils/dateFormatter";
 import ThemedTable from "../../components/ThemedTable";
+import ConfirmDialog from "../../components/ConfirmDialog";
 /* ================= HELPERS ================= */
 
 const getPaymentBadge = (status) => {
@@ -64,7 +66,6 @@ const formatStatus = (status) => {
 const ViewOrders = () => {
   const [orders, setOrders] = useState([]);
   const [needsRefresh, setNeedsRefresh] = useState(false);
-
   const [statusCounts, setStatusCounts] = useState({
     pending: 0,
     processing: 0,
@@ -73,10 +74,12 @@ const ViewOrders = () => {
     completed: 0,
     cancelled: 0,
   });
-
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
   const [search, setSearch] = useState("");
+
+  const [deleting, setDeleting] = useState(false);
 
   const [viewModal, setViewModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
@@ -93,6 +96,39 @@ const handleDateApply = (from, to) => {
   setToDate(to);
   setCurrentPage(1);
 };
+const TAB_STYLES = {
+  pending: {
+    active: "bg-yellow-500 text-white",
+    inactive:
+      "bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200",
+  },
+  processing: {
+    active: "bg-orange-500 text-white",
+    inactive:
+      "bg-orange-100 text-orange-800 border border-orange-300 hover:bg-orange-200",
+  },
+  shipped: {
+    active: "bg-blue-600 text-white",
+    inactive:
+      "bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200",
+  },
+  delivered: {
+    active: "bg-purple-600 text-white",
+    inactive:
+      "bg-purple-100 text-purple-800 border border-purple-300 hover:bg-purple-200",
+  },
+  completed: {
+    active: "bg-green-600 text-white",
+    inactive:
+      "bg-green-100 text-green-800 border border-green-300 hover:bg-green-200",
+  },
+  cancelled: {
+    active: "bg-red-600 text-white",
+    inactive:
+      "bg-red-100 text-red-800 border border-red-300 hover:bg-red-200",
+  },
+};
+
 
 const handleDateClear = () => {
   setFromDate("");
@@ -216,15 +252,18 @@ useEffect(() => {
 
   /* ================= DELETE ================= */
 
-  const handleConfirmDelete = async () => {
-    try {
-      await apiClient.delete(`/orders/${deleteModal._id}`);
-      setDeleteModal(null);
-      loadOrders(currentPage, limit, activeTab);
-    } catch (err) {
-      alert("Failed to delete order");
-    }
-  };
+ const handleConfirmDelete = async () => {
+  try {
+    setDeleting(true);
+    await apiClient.delete(`/orders/${deleteModal._id}`);
+    setDeleteModal(null);
+    loadOrders(currentPage, limit, activeTab);
+  } catch (err) {
+    alert("Failed to delete order");
+  } finally {
+    setDeleting(false);
+  }
+};
 
   /* ================= SEARCH ================= */
 
@@ -290,150 +329,152 @@ useEffect(() => {
 });
 
 
-  if (loading) {
-    return (
-      <div>
-        <div className="text-gray-600">Loading orders...</div>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div>
+  //       <div className="text-gray-600">Loading orders...</div>
+  //     </div>
+  //   );
+  // }
 
   /* ================= UI ================= */
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-2">View Orders</h1>
-      <p className="text-gray-600 mb-6">All orders and their statuses</p>
+     {/* ================= HEADER ================= */}
+<div className="bg-white mb-6">
 
-  {/* ================= TABS ================= */}
+  {/* ================= HEADER TOP ================= */}
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
+    <div className="min-w-0">
+      <h1 className="text-2xl font-semibold text-gray-900">View Orders</h1>
+      <p className="text-sm text-gray-500">All orders and their statuses</p>
+    </div>
 
-<div className="flex items-center gap-5 w-full">
-
-  {/* LEFT: STATUS TABS */}
-  <div className="flex gap-2">
+    {/* CREATE ORDER BUTTON */}
     <button
-      onClick={() => setActiveTab("pending")}
-      className={`px-4 py-2 rounded-lg font-medium ${
-        activeTab === "pending"
-          ? "bg-yellow-100 text-yellow-800"
-          : "bg-yellow-50 text-yellow-700"
-      }`}
+      onClick={() => navigate("/orders/generate-order")} // adjust route if needed
+      className="bg-blue-900 hover:bg-amber-500 text-white
+                 px-4 py-4 rounded-lg flex items-center gap-2
+                 text-sm font-medium whitespace-nowrap transition"
     >
-      Pending ({statusCounts.pending})
-    </button>
-    <button
-      onClick={() => setActiveTab("processing")}
-      className={`px-4 py-2 rounded-lg font-medium ${
-        activeTab === "processing"
-          ? "bg-orange-100 text-orange-800"
-          : "bg-orange-50 text-orange-700"
-      }`}
-    >
-      Processing ({statusCounts.processing})
-    </button>
-    <button
-      onClick={() => setActiveTab("shipped")}
-      className={`px-4 py-2 rounded-lg font-medium ${
-        activeTab === "shipped"
-          ? "bg-blue-100 text-blue-800"
-          : "bg-blue-50 text-blue-700"
-      }`}
-    >
-      Shipped ({statusCounts.shipped})
-    </button>
-
-    <button
-      onClick={() => setActiveTab("delivered")}
-      className={`px-4 py-2 rounded-lg font-medium ${
-        activeTab === "delivered"
-          ? "bg-purple-100 text-purple-800"
-          : "bg-purple-50 text-purple-700"
-      }`}
-    >
-      Delivered ({statusCounts.delivered})
-    </button>
-
-    <button
-      onClick={() => setActiveTab("completed")}
-      className={`px-4 py-2 rounded-lg font-medium ${
-        activeTab === "completed"
-          ? "bg-green-100 text-green-800"
-          : "bg-green-50 text-green-700"
-      }`}
-    >
-      Completed ({statusCounts.completed})
-    </button>
-    <button
-      onClick={() => setActiveTab("cancelled")}
-      className={`px-4 py-2 rounded-lg font-medium ${
-        activeTab === "cancelled"
-          ? "bg-yellow-100 text-yellow-800"
-          : "bg-yellow-50 text-yellow-700"
-      }`}
-    >
-      Cancelled ({statusCounts.cancelled})
+      + Create Order
     </button>
   </div>
 
-  {/* RIGHT: SEARCH + DATE */}
-  <div className="flex items-center gap-3 ml-auto">
-    <input
-      type="text"
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-      placeholder="Search orders..."
-      className="h-10 w-72 px-4 rounded-full border text-sm
-                 focus:ring-2 focus:ring-blue-500 outline-none"
-    />
 
-    <OrderDateFilter
-      fromDate={fromDate}
-      toDate={toDate}
-      onApply={handleDateApply}
-      onClear={handleDateClear}
-    />
+{/* ================= FILTER BAR (PRODUCT STYLE) ================= */}
+<div className="bg-slate-50 border border-slate-200 p-2 sm:p-4 rounded-lg sm:rounded-xl mb-4 sm:mb-6">
 
-    {/* Collected Filter Dropdown */}
-    <div className="relative">
-      <button
-        className="h-10 px-4 rounded-full border text-sm bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none flex items-center gap-2"
-        onClick={() => setCollectedFilter(collectedFilter === "open" ? "" : "open")}
-      >
-        <Filter size={16} />
-        {collectedFilter === "" || collectedFilter === "open" ? "All Items" : (collectedFilter === "collected" ? " Collected" : " Not Collected")}
-      </button>
-      {collectedFilter === "open" && (
-        <div className="absolute right-0 mt-2 w-48 bg-white border rounded-lg shadow-lg z-10">
-          <button
-            onClick={() => {
-              setCollectedFilter("");
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
-          >
-            All Items
-          </button>
-          <button
-            onClick={() => {
-              setCollectedFilter("collected");
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
-          >
-             Collected
-          </button>
-          <button
-            onClick={() => {
-              setCollectedFilter("notcollected");
-            }}
-            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
-          >
-             Not Collected
-          </button>
-        </div>
-      )}
+  <div className="flex flex-col lg:flex-row
+                  items-start lg:items-center gap-3">
+
+    {/* LEFT — STATUS TABS */}
+    <div className="flex items-center gap-1
+                overflow-x-auto whitespace-nowrap
+                scrollbar-hide w-full lg:flex-1">
+
+  {[
+    ["pending", "Pending"],
+    ["processing", "Processing"],
+    ["shipped", "Shipped"],
+    ["delivered", "Delivered"],
+    ["completed", "Completed"],
+    ["cancelled", "Cancelled"],
+  ].map(([key, label]) => (
+    <button
+      key={key}
+      onClick={() => setActiveTab(key)}
+      className={`h-8 px-2.5 text-xs rounded-md font-medium transition
+        ${
+          activeTab === key
+            ? TAB_STYLES[key].active
+            : TAB_STYLES[key].inactive
+        }`}
+    >
+      {label} ({statusCounts[key]})
+    </button>
+  ))}
+</div>
+
+
+    {/* RIGHT — CONTROLS */}
+    <div className="flex flex-col sm:flex-row gap-2
+                    w-full lg:w-auto lg:ml-auto">
+
+      {/* SEARCH */}
+      <div className="flex items-center border rounded-lg
+                      bg-white px-3 py-2
+                      w-full sm:w-56">
+        <input
+          type="text"
+          placeholder="Search orders…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="outline-none w-full text-xs sm:text-sm"
+        />
+      </div>
+
+      {/* DATE FILTER */}
+      <OrderDateFilter
+        fromDate={fromDate}
+        toDate={toDate}
+        onApply={handleDateApply}
+        onClear={handleDateClear}
+      />
+
+      {/* COLLECTED FILTER */}
+      <div className="relative w-full sm:w-36">
+        <button
+          onClick={() =>
+            setCollectedFilter(collectedFilter === "open" ? "" : "open")
+          }
+          className="h-9 w-full px-3 rounded-lg
+                     border border-slate-300 bg-white
+                     hover:bg-slate-50 text-xs
+                     flex items-center justify-center gap-2"
+        >
+          <Filter size={14} />
+          <span className="truncate">
+            {collectedFilter === "collected"
+              ? "Collected"
+              : collectedFilter === "notcollected"
+              ? "Not Collected"
+              : "All"}
+          </span>
+        </button>
+
+        {collectedFilter === "open" && (
+          <div className="absolute right-0 mt-1 w-full
+                          bg-white border rounded-lg
+                          shadow z-20">
+            {[
+              ["", "All"],
+              ["collected", "Collected"],
+              ["notcollected", "Not Collected"],
+            ].map(([val, label]) => (
+              <button
+                key={label}
+                onClick={() => setCollectedFilter(val)}
+                className="block w-full px-3 py-2
+                           text-xs text-left
+                           hover:bg-slate-100"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   </div>
 </div>
-`
+
+
+</div>
+
+
 
 
       {/* ================= TABLE ================= */}
@@ -461,7 +502,36 @@ useEffect(() => {
 
     {/* Table Body */}
     <tbody className="text-gray-800 mb-4">
-      {filteredOrders.length === 0 ? (
+  {loading ? (
+    <tr>
+      <td colSpan="12" className="py-10 text-center">
+        <div className="flex justify-center items-center gap-2 text-gray-500 text-sm">
+          <svg
+            className="animate-spin h-5 w-5 text-blue-600"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            />
+          </svg>
+          Loading orders...
+        </div>
+      </td>
+    </tr>
+  ) : filteredOrders.length === 0 ? (
+
         <tr>
           <td colSpan="10" className="text-center py-6 text-gray-500">
             No orders found for selected tab
@@ -662,22 +732,18 @@ const paymentStatus =
     </tbody>
   </ThemedTable>
 </div>
-<div className="mt-6">
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={(page) => setCurrentPage(page)}
-        />
-      </div> 
+<div className="mt-4 border-t flex justify-center">
+  <Pagination
+    currentPage={currentPage}
+    totalPages={totalPages}
+    onPageChange={(page) => setCurrentPage(page)}
+  />
 </div>
-      {/* Pagination
-      <div className="mt-6">
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={(page) => setCurrentPage(page)}
-        />
-      </div> */}
+
+ 
+</div>
+     
+    
 
       {/* ================= MODALS (UNCHANGED) ================= */}
       {viewModal && (
@@ -701,21 +767,18 @@ const paymentStatus =
         />
       )}
 
-      {deleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
-            <div className="flex justify-between mb-4">
-              <h2 className="text-2xl font-bold">Delete Order</h2>
-              <X onClick={() => setDeleteModal(null)} />
-            </div>
-            <p className="mb-6">{deleteModal.orderId}</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteModal(null)}>Cancel</button>
-              <button onClick={handleConfirmDelete}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+     <ConfirmDialog
+  open={!!deleteModal}
+  title="Delete Order"
+  description={`Are you sure you want to delete order ${deleteModal?.orderId}? This action cannot be undone.`}
+  confirmText="Delete"
+  cancelText="Cancel"
+  variant="danger"
+  loading={deleting}
+  onCancel={() => setDeleteModal(null)}
+  onConfirm={handleConfirmDelete}
+/>
+
     </div>
   );
 };

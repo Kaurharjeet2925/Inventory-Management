@@ -4,7 +4,6 @@ import { toast } from "react-toastify";
 import { Pencil, Trash2 } from "lucide-react";
 import AddClient from "./AddClient";
 import ThemedTable from "../../components/ThemedTable";
-import PageContainer from "../../components/PageContainer";
 
 const Client = () => {
   const [clients, setClients] = useState([]);

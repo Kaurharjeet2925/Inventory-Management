@@ -363,7 +363,7 @@ const handleTransferStock = async () => {
 
         <button
           onClick={openAdd}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 transition text-sm sm:text-base whitespace-nowrap"
+          className="bg-blue-900 hover:bg-amber-500 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 transition text-sm sm:text-base whitespace-nowrap"
         >
           <Plus className="w-4 sm:w-5 h-4 sm:h-5" />
           <span className="hidden xs:inline">Add Product</span>

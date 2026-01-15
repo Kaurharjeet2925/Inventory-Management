@@ -26,24 +26,30 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
   const [errors, setErrors] = useState({});
 
   /* ================= PREFILL ================= */
-  useEffect(() => {
-    if (isEdit && clientData) {
-      setFormData({
-        name: clientData.name || "",
-        email: clientData.email || "",
-        phone: clientData.phone || "",
-        companyName: clientData.companyName || "",
-        address: clientData.address || "",
-        city: clientData.city || "",
-        state: clientData.state || "",
-        zipCode: clientData.zipCode || "",
-        country: clientData.country || "",
-        openingBalance: clientData.openingBalance ?? 0,
-      });
-    } else {
-      resetForm();
-    }
-  }, [isOpen, clientData, isEdit]);
+ useEffect(() => {
+  if (isEdit && clientData) {
+    const balance = Number(clientData.openingBalance || 0);
+
+    setFormData({
+      name: clientData.name || "",
+      email: clientData.email || "",
+      phone: clientData.phone || "",
+      companyName: clientData.companyName || "",
+      address: clientData.address || "",
+      city: clientData.city || "",
+      state: clientData.state || "",
+      zipCode: clientData.zipCode || "",
+      country: clientData.country || "",
+
+      // 🔥 IMPORTANT FIX
+      openingBalance: Math.abs(balance),
+      openingBalanceType: balance < 0 ? "credit" : "debit",
+    });
+  } else {
+    resetForm();
+  }
+}, [isOpen, clientData, isEdit]);
+
 
   /* ================= HANDLERS ================= */
   const handleChange = (e) => {
@@ -202,20 +208,40 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
               <input name="country" value={formData.country} onChange={handleChange} className={inputClass} />
             </div>
 
-            <div>
-              <label className={labelClass}>Opening Balance</label>
-              <input
-                type="number"
-                min="0"
-                name="openingBalance"
-                value={formData.openingBalance}
-                onChange={handleChange}
-                className={inputClass}
-              />
-              {errors.openingBalance && (
-                <p className="text-red-500 text-xs mt-1">{errors.openingBalance}</p>
-              )}
-            </div>
+           <div>
+  <label className={labelClass}>Opening Balance</label>
+
+  <div className="grid grid-cols-2 gap-3">
+    {/* AMOUNT */}
+    <input
+      type="number"
+      min="0"
+      name="openingBalance"
+      value={formData.openingBalance}
+      onChange={handleChange}
+      className={inputClass}
+      placeholder="Amount"
+    />
+
+    {/* DEBIT / CREDIT */}
+    <select
+      name="openingBalanceType"
+      value={formData.openingBalanceType}
+      onChange={handleChange}
+      className={inputClass}
+    >
+      <option value="debit">Debit (Due)</option>
+      <option value="credit">Credit (Advance)</option>
+    </select>
+  </div>
+
+  {errors.openingBalance && (
+    <p className="text-red-500 text-xs mt-1">
+      {errors.openingBalance}
+    </p>
+  )}
+</div>
+
           </div>
 
           {/* FOOTER */}

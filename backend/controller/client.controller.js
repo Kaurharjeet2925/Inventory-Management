@@ -1,5 +1,5 @@
 const Client = require("../models/client.model");
-
+const ClientLedger = require("../models/clientLedger.model");
 // Get all clients
 exports.getAllClients = async (req, res) => {
   try {
@@ -38,53 +38,134 @@ exports.getClientById = async (req, res) => {
 // Create new client
 exports.createClient = async (req, res) => {
   try {
-    const { name, email, phone, companyName, address, city, state, zipCode, country, notes, openingBalance=0 } = req.body;
-
-    // Validate required fields
-    if (!name || !email || !phone) {
-      return res.status(400).json({ message: "Name, email, and phone are required" });
-    }
-
-    // Check if email already exists
-    const existingClient = await Client.findOne({ email });
-    if (existingClient) {
-      return res.status(400).json({ message: "Client with this email already exists" });
-    }
-
-    const newClient = await Client.create({
+    const {
       name,
       email,
       phone,
-      address,
       companyName,
+      address,
       city,
       state,
       zipCode,
       country,
       notes,
-      openingBalance,
+      openingBalance = 0,
+      openingBalanceType = "debit",
+    } = req.body;
+
+    if (!name || !email || !phone) {
+      return res
+        .status(400)
+        .json({ message: "Name, email, and phone are required" });
+    }
+
+    const existingClient = await Client.findOne({ email });
+    if (existingClient) {
+      return res
+        .status(400)
+        .json({ message: "Client with this email already exists" });
+    }
+
+    // ✅ NORMALIZE opening balance
+    const absOpeningBalance = Math.abs(Number(openingBalance) || 0);
+
+    // ✅ SIGNED running balance
+    const balance =
+      openingBalanceType === "credit"
+        ? -absOpeningBalance
+        : absOpeningBalance;
+
+    const newClient = await Client.create({
+      name,
+      email,
+      phone,
+      companyName,
+      address,
+      city,
+      state,
+      zipCode,
+      country,
+      notes,
+      openingBalance: absOpeningBalance,      // ALWAYS positive
+      openingBalanceType,                     // debit / credit
+      balance,                                // signed
       createdBy: req.user?._id,
     });
 
-    const populatedClient = await newClient.populate("createdBy", "name email");
+    // 🔹 Opening ledger entry
+    if (absOpeningBalance !== 0) {
+      await ClientLedger.create({
+        clientId: newClient._id,
+        type: "opening",
+        description: "Opening Balance",
+        debit: openingBalanceType === "debit" ? absOpeningBalance : 0,
+        credit: openingBalanceType === "credit" ? absOpeningBalance : 0,
+        balanceAfter: balance,
+        createdBy: req.user?._id,
+      });
+    }
+
+    const populatedClient = await newClient.populate(
+      "createdBy",
+      "name email"
+    );
 
     res.status(201).json({
       message: "Client created successfully",
       client: populatedClient,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error creating client", error: error.message });
+    res.status(500).json({
+      message: "Error creating client",
+      error: error.message,
+    });
   }
 };
+
+
 
 // Update client
 exports.updateClient = async (req, res) => {
   try {
-    const { name, email, phone, companyName, address, city, state, zipCode, country, notes, openingBalance } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      companyName,
+      address,
+      city,
+      state,
+      zipCode,
+      country,
+      notes,
+      openingBalance,
+      openingBalanceType,
+    } = req.body;
+
+    // 🔒 NORMALIZE BALANCE (THIS IS THE FIX)
+    let normalizedOpeningBalance = Number(openingBalance) || 0;
+
+    if (openingBalanceType === "credit") {
+      normalizedOpeningBalance = -Math.abs(normalizedOpeningBalance);
+    } else {
+      normalizedOpeningBalance = Math.abs(normalizedOpeningBalance);
+    }
 
     const client = await Client.findByIdAndUpdate(
       req.params.id,
-      { name, email, phone, companyName, address, city, state, zipCode, country, notes, openingBalance },
+      {
+        name,
+        email,
+        phone,
+        companyName,
+        address,
+        city,
+        state,
+        zipCode,
+        country,
+        notes,
+        openingBalance: normalizedOpeningBalance,
+      },
       { new: true, runValidators: true }
     ).populate("createdBy", "name email");
 
@@ -97,9 +178,14 @@ exports.updateClient = async (req, res) => {
       client,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error updating client", error: error.message });
+    res.status(500).json({
+      message: "Error updating client",
+      error: error.message,
+    });
   }
 };
+
+
 
 // Delete client
 exports.deleteClient = async (req, res) => {

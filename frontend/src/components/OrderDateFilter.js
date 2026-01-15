@@ -9,6 +9,7 @@ import "react-date-range/dist/theme/default.css";
 const OrderDateFilter = ({ fromDate, toDate, onApply, onClear }) => {
   const wrapperRef = useRef(null);
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   const [range, setRange] = useState([
     {
@@ -45,47 +46,58 @@ const OrderDateFilter = ({ fromDate, toDate, onApply, onClear }) => {
     setOpen(false);
   };
 
-  /* ---------------- INPUT LABEL ---------------- */
+  /* ---------------- LABEL ---------------- */
+  let label = "Select dates";
 
- let label = "Select dates";
+  if (fromDate && toDate) {
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
 
-if (fromDate && toDate) {
-  const start = new Date(fromDate);
-  const end = new Date(toDate);
+    const sameDay = start.toDateString() === end.toDateString();
+    const sameYear = start.getFullYear() === end.getFullYear();
 
-  const sameDay = start.toDateString() === end.toDateString();
-  const sameYear = start.getFullYear() === end.getFullYear();
-
-  if (sameDay) {
-    label = format(start, "dd MMM yyyy");
-  } else if (sameYear) {
-    label = `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
-  } else {
-    label = `${format(start, "dd MMM yyyy")} – ${format(end, "dd MMM yyyy")}`;
+    if (sameDay) {
+      label = format(start, "dd MMM yyyy");
+    } else if (sameYear) {
+      label = `${format(start, "dd MMM")} – ${format(end, "dd MMM yyyy")}`;
+    } else {
+      label = `${format(start, "dd MMM yyyy")} – ${format(end, "dd MMM yyyy")}`;
+    }
   }
-}
 
-
-
+  /* ---------------- OPEN HANDLER ---------------- */
+  const handleOpen = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 6,
+      left: rect.right - 340,
+    });
+    setOpen((prev) => !prev);
+  };
 
   return (
-    <div className="relative" ref={wrapperRef}>
-      {/* INPUT */}
-   <button
-  onClick={() => setOpen(!open)}
-  className="flex items-center gap-2 px-4 py-2 rounded-full border bg-white shadow-sm
-             hover:bg-gray-50 text-sm font-medium text-gray-700"
->
-  <Calendar size={16} className="text-gray-500" />
-  <span>{label}</span>
-</button>
+    <div ref={wrapperRef}>
+      {/* INPUT BUTTON */}
+      <button
+        onClick={handleOpen}
+        className="h-9 w-40 px-3 rounded-md border border-gray-300 bg-white
+                   hover:bg-gray-50 text-xs font-medium text-gray-700
+                   flex items-center gap-2"
+      >
+        <Calendar size={14} className="text-gray-500 shrink-0" />
+        <span className="max-w-[120px] truncate whitespace-nowrap">
+          {label}
+        </span>
+      </button>
 
-
-      {/* CALENDAR */}
+      {/* CALENDAR (FIXED POSITION — NO SCROLL) */}
       {open && (
-        <div className="absolute right-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border w-[340px]">
+        <div
+          className="fixed z-[9999] bg-white rounded-xl shadow-2xl border w-[340px]"
+          style={{ top: pos.top, left: pos.left }}
+        >
           {/* Calendar body */}
-          <div className="p-3 max-h-[420px] overflow-y-auto">
+          <div className="p-3">
             <DateRange
               ranges={range}
               onChange={(item) => setRange([item.selection])}
@@ -102,14 +114,16 @@ if (fromDate && toDate) {
           <div className="flex gap-2 p-3 border-t bg-gray-50 rounded-b-xl">
             <button
               onClick={handleApply}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium"
+              className="flex-1 bg-blue-600 hover:bg-blue-700
+                         text-white py-1.5 rounded-md text-xs font-medium"
             >
               Apply
             </button>
 
             <button
               onClick={handleClear}
-              className="flex-1 bg-white border hover:bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium"
+              className="flex-1 bg-white border hover:bg-gray-100
+                         text-gray-700 py-1.5 rounded-md text-xs font-medium"
             >
               Clear
             </button>

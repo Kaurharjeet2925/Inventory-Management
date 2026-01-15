@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const clientSchema = new Schema(
+const clientSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     companyName: { type: String, trim: true },
@@ -13,13 +12,18 @@ const clientSchema = new Schema(
     zipCode: { type: String, trim: true },
     country: { type: String, trim: true },
     notes: { type: String },
-    openingBalance: {
-      type: Number,
-      default: 0
+
+    openingBalance: { type: Number, default: 0},
+    openingBalanceType: {
+      type: String,
+      enum: ["debit", "credit"],
+      default: "debit",
     },
+
+    balance: { type: Number, default: 0 }, // ⭐ real running balance
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "Users" },
   },
   { timestamps: true }
 );
-
 module.exports = mongoose.model("Client", clientSchema);

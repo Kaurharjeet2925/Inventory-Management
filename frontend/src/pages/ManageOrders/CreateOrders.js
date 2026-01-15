@@ -797,7 +797,7 @@ const paymentStatus =
   </div>
 
   {/* RIGHT — ORDER SUMMARY */}
-  <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg">
+  <div className="bg-gradient-to-br from-blue-950 to-blue-800 rounded-2xl p-6 text-white shadow-lg">
 
     <p className="text-xs text-slate-400 mb-3">
       ORDER SUMMARY

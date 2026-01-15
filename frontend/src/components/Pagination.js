@@ -8,8 +8,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
   };
 
   return (
-    <div className="flex justify-center mt-6">
-      <div className="flex items-center gap-2  px-4 py-2 rounded-lg shadow-sm">
+    <div className="flex justify-center mt-4">
+      <div className="flex items-center gap-2  px-4 py-2 rounded-lg shadow-md">
 
         {/* Previous Button */}
         <button
