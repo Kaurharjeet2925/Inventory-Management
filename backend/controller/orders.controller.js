@@ -1,5 +1,8 @@
 const Order = require("../models/orders.model");
 const Product = require("../models/product.model");
+const Client = require("../models/client.model")
+const ClientLedger = require("../models/clientLedger.model")
+const {getLastLedgerBalance} = require("../utils/getLastLedgerBalance")
 const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
 
@@ -28,158 +31,154 @@ const generateOrderId = async () => {
 
 exports.createOrder = async (req, res) => {
   try {
-    const { 
-      clientId, 
+    const {
+      clientId,
       deliveryPersonId,
       paymentDetails,
-      items, 
-      notes, 
-      status = "pending" 
+      items,
+      notes,
+      status = "pending",
     } = req.body;
-    const assignedBy = req.user._id; // Get current user ID
 
-    console.log("Create Order Request:", req.body);
+    const assignedBy = req.user._id;
 
     if (!clientId) return res.status(400).json({ message: "Client is required" });
-    if (!deliveryPersonId) return res.status(400).json({ message: "Delivery person is required" });
+    if (!deliveryPersonId)
+      return res.status(400).json({ message: "Delivery person is required" });
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Order must contain at least 1 item" });
 
-    // Get io instance early so it's available throughout function
     const io = req.app.get("io");
 
+    /* ================= STOCK CHECK ================= */
     for (let item of items) {
-  const product = await Product.findById(item.productId)
-    .populate("warehouses.location");
+      const product = await Product.findById(item.productId).populate(
+        "warehouses.location"
+      );
 
-  if (!product) {
-    return res.status(404).json({
-      message: `Product not found: ${item.productName}`,
-    });
-  }
+      if (!product) {
+        return res.status(404).json({
+          message: `Product not found: ${item.productName}`,
+        });
+      }
 
-  const warehouse = product.warehouses.find(
-    w => w.location._id.toString() === item.warehouseId
-  );
+      const warehouse = product.warehouses.find(
+        (w) => w.location._id.toString() === item.warehouseId
+      );
 
-  if (!warehouse) {
-    return res.status(404).json({
-      message: `Warehouse stock not found for product: ${item.productName}`,
-    });
-  }
+      if (!warehouse) {
+        return res.status(404).json({
+          message: `Warehouse stock not found for product: ${item.productName}`,
+        });
+      }
 
-  const available = Number(warehouse.quantity || 0);
-  const qty = Number(item.quantity);
+      if (Number(item.quantity) > Number(warehouse.quantity || 0)) {
+        return res.status(400).json({
+          message: `Not enough stock in ${warehouse.location.name}`,
+        });
+      }
+    }
 
-  if (qty > available) {
-    return res.status(400).json({
-      message: `Not enough stock in ${warehouse.location.name}. Available: ${available}`,
-    });
-  }
-}
-
-
-  
-  
-
+    /* ================= STOCK DEDUCTION ================= */
     for (let item of items) {
-  const product = await Product.findById(item.productId);
+      const product = await Product.findById(item.productId);
 
-  const warehouseIndex = product.warehouses.findIndex(
-    w => w.location.toString() === item.warehouseId
-  );
+      const warehouseIndex = product.warehouses.findIndex(
+        (w) => w.location.toString() === item.warehouseId
+      );
 
-  if (warehouseIndex === -1) continue;
+      if (warehouseIndex !== -1) {
+        product.warehouses[warehouseIndex].quantity -= Number(item.quantity);
+        await product.save();
+        io.emit("product_updated", { productId: product._id });
+      }
+    }
 
-  product.warehouses[warehouseIndex].quantity -= Number(item.quantity);
-
-  await product.save();
-
-  // 🔔 Emit socket update (warehouse-based)
-  io.emit("product_updated", {
-    productId: product._id,
-  });
-}
-
-
-    // Generate Order ID
+    /* ================= ORDER ITEMS ================= */
     const orderId = await generateOrderId();
 
     let totalAmount = 0;
     const formattedItems = [];
 
-    
     for (let item of items) {
-  const product = await Product.findById(item.productId)
-    .populate("warehouses.location");
+      const price = Number(item.price || 0);
+      const qty = Number(item.quantity || 0);
+      const totalPrice = price * qty;
 
-  const warehouse = product.warehouses.find(
-    w => w.location._id.toString() === item.warehouseId
-  );
+      totalAmount += totalPrice;
 
-  const price = Number(item.price || 0);
-  const qty = Number(item.quantity || 0);
-  const totalPrice = qty * price;
+      formattedItems.push({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: qty,
+        quantityValue: item.quantityValue,
+        quantityUnit: item.quantityUnit,
+        price,
+        totalPrice,
+        warehouseId: item.warehouseId,
+        warehouseName: item.warehouseName,
+      });
+    }
 
-  totalAmount += totalPrice;
+    /* ================= PAYMENT CALCULATION ================= */
+    const discount = Math.max(Number(paymentDetails?.discount || 0), 0);
 
-  formattedItems.push({
-    productId: item.productId,
-    productName: item.productName,
+    const payments = Array.isArray(paymentDetails?.payments)
+      ? paymentDetails.payments
+      : [];
 
-    quantity: qty,
-    quantityValue: item.quantityValue,
-    quantityUnit: item.quantityUnit,
-
-    price,
-    totalPrice,
-
-    warehouseId: warehouse.location._id,
-    warehouseName: warehouse.location.name,
-    warehouseAddress: warehouse.location.address,
-  });
-}
-
-
-
- // ---------------- PAYMENT DETAILS ----------------
-const discount = Math.max(Number(paymentDetails?.discount || 0), 0);
-
-// ensure payments array
-const payments = Array.isArray(paymentDetails?.payments)
-  ? paymentDetails.payments
-  : [];
-
-// calculate paid from payment modes
-const paid = payments.reduce(
+    const manualPaid = payments.reduce(
   (sum, p) => sum + Number(p.amount || 0),
   0
 );
 
-// payable after discount
-const payable = Math.max(totalAmount - discount, 0);
 
-// balance
-const balance = Math.max(payable - paid, 0);
+    const payable = Math.max(totalAmount - discount, 0);
+    let adjustedPaidFromLedger = 0;
+let unpaidAmount = payable;
+ const client = await Client.findById(clientId);
 
-// final payment object (ENUM SAFE ✅)
-const finalPaymentDetails = {
+   const previousBalance = await getLastLedgerBalance(
+  clientId,
+  client.openingBalanceType === "credit"
+    ? -client.openingBalance
+    : client.openingBalance
+);
+// Case 1: Client has advance
+if (previousBalance < 0) {
+  const availableAdvance = Math.abs(previousBalance);
+
+  if (availableAdvance >= payable) {
+    // FULLY PAID by advance
+    adjustedPaidFromLedger = payable;
+    unpaidAmount = 0;
+  } else {
+    // PARTIALLY PAID by advance
+    adjustedPaidFromLedger = availableAdvance;
+    unpaidAmount = payable - availableAdvance;
+  }
+}
+const totalPaid = manualPaid + adjustedPaidFromLedger;
+
+let paymentStatus = "unpaid";
+if (totalPaid >= payable) {
+  paymentStatus = "paid";
+} else if (totalPaid > 0) {
+  paymentStatus = "partial";
+}
+
+
+    const finalPaymentDetails = {
   totalAmount,
   discount,
-  payments,
-  paidAmount: paid,
-  balanceAmount: balance,
-  paymentStatus:
-    paid === 0
-      ? "unpaid"
-      : paid >= payable
-      ? "paid"
-      : "partial",
+  payments, // only real payments (cash/upi)
+  paidAmount: totalPaid, // ✅ FIXED
+  balanceAmount: unpaidAmount,
+  paymentStatus,
 };
 
-    // -----------------------------------------------------
-    // Save Order
-    // ⭐ -------------------------------------------------
+
+    /* ================= SAVE ORDER ================= */
     const newOrder = await Order.create({
       orderId,
       clientId,
@@ -188,18 +187,40 @@ const finalPaymentDetails = {
       paymentDetails: finalPaymentDetails,
       items: formattedItems,
       notes,
-      status
+      status,
     });
 
-    // Fetch and populate order before emitting via socket
-   const populatedOrder = await Order.findById(newOrder._id)
-  .select("+paymentDetails") // ✅ ADD THIS
-  .populate("deliveryPersonId", "name phone email")
-  .populate("assignedBy", "name role")
-  .populate("clientId", "name phone address");
+    /* ================= CLIENT BALANCE UPDATE ================= */
+   
+
+const newBalance = previousBalance + payable;
 
 
-      let dpId =
+    await Client.findByIdAndUpdate(clientId, {
+      balance: newBalance,
+    });
+
+    /* ================= CLIENT LEDGER ENTRY ================= */
+    await ClientLedger.create({
+  clientId,
+  type: "order",
+  referenceId: newOrder._id,
+  description: `Order ${orderId}`,
+  debit: payable,
+  credit: 0,
+  balanceAfter: newBalance,
+  createdBy: req.user._id,
+});
+
+
+    /* ================= SOCKET + NOTIFICATIONS ================= */
+    const populatedOrder = await Order.findById(newOrder._id)
+      .select("+paymentDetails")
+      .populate("deliveryPersonId", "name phone email")
+      .populate("assignedBy", "name role")
+      .populate("clientId", "name phone address");
+
+     let dpId =
       typeof deliveryPersonId === "string"
         ? deliveryPersonId
         : (deliveryPersonId?._id || "").toString();
@@ -258,6 +279,7 @@ if (req.user.role !== "superAdmin") {
     return res.status(500).json({ message: "Server error", error });
   }
 };
+
 
 
 exports.getOrders = async (req, res) => {
@@ -444,9 +466,29 @@ const paid = Number(paymentDetails?.paidAmount || 0);
 const payable = Math.max(totalAmount - discount, 0);
 const balanceAmount = Math.max(payable - paid, 0);
 
+const client = await Client.findById(existingOrder.clientId);
+
+const previousBalance = await getLastLedgerBalance(
+  client._id,
+  client.openingBalanceType === "credit"
+    ? -client.openingBalance
+    : client.openingBalance
+);
+
+// Remove old order impact
+const oldUnpaid =
+  existingOrder.paymentDetails.balanceAmount || 0;
+
+const balanceWithoutOldOrder = previousBalance - oldUnpaid;
+
+// Apply new order amount
+const newUnpaid = Math.max(totalAmount - discount - paid, 0);
+const newBalance = balanceWithoutOldOrder + newUnpaid;
+
+// Decide payment status
 let paymentStatus = "unpaid";
-if (paid >= payable && payable > 0) paymentStatus = "paid";
-else if (paid > 0) paymentStatus = "partial";
+if (newBalance <= 0) paymentStatus = "paid";
+else if (balanceWithoutOldOrder < 0) paymentStatus = "partial";
 
 
     /* ================= UPDATE ORDER ================= */
@@ -458,8 +500,8 @@ else if (paid > 0) paymentStatus = "partial";
         paymentDetails: {
   totalAmount,
   discount,
-  paidAmount: paid,
-  balanceAmount,
+   paidAmount: paid,
+  balanceAmount: Math.max(newBalance, 0),
   paymentStatus,
 },
       },
@@ -511,6 +553,7 @@ exports.updateOrderPayment = async (req, res) => {
     const { payment, discount } = req.body;
     const orderId = req.params.id;
 
+    /* ================= FIND ORDER ================= */
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
@@ -530,7 +573,7 @@ exports.updateOrderPayment = async (req, res) => {
         payments: [],
         paidAmount: 0,
         balanceAmount: total,
-        paymentStatus: "unpaid"
+        paymentStatus: "unpaid",
       };
     }
 
@@ -544,30 +587,31 @@ exports.updateOrderPayment = async (req, res) => {
 
       if (discountValue < 0) {
         return res.status(400).json({
-          message: "Discount cannot be negative"
+          message: "Discount cannot be negative",
         });
       }
 
       if (discountValue > order.paymentDetails.totalAmount) {
         return res.status(400).json({
-          message: "Discount cannot exceed total amount"
+          message: "Discount cannot exceed total amount",
         });
       }
 
       order.paymentDetails.discount = discountValue;
     }
 
+    let paymentAmount = 0;
+
     /* ================= ADD PAYMENT ================= */
     if (payment) {
-      const amount = Number(payment.amount);
+      paymentAmount = Number(payment.amount);
 
-      if (!payment.mode || !amount || amount <= 0) {
+      if (!payment.mode || !paymentAmount || paymentAmount <= 0) {
         return res.status(400).json({
-          message: "Invalid payment data"
+          message: "Invalid payment data",
         });
       }
 
-      // calculate current payable
       const payable =
         order.paymentDetails.totalAmount -
         order.paymentDetails.discount;
@@ -577,15 +621,15 @@ exports.updateOrderPayment = async (req, res) => {
         0
       );
 
-      if (alreadyPaid + amount > payable) {
+      if (alreadyPaid + paymentAmount > payable) {
         return res.status(400).json({
-          message: `Cannot collect more than ₹${payable - alreadyPaid}`
+          message: `Cannot collect more than ₹${payable - alreadyPaid}`,
         });
       }
 
       order.paymentDetails.payments.push({
         mode: payment.mode,
-        amount
+        amount: paymentAmount,
       });
     }
 
@@ -605,28 +649,73 @@ exports.updateOrderPayment = async (req, res) => {
       0
     );
 
-    order.paymentDetails.paymentStatus =
-      totalPaid === 0
-        ? "unpaid"
-        : totalPaid >= payable
-        ? "paid"
-        : "partial";
+   const previousBalance = await getLastLedgerBalance(
+  order.clientId,
+  client.openingBalanceType === "credit"
+    ? -client.openingBalance
+    : client.openingBalance
+);
 
+const newBalance = previousBalance - paymentAmount;
+
+// Decide status ONLY from ledger
+let paymentStatus = "unpaid";
+if (newBalance <= 0) paymentStatus = "paid";
+else if (previousBalance < 0 && newBalance > 0)
+  paymentStatus = "partial";
+
+order.paymentDetails.paymentStatus = paymentStatus;
+order.paymentDetails.balanceAmount = Math.max(newBalance, 0);
+
+
+    /* ================= SAVE ORDER ONCE ================= */
     await order.save();
+
+    /* ================= CLIENT BALANCE + LEDGER ================= */
+    if (payment && paymentAmount > 0) {
+      const client = await Client.findById(order.clientId);
+
+      if (client) {
+        const previousBalance = await getLastLedgerBalance(
+  order.clientId,
+  client.openingBalanceType === "credit"
+    ? -client.openingBalance
+    : client.openingBalance
+);
+
+const newBalance = previousBalance - paymentAmount;
+
+client.balance = newBalance;
+
+
+        await client.save();
+
+        await ClientLedger.create({
+          clientId: order.clientId,
+          type: "payment",
+          referenceId: order._id,
+          description: `Payment received for Order ${order.orderId}`,
+          debit: 0,
+          credit: paymentAmount,
+          balanceAfter: client.balance,
+          createdBy: req.user._id,
+        });
+      }
+    }
 
     return res.json({
       message: "Payment updated successfully",
-      order
+      order,
     });
-
   } catch (error) {
     console.error("updateOrderPayment error:", error);
     return res.status(500).json({
       message: "Payment update failed",
-      error: error.message
+      error: error.message,
     });
   }
 };
+
 
 
 

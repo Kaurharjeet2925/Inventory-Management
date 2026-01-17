@@ -40,6 +40,7 @@ import MyProfile from './pages/Profile/MyProfile.js';
 import CompanySettings from './pages/Settings/CompanySettings.js';
 import ChangePassword from './pages/Settings/ChangePassword.js';
 import ProcessingOrders from './pages/Delivery/Deliveries/ProcessingOrders.js';
+import ClientLedger from './pages/ManageClient/ClientLedger.js';
 function App() {
   useEffect(() => {
     socket.on("connect", () => {
@@ -85,6 +86,8 @@ function App() {
 
         <Route path="/manage-client" element={<ManageClients />}>
           <Route path="client" element={<Client />} />
+          <Route path="client-ledger/:id" element={<ClientLedger />} />
+
         </Route>
 
         <Route path="/orders" element={<ManageOrders />}>

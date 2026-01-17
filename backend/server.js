@@ -59,7 +59,7 @@ app.use("/api", ProductRoutes);
 const NotificationRoutes = require("./routes/notification.routes");
 app.use("/api/notifications", NotificationRoutes);
 app.use("/api", OrderRoutes);
-app.use("/api/clients", ClientRoutes);
+app.use("/api", ClientRoutes);
 app.use("/api", LocationRoutes);
 app.use("/api", ReportRoutes);
 app.use("/api", CompanySettingsRoutes);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../../apiclient/apiclient";
 import { toast } from "react-toastify";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import AddClient from "./AddClient";
 import ThemedTable from "../../components/ThemedTable";
 
@@ -13,6 +14,8 @@ const Client = () => {
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isEdit, setIsEdit] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+
+  const navigate = useNavigate();
 
   /* ================= FETCH CLIENTS ================= */
   useEffect(() => {
@@ -38,6 +41,25 @@ const Client = () => {
       c.email?.toLowerCase().includes(search.toLowerCase()) ||
       c.phone?.includes(search)
   );
+
+  /* ================= HELPERS ================= */
+  const renderBalance = (balance = 0) => {
+    if (balance > 0)
+      return (
+        <span className="text-red-600 font-semibold">
+          ₹ {balance} Dr
+        </span>
+      );
+
+    if (balance < 0)
+      return (
+        <span className="text-green-600 font-semibold">
+          ₹ {Math.abs(balance)} Cr
+        </span>
+      );
+
+    return <span className="text-slate-500">₹ 0</span>;
+  };
 
   /* ================= EDIT ================= */
   const handleEdit = (client) => {
@@ -78,7 +100,7 @@ const Client = () => {
           Clients
         </h1>
         <p className="text-sm text-slate-500">
-          Manage client information
+          Manage clients and view balances
         </p>
       </div>
 
@@ -118,10 +140,10 @@ const Client = () => {
           <thead className="bg-gray-200 text-slate-700">
             <tr className="h-12">
               <th className="px-6 text-left">Name</th>
-              <th className="px-6 text-left">Email</th>
               <th className="px-6 text-left">Phone</th>
               <th className="px-6 text-left">Company</th>
-              <th className="px-6 text-left">City</th>
+              <th className="px-6 text-center">Total Orders</th>
+              <th className="px-6 text-center">Balance</th>
               <th className="px-6 text-center">Actions</th>
             </tr>
           </thead>
@@ -134,42 +156,52 @@ const Client = () => {
                   className="border-b hover:bg-gray-50 transition h-[60px]"
                 >
                   <td className="px-6">{client.name}</td>
-                  <td className="px-6">{client.email}</td>
                   <td className="px-6">{client.phone}</td>
                   <td className="px-6">{client.companyName || "-"}</td>
-                  <td className="px-6">{client.city || "-"}</td>
+
+                  {/* TOTAL ORDERS */}
+                  <td className="px-6 text-center font-medium">
+                    {client.totalOrders ?? 0}
+                  </td>
+
+                  {/* BALANCE */}
+                  <td className="px-6 text-center">
+                    {renderBalance(client.balance)}
+                  </td>
 
                   {/* ACTIONS */}
                   <td className="px-6">
                     <div className="flex justify-center gap-2">
-                      {/* EDIT */}
                       <button
-                        type="button"
                         onClick={() => handleEdit(client)}
                         title="Edit Client"
-                        className="
-                          w-9 h-9 flex items-center justify-center
-                          rounded-full border border-blue-200
-                          text-blue-600 hover:bg-blue-100 hover:text-blue-700
-                          focus:outline-none focus:ring-2 focus:ring-blue-400
-                          transition
-                        "
+                        className="w-9 h-9 flex items-center justify-center
+                                   rounded-full border border-blue-200
+                                   text-blue-600 hover:bg-blue-100"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
 
-                      {/* DELETE */}
                       <button
-                        type="button"
+                        onClick={() =>
+                          navigate(
+                            `/manage-client/client-ledger/${client._id}`
+                          )
+                        }
+                        title="View Ledger"
+                        className="w-9 h-9 flex items-center justify-center
+                                   rounded-full border border-indigo-200
+                                   text-indigo-600 hover:bg-indigo-100"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      <button
                         onClick={() => handleDelete(client)}
                         title="Delete Client"
-                        className="
-                          w-9 h-9 flex items-center justify-center
-                          rounded-full border border-red-200
-                          text-red-600 hover:bg-red-100 hover:text-red-700
-                          focus:outline-none focus:ring-2 focus:ring-red-400
-                          transition
-                        "
+                        className="w-9 h-9 flex items-center justify-center
+                                   rounded-full border border-red-200
+                                   text-red-600 hover:bg-red-100"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
