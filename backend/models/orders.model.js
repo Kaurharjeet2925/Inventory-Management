@@ -36,22 +36,35 @@ const orderSchema = new mongoose.Schema(
       }
 
     ],
-   paymentDetails: {
+ paymentDetails: {
   totalAmount: { type: Number, required: true },
   discount: { type: Number, default: 0 },
 
   payments: [
     {
-      mode: { type: String, enum: ["Cash", "UPI", "Card", "Bank"], required: true },
+      mode: {
+        type: String,
+        enum: ["Cash", "UPI", "Card", "Bank"],
+        required: true
+      },
       amount: { type: Number, required: true },
       paidAt: { type: Date, default: Date.now }
     }
   ],
 
-  paidAmount: { type: Number, default: 0 },
+  manualPaidAmount: { type: Number, default: 0 }, // 👈 Cash/UPI etc
+  advanceUsed: { type: Number, default: 0 },      // 👈 Ledger se use hua
+
+  paidAmount: { type: Number, default: 0 },       // manual + advance
   balanceAmount: { type: Number, default: 0 },
-  paymentStatus: { type: String, enum: ["unpaid", "partial", "paid"], default: "unpaid" }
+
+  paymentStatus: {
+    type: String,
+    enum: ["unpaid", "partial", "paid"],
+    default: "unpaid"
+  }
 },
+
 
 
     collected: { type: Boolean, default: false },

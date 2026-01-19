@@ -384,9 +384,9 @@ const getWarehouseOptions = (productId, index) => {
                   setForm({
                     ...form,
                     paymentDetails: {
-                      ...form.paymentDetails,
-                      discount: Number(e.target.value || 0),
-                    },
+                discount
+}
+
                   })
                 }
                 className="border p-2 w-full"
@@ -394,34 +394,23 @@ const getWarehouseOptions = (productId, index) => {
             </div>
 
             <div>
-              <label className="text-sm text-gray-600">Amount Received</label>
-              <input
-                type="number"
-                disabled={!paymentEditable}
-                value={form.paymentDetails.paidAmount}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    paymentDetails: {
-                      ...form.paymentDetails,
-                      paidAmount: Number(e.target.value || 0),
-                    },
-                  })
-                }
-                className="border p-2 w-full"
-              />
+             <div>
+  <label className="text-sm text-gray-600">Paid</label>
+  <input
+    disabled
+    value={form.paymentDetails.paidAmount}
+    className="border p-2 w-full bg-gray-100"
+  />
+</div>
+
             </div>
 
             <div>
               <label className="text-sm text-gray-600">Balance</label>
               <input
                 disabled
-                value={Math.max(
-                  form.paymentDetails.totalAmount -
-                    form.paymentDetails.discount -
-                    form.paymentDetails.paidAmount,
-                  0
-                )}
+                value={form.paymentDetails.balanceAmount}
+
                 className="border p-2 w-full bg-gray-100 text-red-600 font-semibold"
               />
             </div>

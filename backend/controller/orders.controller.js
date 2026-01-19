@@ -9,6 +9,38 @@ const PDFDocument = require("pdfkit");
 const mongoose = require("mongoose")
 const { createNotification } = require("./notification.controller");
 // Helper to generate orderId like STN00001
+
+function calculateOrderPayment({
+  totalAmount,
+  discount = 0,
+  payments = [],
+  availableAdvance = 0, // positive number
+}) {
+  const payable = Math.max(totalAmount - discount, 0);
+
+  const manualPaid = payments.reduce(
+    (sum, p) => sum + Number(p.amount || 0),
+    0
+  );
+
+  const advanceUsed = Math.min(availableAdvance, payable - manualPaid);
+
+  const totalPaid = manualPaid + advanceUsed;
+  const balanceAmount = Math.max(payable - totalPaid, 0);
+
+  let paymentStatus = "unpaid";
+  if (balanceAmount === 0) paymentStatus = "paid";
+  else if (totalPaid > 0) paymentStatus = "partial";
+
+  return {
+    payable,
+    manualPaid,
+    advanceUsed,
+    totalPaid,
+    balanceAmount,
+    paymentStatus,
+  };
+}
 const generateOrderId = async () => {
   // Find all orders and get the highest number
   const allOrders = await Order.find().sort({ createdAt: -1 });
@@ -134,46 +166,46 @@ exports.createOrder = async (req, res) => {
 
 
     const payable = Math.max(totalAmount - discount, 0);
-    let adjustedPaidFromLedger = 0;
-let unpaidAmount = payable;
+   
  const client = await Client.findById(clientId);
+ 
 
-   const previousBalance = await getLastLedgerBalance(
+if (!client) {
+  return res.status(404).json({ message: "Client not found" });
+}
+
+const previousBalance = await getLastLedgerBalance(
   clientId,
   client.openingBalanceType === "credit"
     ? -client.openingBalance
     : client.openingBalance
 );
-// Case 1: Client has advance
-if (previousBalance < 0) {
-  const availableAdvance = Math.abs(previousBalance);
 
-  if (availableAdvance >= payable) {
-    // FULLY PAID by advance
-    adjustedPaidFromLedger = payable;
-    unpaidAmount = 0;
-  } else {
-    // PARTIALLY PAID by advance
-    adjustedPaidFromLedger = availableAdvance;
-    unpaidAmount = payable - availableAdvance;
-  }
-}
-const totalPaid = manualPaid + adjustedPaidFromLedger;
+// only ADVANCE is usable
+const availableAdvance =
+  previousBalance < 0 ? Math.abs(previousBalance) : 0;
+
+// ✅ USE ADVANCE AUTOMATICALLY
+const advanceUsed = Math.min(
+  availableAdvance,
+  Math.max(payable - manualPaid, 0)
+);
+
+const totalPaid = manualPaid + advanceUsed;
+const balanceAmount = Math.max(payable - totalPaid, 0);
 
 let paymentStatus = "unpaid";
-if (totalPaid >= payable) {
-  paymentStatus = "paid";
-} else if (totalPaid > 0) {
-  paymentStatus = "partial";
-}
+if (balanceAmount === 0) paymentStatus = "paid";
+else if (totalPaid > 0) paymentStatus = "partial";
 
-
-    const finalPaymentDetails = {
+const finalPaymentDetails = {
   totalAmount,
   discount,
-  payments, // only real payments (cash/upi)
-  paidAmount: totalPaid, // ✅ FIXED
-  balanceAmount: unpaidAmount,
+  payments,          // only cash/upi/card etc
+  paidAmount: totalPaid,
+  manualPaidAmount: manualPaid,   // ✅ ADD
+  advanceUsed,  
+  balanceAmount,
   paymentStatus,
 };
 
@@ -193,23 +225,50 @@ if (totalPaid >= payable) {
     /* ================= CLIENT BALANCE UPDATE ================= */
    
 
-const newBalance = previousBalance + payable;
+// Ledger flow:
+// 1. Order debit
+const afterOrderBalance = previousBalance + payable;
+
+// 2. Advance usage
+let balanceAfterPayment = afterOrderBalance;
+
+// subtract manual payment first
+if (manualPaid > 0) {
+  balanceAfterPayment -= manualPaid;
+}
+
+// advance is already implicitly used by order debit
+// so DO NOT subtract it again
 
 
-    await Client.findByIdAndUpdate(clientId, {
-      balance: newBalance,
-    });
 
     /* ================= CLIENT LEDGER ENTRY ================= */
-    await ClientLedger.create({
+ await ClientLedger.create({
   clientId,
   type: "order",
   referenceId: newOrder._id,
   description: `Order ${orderId}`,
   debit: payable,
   credit: 0,
-  balanceAfter: newBalance,
+  balanceAfter: afterOrderBalance,
   createdBy: req.user._id,
+});
+
+if (manualPaid > 0) {
+  await ClientLedger.create({
+    clientId,
+    type: "payment",
+    referenceId: newOrder._id,
+    description: `Payment received at order creation (${orderId})`,
+    debit: 0,
+    credit: manualPaid,
+    balanceAfter: balanceAfterPayment,
+    createdBy: req.user._id,
+  });
+}
+
+await Client.findByIdAndUpdate(clientId, {
+  balance: balanceAfterPayment,
 });
 
 
@@ -460,53 +519,89 @@ exports.updateOrder = async (req, res) => {
       };
     });
 
-   const discount = Number(paymentDetails?.discount || 0);
-const paid = Number(paymentDetails?.paidAmount || 0);
+const discount = Math.max(Number(paymentDetails?.discount || 0), 0);
 
-const payable = Math.max(totalAmount - discount, 0);
-const balanceAmount = Math.max(payable - paid, 0);
+/* ================= PAYABLE ================= */
+const newPayable = Math.max(totalAmount - discount, 0);
 
-const client = await Client.findById(existingOrder.clientId);
+/* ================= PAID ================= */
+const manualPaid =
+  existingOrder.paymentDetails.payments?.reduce(
+    (s, p) => s + Number(p.amount || 0),
+    0
+  ) || 0;
 
-const previousBalance = await getLastLedgerBalance(
-  client._id,
-  client.openingBalanceType === "credit"
-    ? -client.openingBalance
-    : client.openingBalance
-);
+// advance already stored from createOrder
+const advanceUsed =
+  existingOrder.paymentDetails.advanceUsed || 0;
 
-// Remove old order impact
-const oldUnpaid =
-  existingOrder.paymentDetails.balanceAmount || 0;
+const paidAmount = manualPaid + advanceUsed;
+const balanceAmount = Math.max(newPayable - paidAmount, 0);
 
-const balanceWithoutOldOrder = previousBalance - oldUnpaid;
-
-// Apply new order amount
-const newUnpaid = Math.max(totalAmount - discount - paid, 0);
-const newBalance = balanceWithoutOldOrder + newUnpaid;
-
-// Decide payment status
+/* ================= STATUS ================= */
 let paymentStatus = "unpaid";
-if (newBalance <= 0) paymentStatus = "paid";
-else if (balanceWithoutOldOrder < 0) paymentStatus = "partial";
+if (balanceAmount === 0) paymentStatus = "paid";
+else if (paidAmount > 0) paymentStatus = "partial";
+
+
+const oldPayable =
+  existingOrder.paymentDetails.totalAmount -
+  existingOrder.paymentDetails.discount;
+
+const difference = newPayable - oldPayable;
+
+if (difference !== 0) {
+  const client = await Client.findById(existingOrder.clientId);
+
+  const previousBalance = await getLastLedgerBalance(
+    client._id,
+    client.openingBalanceType === "credit"
+      ? -client.openingBalance
+      : client.openingBalance
+  );
+
+  let newBalance = previousBalance + difference;
+
+  await ClientLedger.create({
+    clientId: client._id,
+    type: "order_adjustment",
+    referenceId: existingOrder._id,
+    description:
+      difference > 0
+        ? `Order ${existingOrder.orderId} amount increased`
+        : `Order ${existingOrder.orderId} amount reduced`,
+    debit: difference > 0 ? difference : 0,
+    credit: difference < 0 ? Math.abs(difference) : 0,
+    balanceAfter: newBalance,
+    createdBy: req.user._id,
+  });
+
+  client.balance = newBalance;
+  await client.save();
+}
+
 
 
     /* ================= UPDATE ORDER ================= */
     const updatedOrder = await Order.findByIdAndUpdate(
-      orderId,
-      {
-        status: status || "pending",
-        items: updatedItems,
-        paymentDetails: {
+  orderId,
+  {
+    status: status || "pending",
+    items: updatedItems,
+   paymentDetails: {
+  ...existingOrder.paymentDetails,
   totalAmount,
   discount,
-   paidAmount: paid,
-  balanceAmount: Math.max(newBalance, 0),
+  paidAmount,
+  balanceAmount,
   paymentStatus,
 },
-      },
-      { new: true }
-    );
+
+
+  },
+  { new: true }
+);
+
 
     /* ================= SOCKET EVENTS ================= */
     const io = req.app.get("io");
@@ -634,74 +729,64 @@ exports.updateOrderPayment = async (req, res) => {
     }
 
     /* ================= RE-CALCULATE TOTALS ================= */
-    const totalPaid = order.paymentDetails.payments.reduce(
-      (sum, p) => sum + Number(p.amount || 0),
-      0
-    );
-
-    const payable =
-      order.paymentDetails.totalAmount -
-      order.paymentDetails.discount;
-
-    order.paymentDetails.paidAmount = totalPaid;
-    order.paymentDetails.balanceAmount = Math.max(
-      payable - totalPaid,
-      0
-    );
-
-   const previousBalance = await getLastLedgerBalance(
-  order.clientId,
-  client.openingBalanceType === "credit"
-    ? -client.openingBalance
-    : client.openingBalance
+    const manualPaid = order.paymentDetails.payments.reduce(
+  (sum, p) => sum + Number(p.amount || 0),
+  0
 );
 
-const newBalance = previousBalance - paymentAmount;
+const advanceUsed = order.paymentDetails.advanceUsed || 0;
 
-// Decide status ONLY from ledger
+const payable =
+  order.paymentDetails.totalAmount -
+  order.paymentDetails.discount;
+
+const paidAmount = manualPaid + advanceUsed;
+const balanceAmount = Math.max(payable - paidAmount, 0);
+
 let paymentStatus = "unpaid";
-if (newBalance <= 0) paymentStatus = "paid";
-else if (previousBalance < 0 && newBalance > 0)
-  paymentStatus = "partial";
+if (balanceAmount === 0) paymentStatus = "paid";
+else if (paidAmount > 0) paymentStatus = "partial";
 
+order.paymentDetails.manualPaidAmount = manualPaid;
+order.paymentDetails.paidAmount = paidAmount;
+order.paymentDetails.balanceAmount = balanceAmount;
 order.paymentDetails.paymentStatus = paymentStatus;
-order.paymentDetails.balanceAmount = Math.max(newBalance, 0);
 
 
+   
     /* ================= SAVE ORDER ONCE ================= */
     await order.save();
 
-    /* ================= CLIENT BALANCE + LEDGER ================= */
-    if (payment && paymentAmount > 0) {
-      const client = await Client.findById(order.clientId);
+   if (paymentAmount > 0) {
+  const client = await Client.findById(order.clientId);
+  if (!client) {
+    return res.status(404).json({ message: "Client not found" });
+  }
 
-      if (client) {
-        const previousBalance = await getLastLedgerBalance(
-  order.clientId,
-  client.openingBalanceType === "credit"
-    ? -client.openingBalance
-    : client.openingBalance
-);
+  const previousBalance = await getLastLedgerBalance(
+    order.clientId,
+    client.openingBalanceType === "credit"
+      ? -client.openingBalance
+      : client.openingBalance
+  );
 
-const newBalance = previousBalance - paymentAmount;
+  const newBalance = previousBalance - paymentAmount;
 
-client.balance = newBalance;
+  await ClientLedger.create({
+    clientId: order.clientId,
+    type: "payment",
+    referenceId: order._id,
+    description: `Payment received for Order ${order.orderId}`,
+    debit: 0,
+    credit: paymentAmount,
+    balanceAfter: newBalance,
+    createdBy: req.user._id,
+  });
 
+  client.balance = newBalance;
+  await client.save();
+}
 
-        await client.save();
-
-        await ClientLedger.create({
-          clientId: order.clientId,
-          type: "payment",
-          referenceId: order._id,
-          description: `Payment received for Order ${order.orderId}`,
-          debit: 0,
-          credit: paymentAmount,
-          balanceAfter: client.balance,
-          createdBy: req.user._id,
-        });
-      }
-    }
 
     return res.json({
       message: "Payment updated successfully",
