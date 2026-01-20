@@ -111,7 +111,9 @@ function App() {
             <Route path="completed" element={<CompletedOrders />} />
           </Route>
           <Route path="deliveries-history" element={<DeliveryList />} />
+          <Route path="create-order" element= {<CreateOrders/>}/>
         </Route>
+
          <Route path="/settings" element={<SettingsLayout />}>
             <Route path="company" element={<CompanySettings />} />
             <Route path="change-password" element={<ChangePassword />} />

@@ -12,7 +12,7 @@ router.get("/clients/:id/client-ledger", clientController.getClientLedger);
 // router.get("/clients/:id/client-ledger",clientController.c)
 // Search clients
 router.get("/clients/search/query", clientController.searchClients);
-
+router.get("/reports/client-ledger/:clientId", clientController.exportClientReport);
 // Create new client (protected route)
 router.post("/clients", auth, clientController.createClient);
 router.post("/clients/:id/adjust-payment",clientController.adjustClientPayment)

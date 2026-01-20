@@ -1,10 +1,9 @@
-import React from "react";
-
 const ThemedTable = ({ children, className = "" }) => {
   return (
-    <div className="relative w-full">
-  <table className="min-w-[900px] md:min-w-full">
-
+    <div className="relative w-full overflow-x-auto">
+      <table
+        className={`min-w-[900px] md:min-w-full border-collapse ${className}`}
+      >
         {children}
       </table>
     </div>

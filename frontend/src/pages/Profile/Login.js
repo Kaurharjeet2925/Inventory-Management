@@ -71,11 +71,11 @@ export default function Login() {
 
     scheduleAutoLogout(decoded.exp * 1000);
 
-    if (user.role === "delivery-boy") {
-      navigate("/agent/agent-dashboard");
-    } else {
-      navigate("/dashboard");
-    }
+    if (user.role === "delivery-boy" || user.role === "coAdmin") {
+  navigate("/agent/agent-dashboard");
+} else {
+  navigate("/dashboard");
+}
   }, [navigate, scheduleAutoLogout, clearAuth]);
 
   /* ================= VALIDATION ================= */
@@ -126,11 +126,12 @@ export default function Login() {
 
       toast.success(`Welcome ${data.user.name}`);
 
-      if (data.user.role === "delivery-boy") {
-        navigate("/agent/agent-dashboard");
-      } else {
-        navigate("/dashboard");
-      }
+      if (data.user.role === "delivery-boy" || data.user.role === "coAdmin") {
+  navigate("/agent/agent-dashboard");
+} else {
+  navigate("/dashboard");
+}
+
     } catch (err) {
       toast.error("Invalid email or password");
     } finally {

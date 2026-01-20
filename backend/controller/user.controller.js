@@ -61,7 +61,7 @@ exports.createUserBySuperAdmin = async (req, res) => {
     const { firstName, lastName, email, password, phone, gender, address, dateofbirth, role } = req.body;
 
     // Only allow admin or delivery-boy
-    if (!["admin", "delivery-boy"].includes(role)) {
+   if (!["admin", "delivery-boy", "coAdmin"].includes(role)) {
       return res.status(400).json({ 
         message: "Only 'admin' or 'delivery-boy' can be created by superadmin" 
       });
@@ -217,7 +217,10 @@ exports.deleteUser = async (req, res) => {
 // GET ALL DELIVERY PERSONS
 exports.getDeliveryPersons = async (req, res) => {
   try {
-    const deliveryPersons = await User.find({ role: "delivery-boy" })
+    const deliveryPersons = await User.find({
+  role: { $in: ["delivery-boy", "coAdmin"] }
+})
+
       .select("_id name phone email");
 
     res.json(deliveryPersons);

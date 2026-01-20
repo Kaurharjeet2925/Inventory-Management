@@ -258,9 +258,9 @@ const isSuperAdmin = user?.role === "superAdmin";
       <NavLink to="/manage-client/client" className={linkClass}>
         Clients
       </NavLink>
-      <NavLink to="/manage-client/client-ledger" className={linkClass}>
+      {/* <NavLink to="/manage-client/client-ledger" className={linkClass}>
         Clients Ledger
-      </NavLink>
+      </NavLink> */}
     </div>
   )}
 

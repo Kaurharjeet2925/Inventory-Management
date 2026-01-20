@@ -64,16 +64,40 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
   };
 
   const validateForm = () => {
-    const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = "Name is required";
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email))
-      newErrors.email = "Invalid email";
-    if (!formData.phone.trim()) newErrors.phone = "Phone is required";
-    if (formData.openingBalance < 0)
-      newErrors.openingBalance = "Opening balance cannot be negative";
-    return newErrors;
-  };
+  const newErrors = {};
+
+  // NAME
+  if (!formData.name.trim()) {
+    newErrors.name = "Client name is required";
+  }
+
+  // PHONE
+  if (!formData.phone.trim()) {
+    newErrors.phone = "Contact number is required";
+  } else if (!/^[0-9]{10}$/.test(formData.phone)) {
+    newErrors.phone = "Enter a valid 10-digit contact number";
+  }
+
+  // ADDRESS
+  if (!formData.address.trim()) {
+    newErrors.address = "Address is required";
+  }
+
+  // EMAIL (optional but validated if present)
+  if (formData.email.trim()) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Invalid email format";
+    }
+  }
+
+  // OPENING BALANCE
+  if (formData.openingBalance < 0) {
+    newErrors.openingBalance = "Opening balance cannot be negative";
+  }
+
+  return newErrors;
+};
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -230,8 +254,8 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
       onChange={handleChange}
       className={inputClass}
     >
-      <option value="debit">Debit (Due)</option>
-      <option value="credit">Credit (Advance)</option>
+      <option value="debit">Debit </option>
+      <option value="credit">Credit</option>
     </select>
   </div>
 

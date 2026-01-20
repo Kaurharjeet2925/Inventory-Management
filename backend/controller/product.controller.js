@@ -164,52 +164,72 @@ exports.updateProduct = async (req, res) => {
 exports.transferStock = async (req, res) => {
   try {
     const { fromLocationId, toLocationId, quantity } = req.body;
-    const product = await Product.findById(req.params.productId);
 
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
+    const qty = Number(quantity);
+    if (!qty || qty <= 0) {
+      return res.status(400).json({ message: "Invalid quantity" });
     }
 
     if (fromLocationId === toLocationId) {
       return res.status(400).json({ message: "Same source & destination" });
     }
 
+    const product = await Product.findById(req.params.productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // 🔍 FIND SOURCE WAREHOUSE
     const fromWarehouse = product.warehouses.find(
-      w =>
-        w.locationId?.toString() === fromLocationId ||
-        w.location?._id?.toString() === fromLocationId
+      w => w.location?.toString() === fromLocationId
     );
 
-    if (!fromWarehouse || fromWarehouse.quantity < quantity) {
+    if (!fromWarehouse || fromWarehouse.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock" });
     }
 
-    // deduct stock
-    fromWarehouse.quantity -= quantity;
+    // ➖ DEDUCT STOCK
+    fromWarehouse.quantity -= qty;
 
+    // 🔍 FIND DESTINATION WAREHOUSE (✅ FIXED)
     const toWarehouse = product.warehouses.find(
-      w =>
-        w.locationId?.toString() === toLocationId ||
-        w.location?._id?.toString() === toLocationId
+      w => w.location?.toString() === toLocationId
     );
 
     if (toWarehouse) {
-      toWarehouse.quantity += quantity;
+      toWarehouse.quantity += qty;
     } else {
+      // ➕ ADD NEW WAREHOUSE ENTRY
       product.warehouses.push({
-        locationId: toLocationId,
-        quantity,
+        location: toLocationId,
+        quantity: qty,
       });
     }
 
+    // 🔄 RECALCULATE TOTAL STOCK
+    product.totalQuantity = product.warehouses.reduce(
+      (sum, w) => sum + Number(w.quantity || 0),
+      0
+    );
+
     await product.save();
 
-    res.json({ message: "Stock transferred successfully" });
+    // 🔁 RETURN POPULATED PRODUCT (IMPORTANT FOR TABLE)
+    const updatedProduct = await Product.findById(product._id)
+      .populate("brand", "name")
+      .populate("category", "name")
+      .populate("warehouses.location", "name address");
+
+    res.json({
+      message: "Stock transferred successfully",
+      product: updatedProduct,
+    });
   } catch (err) {
     console.error("Transfer error:", err);
     res.status(500).json({ message: "Transfer failed" });
   }
 };
+
 
 // DELETE PRODUCT
 exports.deleteProduct = async (req, res) => {

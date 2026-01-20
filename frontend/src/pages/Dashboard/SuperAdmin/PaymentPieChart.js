@@ -18,21 +18,22 @@ const PaymentPieChart = () => {
   const [total, setTotal] = useState(0);
   const [activeIndex, setActiveIndex] = useState(null); // 👈 hover control
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await apiClient.get("/payment-summary");
+ useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const res = await apiClient.get("/payment-summary");
 
-        setPaid(res.data.find(d => d.name === "Paid")?.value || 0);
-        setPending(res.data.find(d => d.name === "Pending")?.value || 0);
-        setTotal(res.data.find(d => d.name === "TotalAmount")?.value || 0);
-      } catch (err) {
-        console.error("Payment summary error", err);
-      }
-    };
+      setPaid(res.data.find(d => d.name === "Paid")?.value || 0);
+      setPending(res.data.find(d => d.name === "Pending")?.value || 0);
+      setTotal(res.data.find(d => d.name === "TotalAmount")?.value || 0);
+    } catch (err) {
+      console.error("Payment summary error", err);
+    }
+  };
 
-    fetchData();
-  }, []);
+  fetchData();
+}, []);
+
 
   const chartData = [
     { name: "Paid", value: paid },

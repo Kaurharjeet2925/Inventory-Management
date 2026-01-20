@@ -15,9 +15,9 @@ const formatAmount = (amt) =>
 
 const formatBalance = (bal) =>
   bal > 0
-    ? `₹ ${bal.toLocaleString()} Dr`
+    ? `₹ ${bal.toLocaleString()} Debit`
     : bal < 0
-    ? `₹ ${Math.abs(bal).toLocaleString()} Cr`
+    ? `₹ ${Math.abs(bal).toLocaleString()} Credit`
     : "₹ 0";
 
 const ClientLedger = () => {
@@ -26,14 +26,22 @@ const ClientLedger = () => {
 
   /* ================= STATE ================= */
   const [ledgerData, setLedgerData] = useState([]);
+  const [client, setClient] = useState(null);
+
   const [summary, setSummary] = useState({
     openingBalance: 0,
     totalDebit: 0,
     totalCredit: 0,
     currentBalance: 0,
   });
+  const [stats, setStats] = useState({
+  totalOrders: 0,
+  totalOrderAmount: 0,
+});
+
   const [loading, setLoading] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+const [search, setSearch] = useState("");
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -63,6 +71,48 @@ const ClientLedger = () => {
       setLoading(false);
     }
   }, [clientId]);
+ const handleDownloadReport = () => {
+  if (!filteredLedger.length) {
+    alert("No data to download");
+    return;
+  }
+
+  // FRONTEND ONLY: call backend excel API
+  const params = new URLSearchParams({
+    fromDate,
+    toDate,
+    type,
+    search,
+  });
+
+  window.open(
+    `/reports/client-ledger/${clientId}?${params.toString()}`,
+    "_blank"
+  );
+};
+
+
+const getInitials = (name = "") => {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+};
+useEffect(() => {
+  const orders = ledgerData.filter((row) => row.type === "order");
+
+  const totalOrders = orders.length;
+
+  const totalOrderAmount = orders.reduce(
+    (sum, o) => sum + (o.debit || 0),
+    0
+  );
+
+  setStats({
+    totalOrders,
+    totalOrderAmount,
+  });
+}, [ledgerData]);
 
   /* ================= EFFECT ================= */
   useEffect(() => {
@@ -71,19 +121,34 @@ const ClientLedger = () => {
 
   /* ================= FILTERED LEDGER ================= */
   const filteredLedger = useMemo(() => {
-    return ledgerData.filter((row) => {
-      const rowDate = new Date(row.createdAt);
+  return ledgerData.filter((row) => {
+    const rowDate = new Date(row.createdAt);
 
-      if (fromDate && rowDate < new Date(fromDate)) return false;
-      if (toDate && rowDate > new Date(toDate + "T23:59:59"))
-        return false;
+    if (fromDate && rowDate < new Date(fromDate)) return false;
+    if (toDate && rowDate > new Date(toDate + "T23:59:59")) return false;
 
-      if (type === "debit" && row.debit <= 0) return false;
-      if (type === "credit" && row.credit <= 0) return false;
+    if (type === "debit" && row.debit <= 0) return false;
+    if (type === "credit" && row.credit <= 0) return false;
 
-      return true;
-    });
-  }, [ledgerData, fromDate, toDate, type]);
+    if (
+      search &&
+      !row.description?.toLowerCase().includes(search.toLowerCase())
+    )
+      return false;
+
+    return true;
+  });
+}, [ledgerData, fromDate, toDate, type, search]);
+
+const fetchClient = useCallback(async () => {
+  if (!clientId) return;
+  const res = await apiClient.get(`/clients/${clientId}`);
+  setClient(res.data.client);
+}, [clientId]);
+
+useEffect(() => {
+  fetchClient();
+}, [fetchClient]);
 
   return (
     <div>
@@ -100,12 +165,10 @@ const ClientLedger = () => {
 
         <button
           onClick={() => setAdjustOpen(true)}
-          disabled={summary.currentBalance === 0}
           className={`h-9 px-4 rounded-md text-sm font-medium
             ${
-              summary.currentBalance === 0
-                ? "bg-slate-300 text-slate-600 cursor-not-allowed"
-                : "bg-slate-800 text-white hover:bg-slate-900"
+              
+                "bg-slate-800 text-white hover:bg-slate-900"
             }`}
         >
           Record Payment
@@ -113,64 +176,103 @@ const ClientLedger = () => {
       </div>
 
       {/* ================= SUMMARY CARDS ================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-xl border">
-          <p className="text-xs text-slate-500">Opening Balance</p>
-          <p className="text-lg font-semibold text-slate-800">
-            {formatBalance(summary.openingBalance)}
-          </p>
-        </div>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
 
-        <div className="bg-green-50 p-4 rounded-xl border border-green-200">
-          <p className="text-xs text-green-600">Total Debit</p>
-          <p className="text-lg font-semibold text-green-700">
-            {formatAmount(summary.totalDebit)}
-          </p>
-        </div>
+  {/* COLUMN 1 — CLIENT */}
+<div className="bg-white p-5 rounded-xl border flex items-center gap-4">
+  <div className="h-14 w-14 rounded-full bg-blue-900 text-white
+                  flex items-center justify-center text-xl font-bold">
+    {getInitials(client?.name)}
+  </div>
 
-        <div className="bg-red-50 p-4 rounded-xl border border-red-200">
-          <p className="text-xs text-red-600">Total Credit</p>
-          <p className="text-lg font-semibold text-red-700">
-            {formatAmount(summary.totalCredit)}
-          </p>
-        </div>
+  <div className="min-w-0">
+    <h2 className="text-lg font-semibold truncate">
+      {client?.name || "—"}
+    </h2>
+    <p className="text-xs text-slate-500 truncate">
+      {client?.companyName || "—"}
+    </p>
+    <p className="text-xs text-slate-500">
+      {client?.phone || "—"}
+    </p>
+  </div>
+</div>
 
-        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-          <p className="text-xs text-blue-600">Current Balance</p>
-          <p className="text-lg font-semibold text-blue-800">
-            {formatBalance(summary.currentBalance)}
-          </p>
-        </div>
-      </div>
+  {/* COLUMN 2 */}
+  <div className="bg-orange-50 border-orange-300 p-4 rounded-xl border">
+    <p className="text-xs text-orange500">Total Orders</p>
+    <p className="text-2xl text-orange-700 font-bold">
+      {stats.totalOrders}
+    </p>
+  </div>
+
+  {/* COLUMN 3 */}
+  <div className="bg-green-100 p-4 rounded-xl border border-green-300">
+    <p className="text-xs text-green-600">Total Amount</p>
+    <p className="text-2xl font-bold text-green-700">
+      ₹ {stats.totalOrderAmount.toLocaleString()}
+    </p>
+  </div>
+
+  {/* COLUMN 4 */}
+  <div className="bg-blue-50 p-4 rounded-xl border border-blue-300">
+    <p className="text-xs text-blue-600">Current Balance</p>
+    <p className="text-2xl font-bold text-blue-800">
+      {formatBalance(summary.currentBalance)}
+    </p>
+  </div>
+
+</div>
+
 
       {/* ================= FILTER BAR ================= */}
       <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl mb-6">
-        <div className="flex flex-col sm:flex-row gap-3 items-center">
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="h-9 px-3 rounded-md border text-sm"
-          />
+  <div className="flex flex-col sm:flex-row gap-3 items-center">
 
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="h-9 px-3 rounded-md border text-sm"
-          />
+    <input
+      type="date"
+      value={fromDate}
+      onChange={(e) => setFromDate(e.target.value)}
+      className="h-9 px-3 rounded-md border text-sm"
+    />
 
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="h-9 px-3 rounded-md border text-sm"
-          >
-            <option value="all">All</option>
-            <option value="debit">Debit</option>
-            <option value="credit">Credit</option>
-          </select>
-        </div>
-      </div>
+    <input
+      type="date"
+      value={toDate}
+      onChange={(e) => setToDate(e.target.value)}
+      className="h-9 px-3 rounded-md border text-sm"
+    />
+
+    <select
+      value={type}
+      onChange={(e) => setType(e.target.value)}
+      className="h-9 px-3 rounded-md border text-sm"
+    >
+      <option value="all">All</option>
+      <option value="debit">Debit</option>
+      <option value="credit">Credit</option>
+    </select>
+
+    {/* 🔍 SEARCH */}
+    <input
+      type="text"
+      placeholder="Search description / order..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      className="h-9 px-3 rounded-md border text-sm flex-1"
+    />
+
+    {/* ⬇️ DOWNLOAD */}
+    <button
+      onClick={handleDownloadReport}
+      className="h-9 px-4 rounded-md text-sm font-medium
+                 bg-green-600 text-white hover:bg-green-700"
+    >
+      Download Report
+    </button>
+  </div>
+</div>
+
 
       {/* ================= LEDGER TABLE ================= */}
       <ThemedTable>

@@ -168,27 +168,47 @@ const getInitials = (name = "") => {
   };
 
   const openEdit = (p) => {
-    setEditingId(p._id);
-    setProductData({
-      name: p.name,
-      brand: p.brand?._id,
-      category: p.category?._id,
-      location: p.location?._id,
-      quantityValue: p.quantityValue,
-      quantityUnit: p.quantityUnit,
-      totalQuantity: p.totalQuantity,
-      mrp: p.mrp,
-      price: p.price,
-      description: p.description,
-      rating: p.rating || 0,
-      thumbnail: null,
-      images: [],
-    });
-   setDeletedImages([]); // reset on open
-    setThumbnailPreview(p.thumbnail ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}` : "");
-    setImagesPreview(Array.isArray(p.images) ? p.images.map((img) => `${process.env.REACT_APP_IMAGE_URL}/${img}`) : []);
-    setShowModal(true);
-  };
+  setEditingId(p._id);
+
+  setProductData({
+    name: p.name,
+    brand: p.brand?._id,
+    category: p.category?._id,
+    quantityValue: p.quantityValue,
+    quantityUnit: p.quantityUnit,
+    mrp: p.mrp,
+    price: p.price,
+    description: p.description,
+    rating: p.rating || 0,
+
+    // ✅ FIX: MAP warehouses correctly
+    warehouses: Array.isArray(p.warehouses)
+      ? p.warehouses.map((w) => ({
+          locationId: w.location?._id || "",
+          quantity: w.quantity || 0,
+        }))
+      : [{ locationId: "", quantity: 0 }],
+
+    thumbnail: null,
+    images: [],
+  });
+
+  setDeletedImages([]);
+
+  setThumbnailPreview(
+    p.thumbnail
+      ? `${process.env.REACT_APP_IMAGE_URL}/${p.thumbnail}`
+      : ""
+  );
+
+  setImagesPreview(
+    Array.isArray(p.images)
+      ? p.images.map((img) => `${process.env.REACT_APP_IMAGE_URL}/${img}`)
+      : []
+  );
+
+  setShowModal(true);
+};
 
   const deleteProduct = async (id) => {
     if (!window.confirm("Delete this product?")) return;

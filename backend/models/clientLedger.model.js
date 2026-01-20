@@ -10,7 +10,7 @@ const clientLedgerSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["opening", "order", "payment", "adjustment"],
+      enum: ["opening", "order", "payment", "adjustment","order_adjustment"],
       required: true,
     },
 

@@ -5,7 +5,7 @@ const ClientLedger = require("../models/clientLedger.model")
 const {getLastLedgerBalance} = require("../utils/getLastLedgerBalance")
 const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
-
+const User = require("../models/user.model");
 const mongoose = require("mongoose")
 const { createNotification } = require("./notification.controller");
 // Helper to generate orderId like STN00001
@@ -73,10 +73,40 @@ exports.createOrder = async (req, res) => {
     } = req.body;
 
     const assignedBy = req.user._id;
+   // ✅ ROLE CHECK: who can create order
+const allowedCreators = ["superAdmin", "admin", "coAdmin"];
+if (!allowedCreators.includes(req.user.role)) {
+  return res.status(403).json({
+    message: "You are not allowed to create orders",
+  });
+}
 
     if (!clientId) return res.status(400).json({ message: "Client is required" });
-    if (!deliveryPersonId)
-      return res.status(400).json({ message: "Delivery person is required" });
+    // ✅ DELIVERY PERSON VALIDATION
+if (!deliveryPersonId && req.user.role !== "coAdmin") {
+  return res.status(400).json({ message: "Delivery person is required" });
+}
+
+let finalDeliveryPersonId = deliveryPersonId;
+
+// 🔒 CoAdmin → ALWAYS self assigned (ignore frontend value)
+if (req.user.role === "coAdmin") {
+  finalDeliveryPersonId = req.user._id;
+}
+
+
+const deliveryUser = await User.findById(finalDeliveryPersonId);
+if (!deliveryUser) {
+  return res.status(404).json({ message: "Delivery user not found" });
+}
+
+// ✅ Only delivery boy or coAdmin allowed
+if (!["delivery-boy", "coAdmin"].includes(deliveryUser.role)) {
+  return res.status(400).json({
+    message: "Only Delivery Boy or Co-Admin can be assigned",
+  });
+}
+
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Order must contain at least 1 item" });
 
@@ -211,16 +241,19 @@ const finalPaymentDetails = {
 
 
     /* ================= SAVE ORDER ================= */
-    const newOrder = await Order.create({
-      orderId,
-      clientId,
-      deliveryPersonId,
-      assignedBy,
-      paymentDetails: finalPaymentDetails,
-      items: formattedItems,
-      notes,
-      status,
-    });
+  const newOrder = await Order.create({
+  orderId,
+  clientId,
+  deliveryPersonId: finalDeliveryPersonId,
+  assignedBy,
+  assignedByRole: req.user.role,
+  deliveryRole: deliveryUser.role,
+  paymentDetails: finalPaymentDetails,
+  items: formattedItems,
+  notes,
+  status,
+});
+
 
     /* ================= CLIENT BALANCE UPDATE ================= */
    
@@ -279,10 +312,8 @@ await Client.findByIdAndUpdate(clientId, {
       .populate("assignedBy", "name role")
       .populate("clientId", "name phone address");
 
-     let dpId =
-      typeof deliveryPersonId === "string"
-        ? deliveryPersonId
-        : (deliveryPersonId?._id || "").toString();
+    let dpId = finalDeliveryPersonId?.toString();
+
     
 // 🔔 Delivery Boy
 if (dpId) {
@@ -321,12 +352,7 @@ if (req.user.role !== "superAdmin") {
 }
 
 
-    // Notify all admins
-    // try {
-    //   await createNotification({ io, message: `New order ${orderId} created`, targetRole: 'admins', data: { orderId: populatedOrder._id } });
-    // } catch (e) { console.error('notify admins failed', e); }
-
-    // io.emit("order_created_global", populatedOrder);
+    
   console.log("FINAL PAYMENT DETAILS =>", finalPaymentDetails);
     return res.status(201).json({
       message: "Order created successfully",
@@ -349,9 +375,10 @@ exports.getOrders = async (req, res) => {
     const baseFilter = { deleted: { $ne: true } };
 
     // 🚚 Delivery boy → only his deliveries
-    if (user.role === "delivery-boy") {
-      baseFilter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
-    }
+    if (["delivery-boy", "coAdmin"].includes(user.role)) {
+  baseFilter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
+}
+
 
     // 🧑‍💼 Admin → only orders created by him
     // if (user.role === "admin") {
@@ -453,9 +480,10 @@ exports.updateOrder = async (req, res) => {
     }
 
     /* ================= ROLE CHECK ================= */
-    if (req.user.role === "delivery-boy") {
-      return res.status(403).json({ message: "Not allowed" });
-    }
+   if (["delivery-boy", "coAdmin"].includes(req.user.role)) {
+  return res.status(403).json({ message: "Not allowed" });
+}
+
 
     /* ================= 🚫 COMPLETED ORDER LOCK ================= */
     if (existingOrder.status === "completed") {
@@ -477,6 +505,58 @@ exports.updateOrder = async (req, res) => {
         order: existingOrder,
       });
     }
+/* ================= CANCEL ORDER ================= */
+if (status === "cancelled" && existingOrder.status !== "cancelled") {
+
+  // 1️⃣ Restore stock
+  for (const item of existingOrder.items) {
+    await Product.findByIdAndUpdate(item.productId, {
+      $inc: { totalQuantity: item.quantity },
+    });
+  }
+
+  // 2️⃣ Ledger reversal
+  const oldPayable =
+    existingOrder.paymentDetails.totalAmount -
+    existingOrder.paymentDetails.discount;
+
+  const client = await Client.findById(existingOrder.clientId);
+
+  const previousBalance = await getLastLedgerBalance(
+    client._id,
+    client.openingBalanceType === "credit"
+      ? -client.openingBalance
+      : client.openingBalance
+  );
+
+  const newBalance = previousBalance - oldPayable;
+
+  await ClientLedger.create({
+    clientId: client._id,
+    type: "adjustment",
+    referenceId: existingOrder._id,
+    description: `Order ${existingOrder.orderId} cancelled`,
+    debit: 0,
+    credit: oldPayable,
+    balanceAfter: newBalance,
+    createdBy: req.user._id,
+  });
+
+  client.balance = newBalance;
+  await client.save();
+
+  // 3️⃣ Update order
+  existingOrder.status = "cancelled";
+  existingOrder.paymentDetails.paymentStatus = "unpaid";
+  existingOrder.paymentDetails.balanceAmount = 0;
+
+  await existingOrder.save();
+
+  return res.json({
+    message: "Order cancelled successfully",
+    order: existingOrder,
+  });
+}
 
     /* ============================================================
        🔹 FULL UPDATE (PENDING ORDERS ONLY)
@@ -809,16 +889,24 @@ exports.collectOrder = async (req, res) => {
   try {
     const { id, itemId } = req.params;
 
-    // 🔐 Only delivery boy allowed
-    if (req.user.role !== "delivery-boy") {
+    // 🔐 Role check
+    if (!["delivery-boy", "coAdmin"].includes(req.user.role)) {
       return res.status(403).json({
-        message: "Only delivery boy can collect items",
+        message: "Only delivery boy or coAdmin can collect items",
       });
     }
 
+    // ✅ FETCH ORDER FIRST
     const order = await Order.findById(id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
+    }
+
+    // 🔒 OWNERSHIP CHECK (AFTER order exists)
+    if (order.deliveryPersonId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: "You can collect only your assigned orders",
+      });
     }
 
     // 🚫 Must accept order first
@@ -867,7 +955,7 @@ exports.collectOrder = async (req, res) => {
       });
     }
 
-    // 🔔 Delivery boy notification
+    // 🔔 Delivery agent notification
     if (updatedOrder.deliveryPersonId?._id) {
       io.to(updatedOrder.deliveryPersonId._id.toString()).emit(
         "order_collected",
@@ -923,9 +1011,9 @@ exports.acceptOrder = async (req, res) => {
     }
 
     // 🔐 Only delivery boy can accept
-    if (req.user.role !== "delivery-boy") {
+if (!["delivery-boy", "coAdmin"].includes(req.user.role)) {
       return res.status(403).json({
-        message: "Only delivery boy can accept order",
+        message: "Only delivery boy or Co Admin can accept order",
       });
     }
 
@@ -984,7 +1072,6 @@ exports.acceptOrder = async (req, res) => {
 };
 
 
-// Update order status (optional)
 exports.updateOrderStatus = async (req, res) => {
   try {
     const id = req.params.id;
@@ -1009,20 +1096,23 @@ exports.updateOrderStatus = async (req, res) => {
       return res.status(400).json({ message: "Invalid status" });
     }
 
-    /* ================= DELIVERY BOY RULES ================= */
-    const deliveryBoyAllowed = ["shipped", "delivered", "completed"];
+   const agentAllowedStatuses = ["shipped", "delivered", "completed"];
 
-    if (user.role === "delivery-boy" && !deliveryBoyAllowed.includes(status)) {
-      return res.status(403).json({
-        message:
-          "Delivery boy can only update status to shipped, delivered or completed",
-      });
-    }
+if (
+  ["delivery-boy", "coAdmin"].includes(user.role) &&
+  !agentAllowedStatuses.includes(status)
+) {
+  return res.status(403).json({
+    message:
+      "You can only update status to shipped, delivered or completed",
+  });
+}
+
 
     /* ================= FIND ORDER ================= */
     let filter = { _id: id };
 
-    if (user.role === "delivery-boy") {
+    if ((user.role === "delivery-boy")|| (user.role === "coAdmin") ){
       filter.deliveryPersonId = user._id;
     }
 
@@ -1375,13 +1465,15 @@ exports.getAllOrders = async (req, res) => {
     const user = req.user;
     const filter = {};
 
-    if (user.role === "delivery-boy") {
-      filter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
-    }
+   if (user.role === "delivery-boy" || user.role === "coAdmin") {
+  filter.deliveryPersonId = new mongoose.Types.ObjectId(user._id);
+}
 
-    if (user.role === "admin" || user.role === "superAdmin") {
-      filter.assignedBy = new mongoose.Types.ObjectId(user._id);
-    }
+if (["admin", "superAdmin"].includes(user.role)) {
+  filter.assignedBy = new mongoose.Types.ObjectId(user._id);
+}
+
+
 
     if (req.query.status) {
       if (req.query.status === "shipped") {
@@ -1406,7 +1498,7 @@ exports.getAllOrders = async (req, res) => {
 // GET /api/orders/agent/dashboard-summary
 exports.agentDashboardSummary = async (req, res) => {
   try {
-    if (req.user.role !== "delivery-boy") {
+   if (!["delivery-boy", "coAdmin"].includes(req.user.role)) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 

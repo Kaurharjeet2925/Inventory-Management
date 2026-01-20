@@ -6,7 +6,7 @@ module.exports = (req, res, next) => {
     }
   
     // ALLOW THESE ROLES
-    const allowed = ["superAdmin", "admin"];
+    const allowed = ["superAdmin", "admin", "coAdmin"];
   
     if (!allowed.includes(req.user.role)) {
       return res.status(403).json({

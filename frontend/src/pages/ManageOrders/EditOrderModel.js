@@ -65,6 +65,40 @@ const EditOrderModal = ({ order, onClose, onSave, viewOnly = false }) => {
 
     setOriginalItems(JSON.parse(JSON.stringify(rebuiltItems)));
   }, [order]);
+useEffect(() => {
+  if (!form) return;
+
+  const totalAmount = form.items.reduce(
+    (sum, item) =>
+      sum + Number(item.price || 0) * Number(item.quantity || 0),
+    0
+  );
+
+  const discount = Number(form.paymentDetails.discount || 0);
+  const paid = Number(form.paymentDetails.paidAmount || 0);
+
+  const payable = Math.max(totalAmount - discount, 0);
+  const balanceAmount = Math.max(payable - paid, 0);
+
+  let paymentStatus = "unpaid";
+  if (balanceAmount === 0) paymentStatus = "paid";
+  else if (paid > 0) paymentStatus = "partial";
+
+  setForm((prev) => ({
+    ...prev,
+    paymentDetails: {
+      ...prev.paymentDetails,
+      totalAmount,
+      balanceAmount,
+      paymentStatus,
+    },
+  }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [
+  form?.items,
+  form?.paymentDetails?.discount,
+]);
+
 
   if (!form) return null;
 
@@ -380,14 +414,15 @@ const getWarehouseOptions = (productId, index) => {
                 type="number"
                 disabled={!paymentEditable}
                 value={form.paymentDetails.discount}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    paymentDetails: {
-                discount
-}
+               onChange={(e) =>
+  setForm({
+    ...form,
+    paymentDetails: {
+      ...form.paymentDetails,
+      discount: Number(e.target.value || 0),
+    },
+  })
 
-                  })
                 }
                 className="border p-2 w-full"
               />

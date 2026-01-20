@@ -206,6 +206,7 @@ const EditProfile = () => {
     <option value="">Select role </option>
     <option value="admin">Admin</option>
     <option value="delivery-boy">Delivery Boy</option>
+    <option value="coAdmin">Co Admin</option>
     
   </select>
 </div>

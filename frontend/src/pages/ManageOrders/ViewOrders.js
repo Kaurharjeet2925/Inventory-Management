@@ -292,12 +292,7 @@ useEffect(() => {
       }
       return true;
     }
-
-    // Products
-    const productMatch = order.items?.some((item) =>
-      item.productName?.toLowerCase().includes(q)
-    );
-    if (productMatch) {
+    if (order.deliveryPersonId?.name.toLowerCase().includes(q)) {
       if (collectedFilter === "collected") {
         return order.items?.some((item) => item.collected === true);
       } else if (collectedFilter === "notcollected") {
@@ -305,6 +300,35 @@ useEffect(() => {
       }
       return true;
     }
+        if (order.assignedBy?.name.toLowerCase().includes(q)) {
+      if (collectedFilter === "collected") {
+        return order.items?.some((item) => item.collected === true);
+      } else if (collectedFilter === "notcollected") {
+        return order.items?.some((item) => item.collected === false);
+      }
+      return true;
+    }
+    // Products
+    const productMatch = order.items?.some((item) =>
+      item.productName?.toLowerCase().includes(q)
+    );
+    if (productMatch) {   if (collectedFilter === "collected") {
+        return order.items?.some((item) => item.collected === true);
+      } else if (collectedFilter === "notcollected") {
+        return order.items?.some((item) => item.collected === false);
+      }
+      return true;
+    }
+if (
+    order.items?.some((item) =>
+      item.warehouseName?.toLowerCase().includes(q)
+    )
+  ) {
+    return true;
+  }
+  if (order.paymentDetails.paymentStatus?.includes(q)) return true;
+
+  return false;
 
     // Collected / Not Collected in search
     if (q === "collected") {
@@ -486,6 +510,7 @@ useEffect(() => {
     <thead className="bg-gray-100 text-gray-700 uppercase text-xs tracking-wide">
       <tr className="h-12">
         <th className="px-6 text-left">Order ID</th>
+        <th className="px-6 text-left">Admin</th>
         <th className="px-6 text-left">Client</th>
         <th className="px-6 text-left">Agent</th>
         <th className="px-6 text-left w-96">Products</th>
@@ -578,12 +603,15 @@ const paymentStatus =
               <td className="px-6 font-semibold text-blue-600 whitespace-nowrap">
                 {order.orderId}
               </td>
+              <td className="px-6 whitespace-nowrap capitalize">
+                {order.assignedBy?.name || "N/A"}
+              </td>
 
-              <td className="px-6 whitespace-nowrap">
+              <td className="px-6 whitespace-nowrap capitalize">
                 {order.clientId?.name || "N/A"}
               </td>
 
-              <td className="px-6 whitespace-nowrap">
+              <td className="px-6 whitespace-nowrap capitalize">
                 {order.deliveryPersonId?.name || "N/A"}
               </td>
 

@@ -6,6 +6,9 @@ import socket from "../../socket/socketClient";
 import ThemedTable from '../../components/ThemedTable';
 
 const CreateOrders = () => {
+  const user = JSON.parse(localStorage.getItem("user"));
+const isCoAdmin = user?.role === "coAdmin";
+
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedDeliveryPersonId, setSelectedDeliveryPersonId] = useState("");
 
@@ -72,6 +75,11 @@ const [discount, setDiscount] = useState(0);
       socket.off("order_created");
     };
   }, []);
+useEffect(() => {
+  if (isCoAdmin && user?._id) {
+    setSelectedDeliveryPersonId(user._id);
+  }
+}, [isCoAdmin, user]);
 
   // Listen for product stock updates from server and update local product list
   useEffect(() => {
@@ -380,7 +388,9 @@ const paymentStatus =
 
     if (!selectedClientId) return alert("Select a client");
     if (orderItems.length === 0) return alert("Add at least one item");
-    if (!selectedDeliveryPersonId) return alert("Select a delivery person");
+if (!selectedDeliveryPersonId && !isCoAdmin) {
+  return alert("Select a delivery person");
+}
 
     if (!amountData.totalAmount) return alert("Total amount required");
 
@@ -498,28 +508,38 @@ const paymentStatus =
 
       {/* DELIVERY PERSON */}
 <div className="bg-gray-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">
-          Delivery Person
-        </h2>
+  <h2 className="text-lg font-semibold text-slate-800 mb-4">
+    Delivery Person
+  </h2>
 
-        <select
-          value={selectedDeliveryPersonId}
-          onChange={(e) => setSelectedDeliveryPersonId(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">Select Delivery Person</option>
-          {deliveryPersons.map((d) => (
-            <option key={d._id} value={d._id}>
-              {d.name} ({d.phone})
-            </option>
-          ))}
-        </select>
-      </div>
+  {isCoAdmin ? (
+    /* ===== CO-ADMIN: SELF ONLY (NOT CLICKABLE) ===== */
+    <input
+      type="text"
+      value={`${user.name}${user.phone ? ` (${user.phone})` : ""}`}
+      disabled
+      className={`${inputClass} bg-gray-100 cursor-not-allowed`}
+    />
+  ) : (
+    /* ===== ADMIN / SUPERADMIN ===== */
+    <select
+      value={selectedDeliveryPersonId}
+      onChange={(e) => setSelectedDeliveryPersonId(e.target.value)}
+      className={inputClass}
+    >
+      <option value="">Select Delivery Person</option>
+      {deliveryPersons.map((d) => (
+        <option key={d._id} value={d._id}>
+          {d.name} ({d.phone})
+        </option>
+      ))}
+    </select>
+  )}
+</div>
 
       {/* ORDER ITEMS */}
 <div className="
   bg-gray-50 p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm mb-6
-  max-h-[75vh] sm:max-h-none
   flex flex-col
 ">
 
@@ -650,8 +670,13 @@ const paymentStatus =
     <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
    
     
-      <ThemedTable className="min-w-[900px] text-left border-collapse">
-        <thead>
+     {orderItems.length > 0 && (
+  <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
+
+    {/* ================= DESKTOP TABLE ================= */}
+    <div className="hidden md:block">
+      <ThemedTable>
+        <thead className="bg-gray-100 text-sm text-gray-700">
           <tr>
             <th className="p-4 text-left">Product</th>
             <th className="p-4 text-left">Warehouse</th>
@@ -661,33 +686,32 @@ const paymentStatus =
             <th className="p-4 text-left">Action</th>
           </tr>
         </thead>
-     
-   
 
-    {/* TABLE BODY (SCROLLS) */}
-   
         <tbody>
           {orderItems.map((item) => (
-            <tr key={item.id} className="border-b hover:bg-gray-50">
+            <tr
+              key={item.id}
+              className="border-b hover:bg-gray-50 text-sm"
+            >
               <td className="p-4">{item.productName}</td>
               <td className="p-4">{item.warehouseName}</td>
               <td className="p-4">₹{item.price}</td>
               <td className="p-4">{item.quantity}</td>
-              <td className="p-4">
+              <td className="p-4 font-medium">
                 ₹{item.quantity * item.price}
               </td>
-              <td className="p-4 flex gap-2">
+              <td className="p-4 flex gap-3">
                 <button
                   type="button"
                   onClick={() => handleEditItem(item)}
-                  className="text-blue-600"
+                  className="text-blue-600 hover:text-blue-800"
                 >
                   <Edit3 size={16} />
                 </button>
                 <button
                   type="button"
                   onClick={() => removeItem(item.id)}
-                  className="text-red-500"
+                  className="text-red-500 hover:text-red-700"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -696,6 +720,59 @@ const paymentStatus =
           ))}
         </tbody>
       </ThemedTable>
+    </div>
+
+    {/* ================= MOBILE CARDS ================= */}
+    <div className="md:hidden space-y-3">
+      {orderItems.map((item) => (
+        <div
+          key={item.id}
+          className="border rounded-lg p-4 bg-gray-50 shadow-sm"
+        >
+          <div className="flex justify-between items-start mb-2">
+            <h4 className="font-semibold text-slate-800">
+              {item.productName}
+            </h4>
+            <span className="text-sm font-bold text-blue-700">
+              ₹{item.quantity * item.price}
+            </span>
+          </div>
+
+          <div className="text-xs text-slate-600 space-y-1">
+            <div>
+              <b>Warehouse:</b> {item.warehouseName}
+            </div>
+            <div>
+              <b>Price:</b> ₹{item.price}
+            </div>
+            <div>
+              <b>Qty:</b> {item.quantity}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-4 mt-3">
+            <button
+              type="button"
+              onClick={() => handleEditItem(item)}
+              className="flex items-center gap-1 text-blue-600 text-sm"
+            >
+              <Edit3 size={14} /> Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => removeItem(item.id)}
+              className="flex items-center gap-1 text-red-600 text-sm"
+            >
+              <Trash2 size={14} /> Remove
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+
+  </div>
+)}
+
     </div>
 
  
@@ -863,10 +940,11 @@ const paymentStatus =
 
 
       {/* ACTIONS */}
-   <div className="flex flex-col sm:flex-row justify-end gap-3">
-        <button type="reset" className={`${secondaryBtn} w-full sm:w-auto`}>Cancel</button>
-        <button type="submit" className={`${primaryBtn} w-full sm:w-auto`}>Create Order</button>
-      </div>
+   <div className="flex flex-row justify-end gap-3">
+  <button type="reset" className={`${secondaryBtn} `}>Cancel</button>
+  <button type="submit" className={`${primaryBtn} `}>Create Order</button>
+</div>
+
 
     </form>
 

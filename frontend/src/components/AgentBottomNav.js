@@ -1,14 +1,19 @@
 import React from "react";
-import { Home, Truck, User } from "lucide-react";
+import { Home, PlusCircleIcon, Truck, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const AgentBottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
+const user = JSON.parse(localStorage.getItem("user"));
+const role = user?.role;
 
   const tabs = [
     { name: "Home", icon: Home, path: "/agent/agent-dashboard" },
     { name: "Deliveries", icon: Truck, path: "/agent/deliveries-history" },
+     ...(role === "coAdmin"
+    ? [{ name: "Create Order", icon: PlusCircleIcon, path: "/agent/create-order" }]
+    : []),
     { name: "Profile", icon: User, path: "/profile" },
   ];
 
