@@ -10,7 +10,7 @@ import { NotificationProvider } from "./context/NotificationContext";
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <BrowserRouter>
-    <NotificationProvider>   {/* ✅ WRAP HERE */}
+    <NotificationProvider> 
         <App />
     </NotificationProvider>
   </BrowserRouter>

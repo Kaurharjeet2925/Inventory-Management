@@ -25,7 +25,7 @@ const TopProducts = () => {
   }, [period]);
 
   return (
-<div className="bg-white rounded-xl p-4 border border-gray-200 w-full h-64 flex flex-col">
+    <div className="bg-white rounded-xl p-4 border border-gray-200 w-full h-64 flex flex-col">
       {/* HEADER */}
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-semibold text-gray-700">
@@ -49,66 +49,69 @@ const TopProducts = () => {
           Loading items...
         </p>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {items.map((item) => (
-            <div
-              key={item.productId || item._id || item.productName}
-              className="border rounded-lg p-3 hover:shadow-sm transition"
-            >
-              {/* IMAGE */}
-              <div className="h-24 flex items-center justify-center bg-gray-50 rounded-md mb-2">
-                {(() => {
-                  const raw = item.image;
-                  // Prefer explicit image base; fall back to backend base or localhost
-                  let base = process.env.REACT_APP_IMAGE_URL || process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
-                  // Normalize base: remove trailing '/uploads' or trailing slash to avoid double paths
-                  base = base.replace(/\/uploads\/?$/i, '');
-                  base = base.replace(/\/$/, '');
+        <table className="w-full text-sm border-collapse">
+          <tbody>
+            {items.map((item, index) => {
+              const raw = item.image;
+              let base =
+                process.env.REACT_APP_IMAGE_URL ||
+                process.env.REACT_APP_BACKEND_URL ||
+                "http://localhost:5000";
 
-                  let src = null;
-                  if (raw) {
-                    if (raw.startsWith("http")) {
-                      src = raw;
-                    } else {
-                      // Ensure path includes /uploads/ when raw is just a filename
-                      const path = raw.startsWith("/") ? raw : `/uploads/${raw}`;
-                        src = `${base}${path}`;
-                        console.log("[TopProducts] image src:", src);
-                    }
-                  }
+              base = base.replace(/\/uploads\/?$/i, "").replace(/\/$/, "");
 
-                    if (src) {
-                    return <img src={src} alt={item.productName || item.name} className="h-full object-contain" />;
-                  }
+              let imgSrc = null;
+              if (raw) {
+                imgSrc = raw.startsWith("http")
+                  ? raw
+                  : `${base}${raw.startsWith("/") ? raw : `/uploads/${raw}`}`;
+              }
 
-                  // Fallback: show initial letter of product name
-                  let nameForInitial = item.productName || item.name || "?";
-                  // If name looks like an ObjectId (24 hex chars) treat it as unknown
-                  if (/^[0-9a-fA-F]{24}$/.test(nameForInitial)) nameForInitial = "Unknown";
-                  const initial = nameForInitial.charAt(0).toUpperCase();
-                  return (
-                    <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold">
-                      {initial}
-                    </div>
-                  );
-                })()}
-              </div>
+              const name = item.productName || item.name || "Unknown";
+              const initial = name.charAt(0).toUpperCase();
 
-              {/* NAME */}
-              <p className="text-xs font-medium text-gray-700 truncate">
-                {item.productName || item.name}
-              </p>
+              return (
+                <tr
+                  key={item.productId || item._id || index}
+                  className={`border-b last:border-b-0 transition-colors ${
+                  
+                       "bg-gray-50 hover:bg-amber-100"
+                      
+                  }`}
+                >
+                  {/* RANK */}
+                  <td className="p-2 w-8 text-gray-500 font-medium">
+                    {index + 1}
+                  </td>
 
-              {/* QTY */}
-              <p className="text-lg font-bold text-gray-900 mt-1">
-                {item.quantitySold}{" "}
-                <span className="text-xs font-medium text-gray-500">
-                  pcs
-                </span>
-              </p>
-            </div>
-          ))}
-        </div>
+                  {/* PRODUCT */}
+                  <td className="p-2 flex items-center gap-3">
+                    {imgSrc ? (
+                      <img
+                        src={imgSrc}
+                        alt={name}
+                        className="w-8 h-8 rounded object-contain bg-gray-50"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700
+                                      flex items-center justify-center text-sm font-semibold">
+                        {initial}
+                      </div>
+                    )}
+
+                    <span className="truncate">{name}</span>
+                  </td>
+
+                  {/* SOLD */}
+                  <td className="p-2 text-right font-semibold text-gray-800">
+                    {item.quantitySold}
+                    <span className="text-xs text-gray-500 ml-1">pcs</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       )}
     </div>
   );

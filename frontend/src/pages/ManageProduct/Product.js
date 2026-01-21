@@ -443,7 +443,7 @@ const handleTransferStock = async () => {
 
     <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
       {mostStockProduct
-        ? `${mostStockProduct.totalQuantity}${mostStockProduct.quantityUnit}`
+        ? `${mostStockProduct.quantityValue}${mostStockProduct.quantityUnit}`
         : ""}
     </span>
   </div>

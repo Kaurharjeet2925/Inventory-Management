@@ -1,12 +1,53 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-const NotificationSchema = new mongoose.Schema({
-  message: { type: String, required: true },
-  title: { type: String },
-  data: { type: mongoose.Schema.Types.Mixed },
-  targetUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  targetRole: { type: String, default: null }, // e.g. 'admin', 'superAdmin', 'admins'
-  read: { type: Boolean, default: false },
-}, { timestamps: true });
+const NotificationSchema = new mongoose.Schema(
+  {
+    title: { type: String },
 
-module.exports = mongoose.model('Notification', NotificationSchema);
+    message: {
+      type: String,
+      required: true,
+    },
+
+    // activityType: {
+    //   type: String,
+    //   enum: [
+    //     "order",
+    //     "payment",
+    //     "ledger",
+    //     "client",
+    //     "product",
+    //     "system",
+    //   ],
+    //   required: true,
+    // },
+
+    data: { type: mongoose.Schema.Types.Mixed },
+
+    targetUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    targetRole: {
+      type: String, // admin, superAdmin, admins
+      default: null,
+    },
+
+    read: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ⭐ AUTO DELETE AFTER 30 DAYS
+    createdAt: {
+      type: Date,
+      default: Date.now,
+      expires: "30d",
+    },
+  },
+  { timestamps: false }
+);
+
+module.exports = mongoose.model("Notification", NotificationSchema);

@@ -71,25 +71,50 @@ const [search, setSearch] = useState("");
       setLoading(false);
     }
   }, [clientId]);
- const handleDownloadReport = () => {
+ const handleDownloadReport = async () => {
   if (!filteredLedger.length) {
     alert("No data to download");
     return;
   }
 
-  // FRONTEND ONLY: call backend excel API
-  const params = new URLSearchParams({
-    fromDate,
-    toDate,
-    type,
-    search,
-  });
+  try {
+    const params = new URLSearchParams({
+      fromDate,
+      toDate,
+      type,
+      search,
+    });
 
-  window.open(
-    `/reports/client-ledger/${clientId}?${params.toString()}`,
-    "_blank"
-  );
+    const res = await apiClient.get(
+      `/reports/client-ledger/${clientId}?${params.toString()}`,
+      {
+        responseType: "blob", // 👈 VERY IMPORTANT
+      }
+    );
+
+    // Create file from blob
+    const blob = new Blob([res.data], {
+      type:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+
+    // Auto download (NO new tab)
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Client-Ledger-${client?.name || "Report"}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error("Download failed", error);
+    alert("Failed to download report");
+  }
 };
+
 
 
 const getInitials = (name = "") => {

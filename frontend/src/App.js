@@ -19,7 +19,7 @@ import CreateOrders from './pages/ManageOrders/CreateOrders.js';
 import ViewOrders from './pages/ManageOrders/ViewOrders.js';
 import ManageClients from './pages/ManageClient/ManageClients.js';
 import Client from './pages/ManageClient/Client.js';
-import Locations from "./pages/ManageProduct/Locations.js";
+import Locations from "./pages/ManageProduct/Location.js";
 import Agent from './pages/Delivery/Agent.js';
 //import History from './pages/Delivery/History.js';
 import CompletedOrders from './pages/Delivery/Deliveries/CompletedOrders.js';
@@ -41,6 +41,7 @@ import CompanySettings from './pages/Settings/CompanySettings.js';
 import ChangePassword from './pages/Settings/ChangePassword.js';
 import ProcessingOrders from './pages/Delivery/Deliveries/ProcessingOrders.js';
 import ClientLedger from './pages/ManageClient/ClientLedger.js';
+import ProtectedRoute from './components/ProtectedRoute.js';
 function App() {
   useEffect(() => {
     socket.on("connect", () => {
@@ -67,6 +68,7 @@ function App() {
       <div className='bg-slate-50'>
       <Routes>
         <Route path="/" element={<Login />} />
+         <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />}>
           
@@ -117,6 +119,7 @@ function App() {
          <Route path="/settings" element={<SettingsLayout />}>
             <Route path="company" element={<CompanySettings />} />
             <Route path="change-password" element={<ChangePassword />} />
+          </Route>
           </Route>
       </Routes>
       </div>

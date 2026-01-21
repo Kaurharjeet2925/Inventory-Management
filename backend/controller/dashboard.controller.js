@@ -39,7 +39,7 @@ exports.getPaymentStatusPie = async (req, res) => {
     let paidAmount = 0;
 
     orders.forEach((order, index) => {
-      const total = Number(order.paymentDetails.totalAmount) || 0;
+      const total = Number(order.paymentDetails.totalAmount-order.paymentDetails.discount) || 0;
       const paid = Number(order.paymentDetails.paidAmount) || 0;
       totalAmount += total;
       paidAmount += paid;

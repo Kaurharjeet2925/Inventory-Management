@@ -314,16 +314,7 @@ const handleMarkCompleted = async () => {
           </span>
         </div>
 
-        {/* DISCOUNT INPUT */}
-        {order.status === "delivered" && (
-          <input
-            type="number"
-            placeholder="Discount"
-            value={discountState}
-            onChange={(e) => setDiscountState(Number(e.target.value || 0))}
-            className="border px-2 py-1 rounded text-sm w-full mt-2"
-          />
-        )}
+       
 
         {/* ADD PAYMENT */}
         {order.status === "delivered" && paymentStatus !== "paid" && (
@@ -357,6 +348,19 @@ const handleMarkCompleted = async () => {
             >
               Add
             </button>
+          </div>
+        )}
+ {/* DISCOUNT INPUT */}
+        {order.status === "delivered" && (
+          <div className="flex flex-row gap-4 justify-center text-center">
+          <label className="text-center mt-3"> Discount </label>
+          <input
+            type="number"
+            placeholder="Discount"
+            value={discountState}
+            onChange={(e) => setDiscountState(Number(e.target.value || 0))}
+            className="border px-2 py-1 rounded text-sm w-full mt-2"
+          />
           </div>
         )}
       </div>

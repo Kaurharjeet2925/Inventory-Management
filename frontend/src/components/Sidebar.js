@@ -10,7 +10,6 @@ const Sidebar = ({ isOpen, onClose }) => {
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [company, setCompany] = useState(null);
   const location = useLocation();
 
  
