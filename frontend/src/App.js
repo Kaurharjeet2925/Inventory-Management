@@ -28,11 +28,10 @@ import PendingOrders from './pages/Delivery/Deliveries/PendingOrders.js';
 import ShippedOrders from './pages/Delivery/Deliveries/ShippedOrders.js';
 import DeliveredOrders from './pages/Delivery/Deliveries/DeliveredOrders.js';
 import socket from "../src/socket/socketClient.js"; 
-import NotificationHandler from './components/NotificationHandler.js';
 import { useEffect } from 'react';
+
 import SalesReports from './pages/Reports/SalesReports.js';
 import InventoryReports from './pages/Reports/InventoryReports.js';
-import { NotificationProvider } from "./context/NotificationContext";
 import Reports from './pages/Reports/Reports.js';
 import SettingsLayout from './components/SettingsLayout.js';
 import DeliveryList from './pages/Delivery/DeliveriesList.js';
@@ -42,6 +41,7 @@ import ChangePassword from './pages/Settings/ChangePassword.js';
 import ProcessingOrders from './pages/Delivery/Deliveries/ProcessingOrders.js';
 import ClientLedger from './pages/ManageClient/ClientLedger.js';
 import ProtectedRoute from './components/ProtectedRoute.js';
+import ActivityLog from './pages/ActivityLogs.js';
 function App() {
   useEffect(() => {
     socket.on("connect", () => {
@@ -52,8 +52,7 @@ function App() {
   }, []);
 
   return (
-    <NotificationProvider>
-      <NotificationHandler />
+    <>
       <ToastContainer 
         position="top-right" 
         autoClose={3000} 
@@ -69,6 +68,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
          <Route element={<ProtectedRoute />}>
+         <Route path='/activity' element={<ActivityLog  />}/>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />}>
           
@@ -123,7 +123,7 @@ function App() {
           </Route>
       </Routes>
       </div>
-    </NotificationProvider>
+      </>
   );
 }
 export default App;

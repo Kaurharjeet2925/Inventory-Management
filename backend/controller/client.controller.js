@@ -1,6 +1,7 @@
 const Client = require("../models/client.model");
 const Order  = require("../models/orders.model.js")
-
+const {logActivity} =require("../utils/logActivity.js")
+const { createNotification } = require("../controller/notification.controller");
 const ClientLedger = require("../models/clientLedger.model");
 const mongoose = require("mongoose")
 // Get all clients
@@ -77,23 +78,31 @@ exports.createClient = async (req, res) => {
       openingBalanceType = "debit",
     } = req.body;
 
-    if (!name || !email || !phone) {
-      return res
-        .status(400)
-        .json({ message: "Name, email, and phone are required" });
+    /* ================= VALIDATION ================= */
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        message: "Client name is required",
+      });
     }
 
-    const existingClient = await Client.findOne({ email });
-    if (existingClient) {
-      return res
-        .status(400)
-        .json({ message: "Client with this email already exists" });
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({
+        message: "Phone number is required",
+      });
     }
 
-    // ✅ NORMALIZE opening balance
+    /* ================= EMAIL UNIQUE (ONLY IF PROVIDED) ================= */
+    if (email) {
+      const existingClient = await Client.findOne({ email });
+      if (existingClient) {
+        return res.status(400).json({
+          message: "Client with this email already exists",
+        });
+      }
+    }
+
+    /* ================= OPENING BALANCE ================= */
     const absOpeningBalance = Math.abs(Number(openingBalance) || 0);
-
-    // ✅ SIGNED running balance
     const balance =
       openingBalanceType === "credit"
         ? -absOpeningBalance
@@ -110,14 +119,14 @@ exports.createClient = async (req, res) => {
       zipCode,
       country,
       notes,
-      openingBalance: absOpeningBalance,      // ALWAYS positive
-      openingBalanceType,                     // debit / credit
-      balance,                                // signed
-      createdBy: req.user?._id,
+      openingBalance: absOpeningBalance,
+      openingBalanceType,
+      balance,
+      createdBy: req.user._id,
     });
 
-    // 🔹 Opening ledger entry
-    if (absOpeningBalance !== 0) {
+    /* ================= LEDGER ================= */
+    if (absOpeningBalance > 0) {
       await ClientLedger.create({
         clientId: newClient._id,
         type: "opening",
@@ -125,28 +134,60 @@ exports.createClient = async (req, res) => {
         debit: openingBalanceType === "debit" ? absOpeningBalance : 0,
         credit: openingBalanceType === "credit" ? absOpeningBalance : 0,
         balanceAfter: balance,
-        createdBy: req.user?._id,
+        createdBy: req.user._id,
       });
     }
+
+    const io = req.app.get("io");
+
+    /* ================= ACTIVITY LOG ================= */
+    await logActivity({
+      title: "Client Created",
+      message: `Client ${newClient.name} created by ${req.user.name}`,
+      activityType: "client",
+      performedBy: req.user._id,
+      data: {
+        clientId: newClient._id,
+        openingBalance: balance,
+      },
+    });
+
+    /* ================= NOTIFICATIONS ================= */
+    await createNotification({
+      message: `New client ${newClient.name} added`,
+      activityType: "client",
+      targetRole: "admins",
+      data: { clientId: newClient._id },
+    });
+
+    await createNotification({ 
+      message: `New client ${newClient.name} added by ${req.user.name}`,
+      activityType: "client",
+      targetRole: "superadmins",
+      data: {
+        clientId: newClient._id,
+        createdBy: req.user._id,
+        createdByName: req.user.name,
+      },
+    });
 
     const populatedClient = await newClient.populate(
       "createdBy",
       "name email"
     );
 
-    res.status(201).json({
+    return res.status(201).json({
       message: "Client created successfully",
       client: populatedClient,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("createClient error:", error);
+    return res.status(500).json({
       message: "Error creating client",
       error: error.message,
     });
   }
 };
-
-
 
 // Update client
 exports.updateClient = async (req, res) => {
@@ -162,13 +203,51 @@ exports.updateClient = async (req, res) => {
       zipCode,
       country,
       notes,
-      openingBalance,
-      openingBalanceType,
+      openingBalance = 0,
+      openingBalanceType = "debit",
     } = req.body;
 
+    const io = req.app.get("io");
+
+    /* ================= FIND CLIENT ================= */
     const client = await Client.findById(req.params.id);
     if (!client) {
       return res.status(404).json({ message: "Client not found" });
+    }
+
+    /* ================= BASIC VALIDATION ================= */
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Client name is required" });
+    }
+
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ message: "Phone number is required" });
+    }
+
+    /* ================= UNIQUE PHONE (EXCEPT SELF) ================= */
+    const phoneExists = await Client.findOne({
+      phone: phone.trim(),
+      _id: { $ne: client._id },
+    });
+
+    if (phoneExists) {
+      return res.status(400).json({
+        message: "Another client already uses this contact number",
+      });
+    }
+
+    /* ================= UNIQUE EMAIL (OPTIONAL) ================= */
+    if (email && email.trim()) {
+      const emailExists = await Client.findOne({
+        email: email.trim(),
+        _id: { $ne: client._id },
+      });
+
+      if (emailExists) {
+        return res.status(400).json({
+          message: "Another client already uses this email",
+        });
+      }
     }
 
     /* ================= NORMALIZE OPENING ================= */
@@ -183,7 +262,7 @@ exports.updateClient = async (req, res) => {
 
     /* ================= UPDATE BASIC INFO ================= */
     client.name = name;
-    client.email = email;
+    client.email = email || null;
     client.phone = phone;
     client.companyName = companyName;
     client.address = address;
@@ -199,7 +278,6 @@ exports.updateClient = async (req, res) => {
     if (signedOpening !== oldOpening) {
       const difference = signedOpening - oldOpening;
 
-      // get last ledger balance
       const lastLedger = await ClientLedger.findOne({
         clientId: client._id,
       }).sort({ createdAt: -1 });
@@ -209,7 +287,6 @@ exports.updateClient = async (req, res) => {
         : oldOpening;
 
       const newBalance = previousBalance + difference;
-
       client.balance = newBalance;
 
       await ClientLedger.create({
@@ -219,19 +296,82 @@ exports.updateClient = async (req, res) => {
         debit: difference > 0 ? difference : 0,
         credit: difference < 0 ? Math.abs(difference) : 0,
         balanceAfter: newBalance,
-        createdBy: req.user?._id,
+        createdBy: req.user._id,
       });
     }
 
     await client.save();
 
-    res.json({
+    /* ================= ACTIVITY LOG ================= */
+    await logActivity({
+      title: "Client Updated",
+      message: `Client ${client.name} updated by ${req.user.name}`,
+      activityType: "client",
+      performedBy: req.user._id,
+      data: {
+        clientId: client._id,
+        openingBalance: client.balance,
+      },
+    });
+
+   /* ================= NOTIFICATIONS ================= */
+
+if (req.user.role === "superAdmin") {
+  // ✅ ONLY ONE notification for superadmin
+  await createNotification({
+    
+    message: `Client ${client.name} updated successfully`,
+    activityType: "client",
+    targetUser: req.user._id, // only self
+    data: { clientId: client._id },
+  });
+
+} else {
+  // 🔔 Admin / CoAdmin update → notify admins
+  await createNotification({
+    io,
+    message: `Client ${client.name} updated`,
+    activityType: "client",
+    targetRole: "admins",
+    data: { clientId: client._id },
+  });
+
+  // 🔔 Also notify superadmins
+  await createNotification({
+   
+    message: `Client ${client.name} updated by ${req.user.name}`,
+    activityType: "client",
+    targetRole: "superadmins",
+    data: {
+      clientId: client._id,
+      updatedBy: req.user._id,
+      updatedByName: req.user.name,
+    },
+  });
+}
+
+    return res.json({
       message: "Client updated successfully",
       client,
     });
   } catch (error) {
     console.error("updateClient error:", error);
-    res.status(500).json({
+
+    // 🔒 Mongo duplicate safety
+    if (error.code === 11000) {
+      if (error.keyPattern?.phone) {
+        return res.status(400).json({
+          message: "Contact number already exists",
+        });
+      }
+      if (error.keyPattern?.email) {
+        return res.status(400).json({
+          message: "Email already exists",
+        });
+      }
+    }
+
+    return res.status(500).json({
       message: "Error updating client",
       error: error.message,
     });
@@ -241,23 +381,78 @@ exports.updateClient = async (req, res) => {
 
 
 
+
 // Delete client
 exports.deleteClient = async (req, res) => {
   try {
+    const io = req.app.get("io"); // ✅ FIX 1
+
     const client = await Client.findByIdAndDelete(req.params.id);
 
     if (!client) {
       return res.status(404).json({ message: "Client not found" });
     }
 
-    res.json({
+    /* ================= ACTIVITY LOG ================= */
+    await logActivity({
+      title: "Client Deleted",
+      message: `Client ${client.name} deleted by ${req.user.name}`,
+      activityType: "client",
+      performedBy: req.user._id,
+      data: {
+        clientId: client._id,
+        openingBalance: client.balance,
+      },
+    });
+
+    /* ================= NOTIFICATIONS ================= */
+
+    if (req.user.role === "superAdmin") {
+      // ✅ ONLY ONE notification for superadmin
+      await createNotification({
+        io,
+        message: `Client ${client.name} deleted successfully`,
+        activityType: "client",
+        targetUser: req.user._id,
+        data: { clientId: client._id },
+      });
+    } else {
+      // 🔔 Notify admins
+      await createNotification({
+        io,
+        message: `Client ${client.name} deleted`,
+        activityType: "client",
+        targetRole: "admins",
+        data: { clientId: client._id },
+      });
+
+      // 🔔 Notify superadmins
+      await createNotification({
+        io,
+        message: `Client ${client.name} deleted by ${req.user.name}`,
+        activityType: "client",
+        targetRole: "superadmins",
+        data: {
+          clientId: client._id,
+          deletedBy: req.user._id,
+          deletedByName: req.user.name, // ✅ FIX 2
+        },
+      });
+    }
+
+    return res.json({
       message: "Client deleted successfully",
       client,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error deleting client", error: error.message });
+    console.error("deleteClient error:", error);
+    return res.status(500).json({
+      message: "Error deleting client",
+      error: error.message,
+    });
   }
 };
+
 
 // Search clients
 exports.searchClients = async (req, res) => {
@@ -290,6 +485,10 @@ exports.searchClients = async (req, res) => {
 };
 exports.adjustClientPayment = async (req, res) => {
   try {
+    const io = req.app.get("io"); // ✅ FIX
+    const userName = req.user?.name || "System";
+     const userId = req.user?._id || null;
+    const userRole = req.user?.role || null;
     const { amount, note } = req.body;
     const clientId = req.params.id;
 
@@ -325,48 +524,90 @@ exports.adjustClientPayment = async (req, res) => {
     });
 
     // ================= APPLY TO ORDERS =================
-    let remainingAmount = paymentAmount;
+    // ================= APPLY TO ORDERS =================
+let remainingAmount = paymentAmount;
 
-    const orders = await Order.find({
-      clientId,
-      "paymentDetails.balanceAmount": { $gt: 0 },
-    }).sort({ createdAt: 1 });
+const orders = await Order.find({
+  clientId,
+  "paymentDetails.balanceAmount": { $gt: 0 },
+}).sort({ createdAt: 1 });
 
-    for (const order of orders) {
-      if (remainingAmount <= 0) break;
+for (const order of orders) {
+  if (remainingAmount <= 0) break;
 
-      const balance = order.paymentDetails.balanceAmount;
-      const adjust = Math.min(balance, remainingAmount);
+  const balance = order.paymentDetails.balanceAmount;
+  const adjust = Math.min(balance, remainingAmount);
 
-      // update order
-      order.paymentDetails.paidAmount += adjust;
-      order.paymentDetails.balanceAmount -= adjust;
-      order.paymentDetails.paymentStatus =
-        order.paymentDetails.balanceAmount === 0 ? "paid" : "partial";
+  order.paymentDetails.paidAmount += adjust;
+  order.paymentDetails.balanceAmount -= adjust;
+  order.paymentDetails.paymentStatus =
+    order.paymentDetails.balanceAmount === 0 ? "paid" : "partial";
 
-      await order.save();
+  await order.save();
 
-      // 🔥 THIS IS THE MAIN FIX
-      runningBalance += adjust; // debit reduces credit
+  // ❌ DO NOT TOUCH runningBalance HERE
+  remainingAmount -= adjust;
+}
 
-      // await ClientLedger.create({
-      //   clientId,
-      //   type: "order_adjustment",
-      //   referenceId: order._id,
-      //   description: `Adjusted against Order ${order.orderId}`,
-      //   debit: adjust,
-      //   credit: 0,
-      //   balanceAfter: runningBalance,
-      //   createdBy: req.user?._id,
-      // });
-
-      remainingAmount -= adjust;
-    }
 
     // save final client balance
     client.balance = runningBalance;
     await client.save();
+    await logActivity({
+      title: "Client Payment Adjusted",
+      message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${req.user.name}`,
+      activityType: "client",
+      performedBy: req.user._id,
+      data: {
+        clientId: client._id,
+        amount: paymentAmount,
+        finalBalance: runningBalance,
+      },
+    });
 
+    /* ================= NOTIFICATIONS ================= */
+   await logActivity({
+      title: "Client Payment Adjusted",
+      message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${userName}`,
+      activityType: "client",
+      performedBy: userId,
+      data: {
+        clientId: client._id,
+        amount: paymentAmount,
+        finalBalance: runningBalance,
+      },
+    });
+
+    /* ================= NOTIFICATIONS ================= */
+    if (userRole === "superAdmin") {
+      await createNotification({
+        io,
+        message: `Payment of ₹${paymentAmount} adjusted for client ${client.name}`,
+        activityType: "client",
+        targetUser: userId,
+        data: { clientId: client._id },
+      });
+    } else {
+      await createNotification({
+        io,
+        message: `Payment adjusted for client ${client.name}`,
+        activityType: "client",
+        targetRole: "admins",
+        data: { clientId: client._id },
+      });
+
+      await createNotification({
+        io,
+        message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${userName}`,
+        activityType: "client",
+        targetRole: "superadmins",
+        data: {
+          clientId: client._id,
+          adjustedBy: userId,
+          adjustedByName: userName,
+        },
+      });
+    }
     return res.json({
       message: "Payment adjusted successfully",
       finalBalance: runningBalance,

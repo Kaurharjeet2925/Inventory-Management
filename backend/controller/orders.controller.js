@@ -7,6 +7,7 @@ const paginate = require("../utils/pagination");
 const PDFDocument = require("pdfkit");
 const User = require("../models/user.model");
 const mongoose = require("mongoose")
+const {logActivity} =require("../utils/logActivity")
 const { createNotification } = require("./notification.controller");
 // Helper to generate orderId like STN00001
 
@@ -297,6 +298,8 @@ if (manualPaid > 0) {
     credit: manualPaid,
     balanceAfter: balanceAfterPayment,
     createdBy: req.user._id,
+    acceptedByDeliveryBoy: false,
+
   });
 }
 
@@ -305,51 +308,60 @@ await Client.findByIdAndUpdate(clientId, {
 });
 
 
-    /* ================= SOCKET + NOTIFICATIONS ================= */
-    const populatedOrder = await Order.findById(newOrder._id)
-      .select("+paymentDetails")
-      .populate("deliveryPersonId", "name phone email")
-      .populate("assignedBy", "name role")
-      .populate("clientId", "name phone address");
+const populatedOrder = await Order.findById(newOrder._id)
+  .select("+paymentDetails")
+  .populate("deliveryPersonId", "name phone email")
+  .populate("assignedBy", "name role")
+  .populate("clientId", "name phone address");
 
-    let dpId = finalDeliveryPersonId?.toString();
+const dpId = finalDeliveryPersonId?.toString();
+const creatorId = req.user._id.toString();
 
-    
-// 🔔 Delivery Boy
+/* 🔔 DELIVERY BOY */
 if (dpId) {
-  io.to(dpId).emit("order_created", populatedOrder);
-
   await createNotification({
     io,
     message: `New order ${orderId} assigned to you`,
+    activityType: "order",
     targetUser: dpId,
     data: { orderId: populatedOrder._id },
   });
 }
 
-// 🔔 Assigned Admin
-if (assignedBy) {
-  io.to(`admin_${assignedBy.toString()}`).emit("order_created", populatedOrder);
+/* 🔔 CREATOR (ADMIN / COADMIN / SUPERADMIN) */
+await createNotification({
+  io,
+  message: `You created order ${orderId}`,
+  activityType: "order",
+  targetUser: creatorId,
+  data: { orderId: populatedOrder._id },
+});
 
-  await createNotification({
-    io,
-    message: `You created a new order ${orderId}`,
-    targetUser: assignedBy,
-    data: { orderId: populatedOrder._id },
-  });
-}
-
-// 🔔 SuperAdmin (only if creator is NOT superadmin)
+/* 🔔 SUPERADMIN (ONLY IF CREATOR IS NOT SUPERADMIN) */
 if (req.user.role !== "superAdmin") {
   io.to("superadmins").emit("order_created", populatedOrder);
-
+io.to("superadmins").emit("order_created", populatedOrder);
   await createNotification({
     io,
     message: `New order ${orderId} created`,
+    activityType: "order",
     targetRole: "superadmins",
     data: { orderId: populatedOrder._id },
   });
 }
+
+/* ================= ACTIVITY LOG (ALWAYS) ================= */
+await logActivity({
+  title: "Order Created",
+  message: `Order ${order.orderId} created by ${req.user.name}`,
+  activityType: "order",
+  performedBy: req.user._id,
+  data: {
+    orderId: newOrder._id,
+    totalAmount: finalPaymentDetails.totalAmount,
+    clientId,
+  },
+});
 
 
     
@@ -472,7 +484,7 @@ exports.updateOrder = async (req, res) => {
   try {
     const orderId = req.params.id;
     const { items, status, paymentDetails } = req.body;
-
+const io = req.app.get("io");
     /* ================= FIND ORDER ================= */
     const existingOrder = await Order.findById(orderId);
     if (!existingOrder) {
@@ -499,6 +511,25 @@ exports.updateOrder = async (req, res) => {
       // Allow ONLY status change
       existingOrder.status = status || existingOrder.status;
       await existingOrder.save();
+    
+        await logActivity({
+    title: "Order Status Updated",
+    message: `Order ${existingOrder.orderId} status changed to ${existingOrder.status}`,
+    activityType: "order",
+    performedBy: req.user._id,
+    data: {
+      orderId: existingOrder._id,
+      status: existingOrder.status,
+    },
+  });
+
+  await createNotification({
+    io,
+    message: `Order ${existingOrder.orderId} status updated to ${existingOrder.status}`,
+    activityType: "order",
+    targetUser: existingOrder.assignedBy,
+    data: { orderId: existingOrder._id },
+  });
 
       return res.json({
         message: "Order status updated successfully",
@@ -551,6 +582,23 @@ if (status === "cancelled" && existingOrder.status !== "cancelled") {
   existingOrder.paymentDetails.balanceAmount = 0;
 
   await existingOrder.save();
+await logActivity({
+  title: "Order Cancelled",
+  message: `Order ${existingOrder.orderId} cancelled`,
+  activityType: "order",
+  performedBy: req.user._id,
+  data: {
+    orderId: existingOrder._id,
+  },
+});
+
+await createNotification({
+  io,
+  message: `Order ${existingOrder.orderId} has been cancelled`,
+  activityType: "order",
+  targetRole: "admins",
+  data: { orderId: existingOrder._id },
+});
 
   return res.json({
     message: "Order cancelled successfully",
@@ -681,10 +729,42 @@ if (difference !== 0) {
   },
   { new: true }
 );
+/* ================= ACTIVITY LOG ================= */
+await logActivity({
+  title: "Order Updated",
+  message: `Order ${existingOrder.orderId} updated`,
+  activityType: "order",
+  performedBy: req.user._id,
+  data: {
+    orderId: updatedOrder._id,
+    totalAmount,
+    paymentStatus,
+  },
+});
+
+/* ================= NOTIFICATIONS ================= */
 
 
-    /* ================= SOCKET EVENTS ================= */
-    const io = req.app.get("io");
+if (updatedOrder.assignedBy) {
+  await createNotification({
+    io,
+    message: `Order ${updatedOrder.orderId} updated`,
+    activityType: "order",
+    targetUser: updatedOrder.assignedBy,
+    data: { orderId: updatedOrder._id },
+  });
+}
+
+if (updatedOrder.deliveryPersonId) {
+  await createNotification({
+    io,
+    message: `Order ${updatedOrder.orderId} updated`,
+    activityType: "order",
+    targetUser: updatedOrder.deliveryPersonId,
+    data: { orderId: updatedOrder._id },
+  });
+}
+
 
     const populatedOrder = await Order.findById(updatedOrder._id)
       .populate("clientId", "name phone address")
@@ -709,7 +789,7 @@ if (difference !== 0) {
 
     // SuperAdmin
     io.to("superadmins").emit("order_updated", populatedOrder);
-
+    
     return res.json({
       message: "Order updated successfully",
       order: updatedOrder,
@@ -864,7 +944,41 @@ order.paymentDetails.paymentStatus = paymentStatus;
   });
 
   client.balance = newBalance;
+
+
   await client.save();
+  if (order.assignedBy) {
+    await createNotification({
+      io,
+      message: `₹${paymentAmount} payment received for Order ${order.orderId}`,
+      activityType: "order",
+      targetUser: order.assignedBy,
+      data: { orderId: order._id },
+    });
+  }
+
+  // Notify SuperAdmins
+  await createNotification({
+    io,
+    message: `Payment of ₹${paymentAmount} received for Order ${order.orderId}`,
+    activityType: "order",
+    targetRole: "superadmins",
+    data: { orderId: order._id },
+  });
+
+  /* ================= 📝 ACTIVITY LOG ================= */
+  await logActivity({
+    title: "Payment Received",
+    message: `₹${paymentAmount} received for Order ${order.orderId}`,
+    activityType: "order",
+    performedBy: req.user._id,
+    data: {
+      orderId: order._id,
+      paymentAmount,
+      paymentMode: payment.mode,
+      clientId: order.clientId,
+    },
+  });
 }
 
 
@@ -909,7 +1023,7 @@ exports.collectOrder = async (req, res) => {
       });
     }
 
-    // 🚫 Must accept order first
+   
     if (!order.acceptedByDeliveryBoy) {
       return res.status(400).json({
         message: "Please accept the order first",
@@ -940,16 +1054,17 @@ exports.collectOrder = async (req, res) => {
 
     const io = req.app.get("io");
 
-    // 🔔 Admin notification
+    
     if (updatedOrder.assignedBy?._id) {
       io.to(`admin_${updatedOrder.assignedBy._id}`).emit(
         "order_collected",
         updatedOrder
       );
-
+  
       await createNotification({
         io,
         message: `An item was collected for ${updatedOrder.orderId}`,
+        activityType:"order",
         targetUser: updatedOrder.assignedBy._id,
         data: { orderId: updatedOrder._id },
       });
@@ -965,18 +1080,40 @@ exports.collectOrder = async (req, res) => {
       await createNotification({
         io,
         message: `Item collected for order ${updatedOrder.orderId}`,
+         activityType:"order",
         targetUser: updatedOrder.deliveryPersonId._id,
         data: { orderId: updatedOrder._id },
       });
     }
 
-    // 🔔 SuperAdmins
-    io.to("superadmins").emit("order_collected", updatedOrder);
+
+io.to("superadmins").emit("order_collected", updatedOrder);
+
+// 🔔 SuperAdmins (notification + toast)
+await createNotification({
+  message: `Item collected for order ${updatedOrder.orderId}`,
+  activityType: "order",
+  targetRole: "superadmins",
+  data: { orderId: updatedOrder._id },
+});
+
+   await logActivity({
+  title: "Order collected",
+  message: `Order ${order.orderId} collected by ${req.user.name}`,
+  activityType: "order",
+  performedBy: req.user._id,
+  data: {
+    orderId: order._id,
+    collectedBy: req.user._id,
+  },
+});
 
     return res.json({
       message: "Item collected successfully",
       order: updatedOrder,
     });
+
+
   } catch (error) {
     console.error("collectOrder error", error);
     res.status(500).json({
@@ -1010,56 +1147,57 @@ exports.acceptOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // 🔐 Only delivery boy can accept
-if (!["delivery-boy", "coAdmin"].includes(req.user.role)) {
+    if (!["delivery-boy", "coAdmin"].includes(req.user.role)) {
       return res.status(403).json({
-        message: "Only delivery boy or Co Admin can accept order",
+        message: "Only delivery boy or CoAdmin can accept order",
       });
     }
 
-    // 🚫 Already accepted
+    // ✅ ALREADY ACCEPTED → OK
     if (order.acceptedByDeliveryBoy) {
-      return res.status(400).json({
+      return res.json({
         message: "Order already accepted",
+        order,
       });
     }
 
-    // ✅ ACCEPT ORDER
+    // 🚫 Accept only pending
+    if (order.status !== "pending") {
+      return res.status(400).json({
+        message: `Order already ${order.status}`,
+      });
+    }
+
+    // ✅ ACCEPT
     order.acceptedByDeliveryBoy = true;
     order.status = "processing";
     await order.save();
 
     const io = req.app.get("io");
 
-    /* ================= 🔔 NOTIFICATIONS ================= */
-
-    // 🔔 Notify Admin
     if (order.assignedBy?._id) {
-      io.to(`admin_${order.assignedBy._id}`).emit(
-        "order_accepted",
-        order
-      );
+    //  io.to(`admin_${order.assignedBy._id}`).emit("order_accepted", order);
 
       await createNotification({
         io,
         message: `Order ${order.orderId} accepted by delivery boy`,
+        activityType: "order",
         targetUser: order.assignedBy._id,
         data: { orderId: order._id },
       });
     }
 
-    // 🔔 Notify SuperAdmins
-    io.to("superadmins").emit("order_accepted", order);
-
-    await createNotification({
-      io,
-      message: `Order ${order.orderId} accepted`,
-      targetRole: "superadmins",
-      data: { orderId: order._id },
-    });
-
-    // 🔔 Optional: Notify Delivery Boy himself
-    io.to(req.user._id.toString()).emit("order_accepted", order);
+   // io.to("superadmins").emit("order_accepted", order);
+await logActivity({
+  title: "Order Accepted",
+  message: `Order ${order.orderId} accepted by ${req.user.name}`,
+  activityType: "order",
+  performedBy: req.user._id,
+  data: {
+    orderId: order._id,
+    acceptedBy: req.user._id,
+  },
+});
 
     return res.json({
       message: "Order accepted successfully",
@@ -1183,14 +1321,18 @@ if (
         await createNotification({
           io,
           message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`,
+           activityType:"order",
           targetUser: updatedOrder.assignedBy._id,
           data: { orderId: updatedOrder._id },
         });
+       
+      
+
       } catch (e) {
         console.error("notify admin failed", e);
       }
     }
-
+    
     // Notify delivery boy
     if (updatedOrder.deliveryPersonId) {
       io.to(updatedOrder.deliveryPersonId.toString()).emit(
@@ -1202,6 +1344,7 @@ if (
         await createNotification({
           io,
           message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`,
+           activityType:"order",
           targetUser: updatedOrder.deliveryPersonId,
           data: { orderId: updatedOrder._id },
         });
@@ -1209,6 +1352,18 @@ if (
         console.error("notify delivery boy failed", e);
       }
     }
+  await logActivity({
+  title: "Order Status Updated",
+  message: `Order ${updatedOrder.orderId} status changed to ${updatedOrder.status}`,
+  activityType: "order",
+  performedBy: req.user._id,
+  data: {
+    orderId: updatedOrder._id,
+    status: updatedOrder.status,
+    totalAmount: updatedOrder.paymentDetails?.totalAmount || 0,
+    paymentStatus: updatedOrder.paymentDetails?.paymentStatus || "unpaid",
+  },
+});
 
     return res.json({
       message: "Status updated successfully",
@@ -1229,13 +1384,15 @@ if (
 exports.deleteOrder = async (req, res) => {
   try {
     const id = req.params.id;
-
-    // STEP 1: Find order first
-    const order = await Order.findById(id);
-    if (!order) return res.status(404).json({ message: "Order not found" });
-
-    // STEP 2: Restore stock
     const io = req.app.get("io");
+
+    /* ================= FIND ORDER ================= */
+    const order = await Order.findById(id);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    /* ================= RESTORE STOCK ================= */
     for (let item of order.items) {
       const restoreQty = Number(item.quantity) || 0;
 
@@ -1245,23 +1402,96 @@ exports.deleteOrder = async (req, res) => {
           { $inc: { totalQuantity: restoreQty } },
           { new: true }
         );
-        console.log(`Stock restored on delete for product ${item.productId}: +${restoreQty}, newTotal: ${resRestore ? resRestore.totalQuantity : 'N/A'}`);
-        try { io.emit('product_updated', { productId: item.productId, totalQuantity: resRestore ? resRestore.totalQuantity : null }); } catch (e) { console.error('Emit product_updated failed', e); }
+
+        io.emit("product_updated", {
+          productId: item.productId,
+          totalQuantity: resRestore?.totalQuantity ?? null,
+        });
       }
     }
 
-    // STEP 3: Delete the order after stock is restored
+    /* ================= REVERSE CLIENT BALANCE ================= */
+    const client = await Client.findById(order.clientId);
+
+    if (client && order.paymentDetails) {
+      const payable =
+        (order.paymentDetails.totalAmount || 0) -
+        (order.paymentDetails.discount || 0);
+
+      const previousBalance = await getLastLedgerBalance(
+        client._id,
+        client.openingBalanceType === "credit"
+          ? -client.openingBalance
+          : client.openingBalance
+      );
+
+      const newBalance = previousBalance - payable;
+
+      // Ledger reversal entry
+      await ClientLedger.create({
+        clientId: client._id,
+        type: "order_adjustment",
+        referenceId: order._id,
+        description: `Order ${order.orderId} deleted`,
+        debit: 0,
+        credit: payable,
+        balanceAfter: newBalance,
+        createdBy: req.user._id,
+      });
+
+      client.balance = newBalance;
+      await client.save();
+    }
+
+    /* ================= DELETE ORDER ================= */
     await Order.findByIdAndDelete(id);
     io.emit("order_deleted", { orderId: id });
-    try { await createNotification({ io, message: `Order ${order.orderId} has been deleted`, targetRole: 'admins', data: { orderId: id } }); } catch(e){console.error('notify admins failed', e);}
-    return res.json({ message: "Order deleted successfully" });
 
+    /* ================= NOTIFICATIONS ================= */
 
+    // Admins
+    await createNotification({
+      io,
+      message: `Order ${order.orderId} has been deleted`,
+      activityType: "order",
+      targetRole: "admins",
+      data: { orderId: id },
+    });
+
+    // SuperAdmins
+    await createNotification({
+      io,
+      message: `Order ${order.orderId} has been deleted`,
+      activityType: "order",
+      targetRole: "superadmins",
+      data: { orderId: id },
+    });
+
+    /* ================= ACTIVITY LOG ================= */
+    await logActivity({
+      title: "Order Deleted",
+      message: `Order ${order.orderId} deleted`,
+      activityType: "order",
+      performedBy: req.user._id,
+      data: {
+        orderId: order._id,
+        totalAmount: order.paymentDetails?.totalAmount || 0,
+        discount: order.paymentDetails?.discount || 0,
+        refundedAmount:
+          (order.paymentDetails?.totalAmount || 0) -
+          (order.paymentDetails?.discount || 0),
+      },
+    });
+
+    return res.json({
+      message: "Order deleted successfully",
+    });
   } catch (error) {
     console.error("deleteOrder Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
+
 
 
 

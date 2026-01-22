@@ -9,18 +9,18 @@ const NotificationSchema = new mongoose.Schema(
       required: true,
     },
 
-    // activityType: {
-    //   type: String,
-    //   enum: [
-    //     "order",
-    //     "payment",
-    //     "ledger",
-    //     "client",
-    //     "product",
-    //     "system",
-    //   ],
-    //   required: true,
-    // },
+    activityType: {
+      type: String,
+      enum: [
+        "order",
+        "payment",
+        "ledger",
+        "client",
+        "product",
+        "system",
+      ],
+      required: true,
+    },
 
     data: { type: mongoose.Schema.Types.Mixed },
 
@@ -40,7 +40,6 @@ const NotificationSchema = new mongoose.Schema(
       default: false,
     },
 
-    // ⭐ AUTO DELETE AFTER 30 DAYS
     createdAt: {
       type: Date,
       default: Date.now,

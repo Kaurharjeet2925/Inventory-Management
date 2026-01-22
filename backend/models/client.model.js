@@ -4,7 +4,12 @@ const clientSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     companyName: { type: String, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true },
+email: {
+  type: String,
+  lowercase: true,
+  trim: true,
+  default: null,
+},
     phone: { type: String, required: true },
     address: { type: String, trim: true },
     city: { type: String, trim: true },

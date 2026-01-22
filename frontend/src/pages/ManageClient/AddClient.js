@@ -20,36 +20,34 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     zipCode: "",
     country: "",
     openingBalance: 0,
+    openingBalanceType: "debit", // ✅ FIX 1
   });
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   /* ================= PREFILL ================= */
- useEffect(() => {
-  if (isEdit && clientData) {
-    const balance = Number(clientData.openingBalance || 0);
+  useEffect(() => {
+    if (isEdit && clientData) {
+      const balance = Number(clientData.openingBalance || 0);
 
-    setFormData({
-      name: clientData.name || "",
-      email: clientData.email || "",
-      phone: clientData.phone || "",
-      companyName: clientData.companyName || "",
-      address: clientData.address || "",
-      city: clientData.city || "",
-      state: clientData.state || "",
-      zipCode: clientData.zipCode || "",
-      country: clientData.country || "",
-
-      // 🔥 IMPORTANT FIX
-      openingBalance: Math.abs(balance),
-      openingBalanceType: balance < 0 ? "credit" : "debit",
-    });
-  } else {
-    resetForm();
-  }
-}, [isOpen, clientData, isEdit]);
-
+      setFormData({
+        name: clientData.name || "",
+        email: clientData.email || "",
+        phone: clientData.phone || "",
+        companyName: clientData.companyName || "",
+        address: clientData.address || "",
+        city: clientData.city || "",
+        state: clientData.state || "",
+        zipCode: clientData.zipCode || "",
+        country: clientData.country || "",
+        openingBalance: Number(clientData.openingBalance || 0),
+  openingBalanceType: clientData.openingBalanceType || "debit",
+      });
+    } else {
+      resetForm();
+    }
+  }, [isOpen, clientData, isEdit]);
 
   /* ================= HANDLERS ================= */
   const handleChange = (e) => {
@@ -63,34 +61,26 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const validateForm = () => {
+ const validateForm = () => {
   const newErrors = {};
 
-  // NAME
   if (!formData.name.trim()) {
     newErrors.name = "Client name is required";
   }
 
-  // PHONE
   if (!formData.phone.trim()) {
     newErrors.phone = "Contact number is required";
   } else if (!/^[0-9]{10}$/.test(formData.phone)) {
     newErrors.phone = "Enter a valid 10-digit contact number";
   }
 
-  // ADDRESS
-  if (!formData.address.trim()) {
-    newErrors.address = "Address is required";
-  }
-
-  // EMAIL (optional but validated if present)
+  // Email optional but validated if entered
   if (formData.email.trim()) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Invalid email format";
     }
   }
 
-  // OPENING BALANCE
   if (formData.openingBalance < 0) {
     newErrors.openingBalance = "Opening balance cannot be negative";
   }
@@ -101,6 +91,7 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const newErrors = validateForm();
     if (Object.keys(newErrors).length) {
       setErrors(newErrors);
@@ -110,15 +101,17 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
     setLoading(true);
     try {
       let res;
+
       if (isEdit) {
         res = await apiClient.put(`/clients/${clientData._id}`, formData);
         toast.success("Client updated successfully");
         onAddClient(res.data?.client, true);
       } else {
         res = await apiClient.post("/clients", formData);
-        toast.success("Client added successfully");
+        toast.success("Client added successfully"); // ✅ Toast ALWAYS works
         onAddClient(res.data?.client, false);
       }
+
       resetForm();
       onClose();
     } catch (err) {
@@ -140,6 +133,7 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
       zipCode: "",
       country: "",
       openingBalance: 0,
+      openingBalanceType: "debit", // ✅ FIX 2
     });
     setErrors({});
   };
@@ -273,9 +267,43 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
             <button type="button" onClick={onClose} className="px-5 py-2 border rounded-md">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="px-6 py-2 bg-blue-900 text-white rounded-md">
-              {loading ? "Saving..." : isEdit ? "Update Client" : "Add Client"}
-            </button>
+            <button
+  type="submit"
+  disabled={loading}
+  className={`px-6 py-2 rounded-md text-white flex items-center justify-center gap-2
+    ${loading ? "bg-blue-700 cursor-not-allowed" : "bg-blue-900 hover:bg-blue-800"}
+  `}
+>
+  {loading && (
+    <svg
+      className="animate-spin h-4 w-4 text-white"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+      />
+    </svg>
+  )}
+
+  {loading
+    ? "Saving..."
+    : isEdit
+    ? "Update Client"
+    : "Add Client"}
+</button>
+
           </div>
 
         </form>

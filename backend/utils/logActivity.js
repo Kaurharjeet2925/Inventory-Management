@@ -1,26 +1,20 @@
-const Notification = require("../models/notification.model")
+// utils/logActivity.js
+const ActivityLog = require("../models/activityLog.model");
 
 exports.logActivity = async ({
-  io,
-  title = null,
+  title,
   message,
   activityType,
-  targetUser = null,
-  targetRole = null,
+  performedBy,
+  targetRole = "admin",
   data = {},
 }) => {
-  const notification = await Notification.create({
+  return await ActivityLog.create({
     title,
     message,
     activityType,
-    targetUser,
+    performedBy,
     targetRole,
     data,
   });
-
-  // Emit real-time
-  if (targetUser) io.to(targetUser.toString()).emit("notification", notification);
-  if (targetRole) io.to(targetRole).emit("notification", notification);
-
-  return notification;
 };
