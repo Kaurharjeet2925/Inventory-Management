@@ -4,9 +4,10 @@ import { Plus, Trash2, Edit3 } from 'lucide-react';
 import AddClient from '../ManageClient/AddClient';
 import socket from "../../socket/socketClient";
 import ThemedTable from '../../components/ThemedTable';
-
+import { useNavigate } from "react-router-dom";
 const CreateOrders = () => {
   const user = JSON.parse(localStorage.getItem("user"));
+  const navigate = useNavigate();
 const isCoAdmin = user?.role === "coAdmin";
 
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -942,7 +943,11 @@ if (!selectedDeliveryPersonId && !isCoAdmin) {
       {/* ACTIONS */}
    <div className="flex flex-row justify-end gap-3">
   <button type="reset" className={`${secondaryBtn} `}>Cancel</button>
-  <button type="submit" className={`${primaryBtn} `}>Create Order</button>
+   <button
+        type="submit"
+        onClick={() => navigate("/orders/view-order")}   // 👈 View Orders page
+        className={secondaryBtn}
+      >Create Order</button>
 </div>
 
 

@@ -154,23 +154,26 @@ exports.createClient = async (req, res) => {
 
     /* ================= NOTIFICATIONS ================= */
     await createNotification({
-      message: `New client ${newClient.name} added`,
+      io,
+      message: `New client ${newClient.name} added by ${req.user.name}`,
       activityType: "client",
       targetRole: "admins",
       data: { clientId: newClient._id },
     });
 
-    await createNotification({ 
-      message: `New client ${newClient.name} added by ${req.user.name}`,
-      activityType: "client",
-      targetRole: "superadmins",
+    if (req.user.role !== "superAdmin") {
+      await createNotification({
+        io,
+        message: `New client ${newClient.name} added by ${req.user.name}`,
+        activityType: "client",
+        targetRole: "superadmins",
       data: {
         clientId: newClient._id,
         createdBy: req.user._id,
         createdByName: req.user.name,
       },
     });
-
+    }
     const populatedClient = await newClient.populate(
       "createdBy",
       "name email"
@@ -315,40 +318,31 @@ exports.updateClient = async (req, res) => {
     });
 
    /* ================= NOTIFICATIONS ================= */
-
-if (req.user.role === "superAdmin") {
-  // ✅ ONLY ONE notification for superadmin
   await createNotification({
-    
-    message: `Client ${client.name} updated successfully`,
-    activityType: "client",
-    targetUser: req.user._id, // only self
-    data: { clientId: client._id },
-  });
+      io,
+      message: `Client ${client.name} updated by ${req.user.name}`,
+      activityType: "client",
+      targetRole: "admins",
+      data: {
+        clientId: client._id,
+        updatedBy: req.user._id,
+        updatedByName: req.user.name,
+      },
+    });
 
-} else {
-  // 🔔 Admin / CoAdmin update → notify admins
-  await createNotification({
-    io,
-    message: `Client ${client.name} updated`,
-    activityType: "client",
-    targetRole: "admins",
-    data: { clientId: client._id },
-  });
-
-  // 🔔 Also notify superadmins
-  await createNotification({
-   
-    message: `Client ${client.name} updated by ${req.user.name}`,
-    activityType: "client",
-    targetRole: "superadmins",
-    data: {
-      clientId: client._id,
-      updatedBy: req.user._id,
-      updatedByName: req.user.name,
-    },
-  });
-}
+    if (req.user.role !== "superAdmin") {
+      await createNotification({
+        io,
+        message: `Client ${client.name} updated by ${req.user.name}`,
+        activityType: "client",
+        targetRole: "superadmins",
+      data: {
+        clientId: client._id,
+        createdBy: req.user._id,
+        createdByName: req.user.name,
+      },
+    });
+    }
 
     return res.json({
       message: "Client updated successfully",
@@ -407,39 +401,27 @@ exports.deleteClient = async (req, res) => {
 
     /* ================= NOTIFICATIONS ================= */
 
-    if (req.user.role === "superAdmin") {
-      // ✅ ONLY ONE notification for superadmin
-      await createNotification({
-        io,
-        message: `Client ${client.name} deleted successfully`,
-        activityType: "client",
-        targetUser: req.user._id,
-        data: { clientId: client._id },
-      });
-    } else {
-      // 🔔 Notify admins
-      await createNotification({
-        io,
-        message: `Client ${client.name} deleted`,
-        activityType: "client",
-        targetRole: "admins",
-        data: { clientId: client._id },
-      });
+    await createNotification({
+      io,
+      message: `Client ${client.name} deleted by ${req.user.name}`,
+      activityType: "client",
+      targetRole: "admins",
+      data: { clientId: client._id },
+    });
 
-      // 🔔 Notify superadmins
+    if (req.user.role !== "superAdmin") {
       await createNotification({
         io,
         message: `Client ${client.name} deleted by ${req.user.name}`,
         activityType: "client",
         targetRole: "superadmins",
-        data: {
-          clientId: client._id,
-          deletedBy: req.user._id,
-          deletedByName: req.user.name, // ✅ FIX 2
-        },
-      });
+      data: {
+        clientId: client._id,
+        createdBy: req.user._id,
+        createdByName: req.user.name,
+      },
+    });
     }
-
     return res.json({
       message: "Client deleted successfully",
       client,
@@ -568,7 +550,7 @@ for (const order of orders) {
     /* ================= NOTIFICATIONS ================= */
    await logActivity({
       title: "Client Payment Adjusted",
-      message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${userName}`,
+      message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${req.user.name}`,
       activityType: "client",
       performedBy: userId,
       data: {
@@ -577,37 +559,28 @@ for (const order of orders) {
         finalBalance: runningBalance,
       },
     });
+await createNotification({
+      io,
+      message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${req.user.name}`,
+      activityType: "client",
+      targetRole: "admins",
+      data: { clientId: client._id },
+    });
 
-    /* ================= NOTIFICATIONS ================= */
-    if (userRole === "superAdmin") {
-      await createNotification({
-        io,
-        message: `Payment of ₹${paymentAmount} adjusted for client ${client.name}`,
-        activityType: "client",
-        targetUser: userId,
-        data: { clientId: client._id },
-      });
-    } else {
-      await createNotification({
-        io,
-        message: `Payment adjusted for client ${client.name}`,
-        activityType: "client",
-        targetRole: "admins",
-        data: { clientId: client._id },
-      });
-
+    if (req.user.role !== "superAdmin") {
       await createNotification({
         io,
         message: `Payment of ₹${paymentAmount} adjusted for client ${client.name} by ${userName}`,
         activityType: "client",
         targetRole: "superadmins",
-        data: {
-          clientId: client._id,
-          adjustedBy: userId,
-          adjustedByName: userName,
-        },
-      });
+      data: {
+        clientId: client._id,
+        createdBy: req.user._id,
+        createdByName: req.user.name,
+      },
+    });
     }
+   
     return res.json({
       message: "Payment adjusted successfully",
       finalBalance: runningBalance,
@@ -770,4 +743,125 @@ exports.exportClientReport = async (req, res) => {
   }
 };
 
+exports.downloadClientLedgerExcel = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid client id" });
+    }
+
+    const client = await Client.findById(id);
+    if (!client) {
+      return res.status(404).json({ message: "Client not found" });
+    }
+
+    const ledger = await ClientLedger.find({ clientId: id })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Client Ledger");
+
+    /* ================= TITLE ================= */
+    sheet.addRow(["CLIENT LEDGER REPORT"]);
+    sheet.getRow(1).font = { size: 16, bold: true };
+    sheet.mergeCells("A1:F1");
+
+    sheet.addRow([]);
+
+    /* ================= CLIENT DETAILS ================= */
+    sheet.addRow(["Client Name", client.name]);
+    sheet.addRow(["Phone", client.phone]);
+    sheet.addRow(["Email", client.email || "-"]);
+
+    const openingBalanceText =
+      client.openingBalanceType === "credit"
+        ? `${client.openingBalance} Credit`
+        : `${client.openingBalance} Debit`;
+
+    sheet.addRow(["Opening Balance", openingBalanceText]);
+
+    sheet.addRow([]); // space before table
+
+    /* ================= TABLE HEADER ================= */
+    sheet.columns = [
+      { header: "Date", key: "date", width: 18 },
+      { header: "Type", key: "type", width: 14 },
+      { header: "Description", key: "description", width: 35 },
+      { header: "Debit (₹)", key: "debit", width: 15 },
+      { header: "Credit (₹)", key: "credit", width: 15 },
+      { header: "Balance", key: "balance", width: 18 },
+    ];
+
+    const headerRow = sheet.getRow(sheet.rowCount + 1);
+    headerRow.values = [
+      "Date",
+      "Type",
+      "Description",
+      "Debit (₹)",
+      "Credit (₹)",
+      "Balance",
+    ];
+    headerRow.font = { bold: true };
+
+    /* ================= LEDGER ROWS ================= */
+    ledger.forEach((row) => {
+      sheet.addRow({
+        date: new Date(row.createdAt).toLocaleString(),
+        type: row.type,
+        description: row.description || "-",
+        debit: row.debit > 0 ? row.debit : "",
+        credit: row.credit > 0 ? row.credit : "",
+        balance:
+          row.balanceAfter > 0
+            ? `${row.balanceAfter} Debit`
+            : row.balanceAfter < 0
+            ? `${Math.abs(row.balanceAfter)} Credit`
+            : "0",
+      });
+    });
+
+    /* ================= CLOSING BALANCE ================= */
+    sheet.addRow([]);
+
+    const closingBalanceText =
+      client.balance > 0
+        ? `${client.balance} Debit`
+        : `${Math.abs(client.balance)} Credit`;
+
+    const closingRow = sheet.addRow(["Closing Balance", closingBalanceText]);
+    closingRow.font = { bold: true };
+
+    /* ================= STYLING ================= */
+    sheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+    });
+
+    /* ================= SEND FILE ================= */
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Client-Ledger-${client.name}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("downloadClientLedgerExcel error:", error);
+    res.status(500).json({
+      message: "Failed to download ledger report",
+    });
+  }
+};
 

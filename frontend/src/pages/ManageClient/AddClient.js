@@ -108,7 +108,8 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
         onAddClient(res.data?.client, true);
       } else {
         res = await apiClient.post("/clients", formData);
-        toast.success("Client added successfully"); // ✅ Toast ALWAYS works
+       toast.success(res.data.message); // "Client created successfully"
+// ✅ Toast ALWAYS works
         onAddClient(res.data?.client, false);
       }
 

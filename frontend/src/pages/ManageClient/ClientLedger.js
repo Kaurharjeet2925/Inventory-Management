@@ -86,7 +86,7 @@ const [search, setSearch] = useState("");
     });
 
     const res = await apiClient.get(
-      `/reports/client-ledger/${clientId}?${params.toString()}`,
+      `/clients/${clientId}/client-ledger-excel`,
       {
         responseType: "blob", // 👈 VERY IMPORTANT
       }

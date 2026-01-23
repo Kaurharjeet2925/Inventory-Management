@@ -353,7 +353,7 @@ io.to("superadmins").emit("order_created", populatedOrder);
 /* ================= ACTIVITY LOG (ALWAYS) ================= */
 await logActivity({
   title: "Order Created",
-  message: `Order ${order.orderId} created by ${req.user.name}`,
+  message: `Order ${orderId} created by ${req.user.name}`,
   activityType: "order",
   performedBy: req.user._id,
   data: {

@@ -46,6 +46,7 @@ const NotificationSchema = new mongoose.Schema(
       expires: "30d",
     },
   },
+  
   { timestamps: false }
 );
 
