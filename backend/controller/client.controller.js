@@ -764,9 +764,10 @@ exports.downloadClientLedgerExcel = async (req, res) => {
     const sheet = workbook.addWorksheet("Client Ledger");
 
     /* ================= TITLE ================= */
-    sheet.addRow(["CLIENT LEDGER REPORT"]);
-    sheet.getRow(1).font = { size: 16, bold: true };
     sheet.mergeCells("A1:F1");
+    sheet.getCell("A1").value = "CLIENT LEDGER REPORT";
+    sheet.getCell("A1").font = { size: 16, bold: true };
+    sheet.getCell("A1").alignment = { horizontal: "center" };
 
     sheet.addRow([]);
 
@@ -782,44 +783,41 @@ exports.downloadClientLedgerExcel = async (req, res) => {
 
     sheet.addRow(["Opening Balance", openingBalanceText]);
 
-    sheet.addRow([]); // space before table
+    sheet.addRow([]);
 
     /* ================= TABLE HEADER ================= */
-    sheet.columns = [
-      { header: "Date", key: "date", width: 18 },
-      { header: "Type", key: "type", width: 14 },
-      { header: "Description", key: "description", width: 35 },
-      { header: "Debit (₹)", key: "debit", width: 15 },
-      { header: "Credit (₹)", key: "credit", width: 15 },
-      { header: "Balance", key: "balance", width: 18 },
-    ];
-
-    const headerRow = sheet.getRow(sheet.rowCount + 1);
-    headerRow.values = [
+    const headerRow = sheet.addRow([
       "Date",
       "Type",
       "Description",
       "Debit (₹)",
       "Credit (₹)",
       "Balance",
-    ];
+    ]);
     headerRow.font = { bold: true };
+
+    /* ================= COLUMN WIDTHS ================= */
+    sheet.getColumn(1).width = 22;
+    sheet.getColumn(2).width = 14;
+    sheet.getColumn(3).width = 35;
+    sheet.getColumn(4).width = 15;
+    sheet.getColumn(5).width = 15;
+    sheet.getColumn(6).width = 20;
 
     /* ================= LEDGER ROWS ================= */
     ledger.forEach((row) => {
-      sheet.addRow({
-        date: new Date(row.createdAt).toLocaleString(),
-        type: row.type,
-        description: row.description || "-",
-        debit: row.debit > 0 ? row.debit : "",
-        credit: row.credit > 0 ? row.credit : "",
-        balance:
-          row.balanceAfter > 0
-            ? `${row.balanceAfter} Debit`
-            : row.balanceAfter < 0
-            ? `${Math.abs(row.balanceAfter)} Credit`
-            : "0",
-      });
+      sheet.addRow([
+        new Date(row.createdAt).toLocaleString(),
+        row.type,
+        row.description || "-",
+        row.debit > 0 ? `${row.debit} Debit` : "",
+        row.credit > 0 ? `${row.credit} Credit` : "",
+        row.balanceAfter > 0
+          ? `${row.balanceAfter} Debit`
+          : row.balanceAfter < 0
+          ? `${Math.abs(row.balanceAfter)} Credit`
+          : "0",
+      ]);
     });
 
     /* ================= CLOSING BALANCE ================= */
@@ -830,10 +828,13 @@ exports.downloadClientLedgerExcel = async (req, res) => {
         ? `${client.balance} Debit`
         : `${Math.abs(client.balance)} Credit`;
 
-    const closingRow = sheet.addRow(["Closing Balance", closingBalanceText]);
+    const closingRow = sheet.addRow([
+      "Closing Balance",
+      closingBalanceText,
+    ]);
     closingRow.font = { bold: true };
 
-    /* ================= STYLING ================= */
+    /* ================= BORDER STYLING ================= */
     sheet.eachRow((row) => {
       row.eachCell((cell) => {
         cell.border = {
@@ -864,4 +865,5 @@ exports.downloadClientLedgerExcel = async (req, res) => {
     });
   }
 };
+
 

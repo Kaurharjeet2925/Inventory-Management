@@ -29,7 +29,7 @@ const AddClient = ({ isOpen, onClose, onAddClient, clientData, isEdit }) => {
   /* ================= PREFILL ================= */
   useEffect(() => {
     if (isEdit && clientData) {
-      const balance = Number(clientData.openingBalance || 0);
+      
 
       setFormData({
         name: clientData.name || "",
